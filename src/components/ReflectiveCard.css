@@ -1,0 +1,141 @@
+.reflective-card {
+  position: relative;
+  min-height: 420px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.45);
+  background: hsl(var(--background));
+  box-shadow: 0 10px 24px hsl(var(--background) / 0.34);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+  content-visibility: auto;
+  contain-intrinsic-size: 420px;
+}
+
+.reflective-card--featured {
+  min-height: 480px;
+}
+
+.reflective-card--lite {
+  min-height: 360px;
+  background: linear-gradient(160deg, hsl(var(--background) / 0.98), hsl(var(--background) / 0.9));
+}
+
+.reflective-card__bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.03);
+  filter: saturate(1) contrast(1) blur(4px);
+}
+
+.reflective-card__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(to top, hsl(var(--background) / 0.9), hsl(var(--background) / 0.45) 45%, hsl(var(--background) / 0.55));
+}
+
+
+.reflective-card__content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  color: hsl(var(--foreground));
+}
+
+.reflective-card__body {
+  margin-top: auto;
+  text-align: center;
+  padding-top: 1.5rem;
+}
+
+.reflective-card--lite .reflective-card__body {
+  padding-top: 0.25rem;
+}
+
+.reflective-card__avatar-wrap {
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 0.75rem;
+  border-radius: 999px;
+  padding: 2px;
+  background: linear-gradient(140deg, hsl(var(--primary) / 0.85), hsl(var(--secondary) / 0.8));
+  box-shadow: 0 0 16px hsl(var(--primary) / 0.2);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.reflective-card--featured .reflective-card__avatar-wrap {
+  width: 158px;
+  height: 158px;
+}
+
+.reflective-card__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.reflective-card__role {
+  margin: 0;
+  color: hsl(var(--primary));
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-family: var(--font-display, inherit);
+}
+
+.reflective-card__name {
+  margin: 0.45rem 0 0;
+  font-size: 1.7rem;
+  line-height: 1.2;
+  font-family: var(--font-display, inherit);
+}
+
+.reflective-card__bio {
+  margin: 0.65rem auto 0;
+  max-width: 26ch;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+
+.reflective-card__footer {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid hsl(var(--border) / 0.45);
+}
+
+.reflective-card::before {
+  display: none;
+}
+
+.reflective-card:hover {
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.45);
+  box-shadow: 0 14px 28px hsl(var(--background) / 0.4);
+}
+
+.reflective-card:hover .reflective-card__avatar-wrap {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.24);
+}
+
+.reflective-card:active {
+  transform: translateY(-1px);
+}
+
+.reflective-card--lite:hover {
+  transform: none;
+  border-color: hsl(var(--border) / 0.45);
+  box-shadow: 0 10px 24px hsl(var(--background) / 0.34);
+}
