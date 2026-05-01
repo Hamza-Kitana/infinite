@@ -125,7 +125,7 @@ const streamers = [
   },
 ];
 
-const featuredStreamerName = "اسمر";
+const featuredStreamerName = "جيمس مورفي";
 const featuredStreamer = streamers.find((streamer) => streamer.name === featuredStreamerName);
 const otherStreamers = streamers.filter((streamer) => streamer.name !== featuredStreamerName);
 
