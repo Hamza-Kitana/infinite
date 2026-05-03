@@ -156,7 +156,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
           </DialogTitle>
           <DialogDescription className="text-right text-base leading-relaxed text-muted-foreground sm:text-lg">
             انتقل بـ «التالي» بين الأقسام؛ إذا كثرت البنود تُقسّم تلقائياً. للعرض الكامل:{" "}
-            <Link to="/justice" className="font-semibold text-primary underline-offset-4 hover:underline">
+            <Link to="/laws" className="font-semibold text-primary underline-offset-4 hover:underline">
               صفحة القوانين
             </Link>
             .

@@ -1,0 +1,126 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { defaultStreamersPersisted } from "@/data/streamersDefaultState";
+import type { StreamerEntry, StreamersPersisted } from "@/types/streamersSchema";
+
+const STORAGE_KEY = "ic_streamers_v1";
+
+function loadPersisted(): StreamersPersisted {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultStreamersPersisted();
+    const p = JSON.parse(raw) as StreamersPersisted;
+    if (p?.v === 1 && Array.isArray(p.items)) {
+      return p;
+    }
+  } catch {
+    /* fallback */
+  }
+  return defaultStreamersPersisted();
+}
+
+function savePersisted(data: StreamersPersisted) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+type StreamersContentValue = {
+  items: StreamerEntry[];
+  resetToDefaults: () => void;
+  reorder: (fromIndex: number, toIndex: number) => void;
+  add: (entry: Omit<StreamerEntry, "id">) => string;
+  update: (id: string, patch: Partial<Omit<StreamerEntry, "id">>) => void;
+  remove: (id: string) => void;
+};
+
+const StreamersContentContext = createContext<StreamersContentValue | null>(null);
+
+export function StreamersContentProvider({ children }: { children: ReactNode }) {
+  const [persisted, setPersisted] = useState<StreamersPersisted>(() => loadPersisted());
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue == null) return;
+      try {
+        const p = JSON.parse(e.newValue) as StreamersPersisted;
+        if (p.v === 1 && Array.isArray(p.items)) setPersisted(p);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const resetToDefaults = useCallback(() => {
+    const next = defaultStreamersPersisted();
+    savePersisted(next);
+    setPersisted(next);
+  }, []);
+
+  const reorder = useCallback((fromIndex: number, toIndex: number) => {
+    setPersisted((prev) => {
+      const items = [...prev.items];
+      const [moved] = items.splice(fromIndex, 1);
+      items.splice(toIndex, 0, moved);
+      const next = { ...prev, items };
+      savePersisted(next);
+      return next;
+    });
+  }, []);
+
+  const add = useCallback((entry: Omit<StreamerEntry, "id">) => {
+    const id = crypto.randomUUID();
+    setPersisted((prev) => {
+      const next = { ...prev, items: [...prev.items, { ...entry, id }] };
+      savePersisted(next);
+      return next;
+    });
+    return id;
+  }, []);
+
+  const update = useCallback((id: string, patch: Partial<Omit<StreamerEntry, "id">>) => {
+    setPersisted((prev) => {
+      const items = prev.items.map((x) => (x.id === id ? { ...x, ...patch } : x));
+      const next = { ...prev, items };
+      savePersisted(next);
+      return next;
+    });
+  }, []);
+
+  const remove = useCallback((id: string) => {
+    setPersisted((prev) => {
+      const next = { ...prev, items: prev.items.filter((x) => x.id !== id) };
+      savePersisted(next);
+      return next;
+    });
+  }, []);
+
+  const value = useMemo<StreamersContentValue>(
+    () => ({
+      items: persisted.items,
+      resetToDefaults,
+      reorder,
+      add,
+      update,
+      remove,
+    }),
+    [persisted.items, resetToDefaults, reorder, add, update, remove],
+  );
+
+  return (
+    <StreamersContentContext.Provider value={value}>{children}</StreamersContentContext.Provider>
+  );
+}
+
+export function useStreamersContent(): StreamersContentValue {
+  const ctx = useContext(StreamersContentContext);
+  if (!ctx) throw new Error("useStreamersContent يجب أن يُستخدم داخل StreamersContentProvider");
+  return ctx;
+}

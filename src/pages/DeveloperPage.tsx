@@ -1,8 +1,9 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { InstitutionLawsPlaceholder } from "@/components/InstitutionLawsPlaceholder";
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
-import { developerRoster } from "@/data/institutionRosters";
+import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
 import { Code2, Cpu, ShieldCheck } from "lucide-react";
 
 const DeveloperPage = () => {
@@ -21,7 +22,7 @@ const DeveloperPage = () => {
       <main className="pb-20">
         <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
           <InstitutionRoster
-            {...developerRoster}
+            {...roster}
             membersTitle="فريق التطوير"
             membersSubtitle="سكربت، واجهات، وبنية تحتية في شبكة تفاعلية."
             chromaRadius={560}
@@ -33,6 +34,8 @@ const DeveloperPage = () => {
           <div className="glass-panel rounded-xl p-6"><Cpu className="h-8 w-8 text-secondary" /><h3 className="mt-4 font-display text-2xl">أداء</h3></div>
           <div className="glass-panel rounded-xl p-6"><ShieldCheck className="h-8 w-8 text-accent" /><h3 className="mt-4 font-display text-2xl">أمان</h3></div>
         </section>
+
+        <InstitutionLawsPlaceholder organizationLabel="المبرمجين" />
       </main>
       <Footer />
     </div>

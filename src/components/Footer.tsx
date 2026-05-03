@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
+import { DiscordIcon } from "@/components/DiscordIcon";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 
 const quickLinks = [
   { label: "الرئيسية", to: "/" },
-  { label: "القوانين", to: "/justice" },
+  { label: "القوانين", to: "/laws" },
   { label: "صنّاع المحتوى", to: "/streamers" },
-  { label: "تواصل معنا", to: "/contact" },
+  { label: "من نحن", to: "/contact" },
   { label: "تقديم طلب", to: "/apply/citizen" },
 ];
 
@@ -64,8 +65,9 @@ const Footer = () => {
               rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#5865F2]/40 bg-[#5865F2]/10 px-4 py-2.5 text-sm font-medium text-[#c9cdfb] transition-colors hover:border-[#5865F2]/60 hover:bg-[#5865F2]/20"
             >
+              <DiscordIcon className="h-5 w-5 shrink-0 text-[#5865F2]" />
               <span className="font-display">ديسكورد</span>
-              <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
             </a>
           </div>
         </div>

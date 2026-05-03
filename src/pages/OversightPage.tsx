@@ -1,11 +1,14 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { InstitutionLawsPlaceholder } from "@/components/InstitutionLawsPlaceholder";
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
-import { oversightRoster } from "@/data/institutionRosters";
+import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
 import { Eye, FileCheck2, Scale } from "lucide-react";
 
 const OversightPage = () => {
+  const roster = useInstitutionRoster("oversight");
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
@@ -21,7 +24,7 @@ const OversightPage = () => {
       <main className="pb-20">
         <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
           <InstitutionRoster
-            {...oversightRoster}
+            {...roster}
             membersTitle="أعضاء الرقابة"
             membersSubtitle="فريق التدقيق والمراجعة الميدانية."
             chromaRadius={560}
@@ -45,6 +48,8 @@ const OversightPage = () => {
             <p className="mt-2 text-muted-foreground">تطبيق المساءلة والعدالة على الجميع بنفس المعايير.</p>
           </div>
         </section>
+
+        <InstitutionLawsPlaceholder organizationLabel="الرقابة" />
       </main>
       <Footer />
     </div>

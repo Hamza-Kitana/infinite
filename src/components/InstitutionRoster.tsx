@@ -139,23 +139,25 @@ export function InstitutionRoster({
         />
       </div>
 
-      <div className="mt-12 md:mt-16">
-        <div className="mb-6 text-center md:text-right">
-          <h3 className="font-display text-xl font-bold md:text-2xl">{membersTitle}</h3>
-          {membersSubtitle ? <p className="mt-2 text-sm text-muted-foreground">{membersSubtitle}</p> : null}
+      {n > 0 ? (
+        <div className="mt-12 md:mt-16">
+          <div className="mb-6 text-center md:text-right">
+            <h3 className="font-display text-xl font-bold md:text-2xl">{membersTitle}</h3>
+            {membersSubtitle ? <p className="mt-2 text-sm text-muted-foreground">{membersSubtitle}</p> : null}
+          </div>
+          <div className="min-h-[min(70vh,620px)] w-full py-2 md:min-h-[520px]">
+            <ChromaGrid
+              items={members}
+              radius={chromaRadius}
+              columns={cols}
+              damping={0.55}
+              fadeOut={0.75}
+              ease="power3.out"
+              rtl
+            />
+          </div>
         </div>
-        <div className="min-h-[min(70vh,620px)] w-full py-2 md:min-h-[520px]">
-          <ChromaGrid
-            items={members}
-            radius={chromaRadius}
-            columns={cols}
-            damping={0.55}
-            fadeOut={0.75}
-            ease="power3.out"
-            rtl
-          />
-        </div>
-      </div>
+      ) : null}
     </section>
   );
 }

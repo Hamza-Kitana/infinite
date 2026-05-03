@@ -1,23 +1,33 @@
-import { useEffect, useState } from "react";
-import { Menu, X, Lock, ChevronDown, Volume2, VolumeX } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
+import { Menu, X, Lock, ChevronDown, Volume2, VolumeX, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoContext";
+import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
 
 const institutionLinks = [
-  { label: "المسعفين", to: "/ems" },
-  { label: "الشرطة", to: "/police" },
+  { label: "وزارة الصحة", to: "/health" },
+  { label: "وزارة الداخلية", to: "/interior" },
   { label: "الرقابة", to: "/oversight" },
   { label: "وزارة العدل", to: "/justice" },
-  { label: "المحاماة", to: "/lawyer" },
   { label: "المبرمجين", to: "/developer" },
 ];
 
+function institutionLinkActive(pathname: string, to: string) {
+  if (to === "/interior") return pathname === "/interior" || pathname.startsWith("/interior/");
+  return pathname === to;
+}
+
 const Navbar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { login, canUseDashboard } = useAuth();
+  const [staffUser, setStaffUser] = useState("");
+  const [staffPass, setStaffPass] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
@@ -79,9 +89,9 @@ const Navbar = () => {
               الرئيسية
             </Link>
             <Link
-              to="/justice"
+              to="/laws"
               className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/justice"
+                location.pathname === "/laws"
                   ? "text-primary after:w-full"
                   : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
               }`}
@@ -137,7 +147,7 @@ const Navbar = () => {
                       key={item.to}
                       to={item.to}
                       className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
-                        location.pathname === item.to
+                        institutionLinkActive(location.pathname, item.to)
                           ? "bg-primary/15 text-primary"
                           : "text-muted-foreground hover:bg-primary/10 hover:text-foreground"
                       }`}
@@ -156,7 +166,7 @@ const Navbar = () => {
                   : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
               }`}
             >
-              تواصل معنا
+              من نحن
             </Link>
           </nav>
 
@@ -167,14 +177,27 @@ const Navbar = () => {
             >
               <Link to="/apply/citizen">قدّم الآن</Link>
             </Button>
-            <Button
-              onClick={() => setLoginOpen(true)}
-              variant="outline"
-              className="hidden sm:inline-flex border-primary/40 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary hover:shadow-glow-primary font-display tracking-wider"
-            >
-              <Lock className="h-4 w-4 ml-2" />
-              تسجيل دخول
-            </Button>
+            {canUseDashboard ? (
+              <Button
+                asChild
+                variant="outline"
+                className="hidden sm:inline-flex border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 hover:border-primary font-display tracking-wider"
+              >
+                <Link to="/dashboard">
+                  <LayoutDashboard className="h-4 w-4 ml-2" />
+                  لوحة التحكم
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setLoginOpen(true)}
+                variant="outline"
+                className="hidden sm:inline-flex border-primary/40 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary hover:shadow-glow-primary font-display tracking-wider"
+              >
+                <Lock className="h-4 w-4 ml-2" />
+                تسجيل دخول
+              </Button>
+            )}
             <button
               type="button"
               onClick={() => setOpen(!open)}
@@ -232,7 +255,7 @@ const Navbar = () => {
                 الرئيسية
               </Link>
               <Link
-                to="/justice"
+                to="/laws"
                 onClick={() => setOpen(false)}
                 className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
@@ -275,51 +298,128 @@ const Navbar = () => {
                 onClick={() => setOpen(false)}
                 className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
-                تواصل معنا
+                من نحن
               </Link>
               <Button asChild className="w-full touch-manipulation bg-gradient-neon text-primary-foreground">
                 <Link to="/apply/citizen" onClick={() => setOpen(false)}>
                   قدّم الآن
                 </Link>
               </Button>
-              <Button
-                type="button"
-                onClick={() => { setOpen(false); setLoginOpen(true); }}
-                className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow"
-              >
-                <Lock className="h-4 w-4 ml-2" /> تسجيل دخول
-              </Button>
+              {canUseDashboard ? (
+                <Button asChild className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow">
+                  <Link to="/dashboard" onClick={() => setOpen(false)}>
+                    <LayoutDashboard className="h-4 w-4 ml-2" /> لوحة التحكم
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setLoginOpen(true);
+                  }}
+                  className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow"
+                >
+                  <Lock className="h-4 w-4 ml-2" /> تسجيل دخول
+                </Button>
+              )}
             </nav>
           </div>
         )}
       </header>
 
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
-        <DialogContent dir="rtl" className="glass-panel border-primary/30 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl text-gradient-neon">
-              دخول الموظفين
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              هذا الدخول مخصص للأعضاء المعتمدين فقط (الإدارة، الشرطة، الإسعاف).
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label htmlFor="user" className="font-display tracking-wider text-xs text-primary">اسم المستخدم</Label>
-              <Input id="user" placeholder="username" className="mt-1 bg-input border-primary/30 focus:border-primary focus:ring-primary" />
+        <DialogContent
+          dir="rtl"
+          className="gap-0 overflow-hidden rounded-2xl border border-primary/25 bg-card/95 p-0 shadow-[0_0_0_1px_hsl(var(--primary)/0.06),0_24px_64px_-12px_hsl(240_50%_2%/0.75),0_0_80px_-24px_hsl(var(--primary)/0.35)] backdrop-blur-xl sm:max-w-[420px]"
+        >
+          <div className="relative bg-[radial-gradient(ellipse_120%_100%_at_50%_-20%,hsl(var(--primary)/0.22),transparent_55%)] px-6 pb-1 pt-14 text-center sm:px-8 sm:pt-16">
+            <div className="mx-auto flex h-[5.25rem] w-[5.25rem] items-center justify-center rounded-2xl border border-primary/35 bg-gradient-to-b from-background/90 to-background/40 shadow-[inset_0_1px_0_hsl(var(--primary)/0.2),0_12px_40px_-8px_hsl(var(--primary)/0.45)] ring-1 ring-primary/15">
+              <img
+                src="/INF_LOGO.png"
+                alt="Infinite City"
+                className="h-[3.25rem] w-[3.25rem] object-contain drop-shadow-[0_0_28px_hsl(var(--primary)/0.55)]"
+                loading="eager"
+              />
             </div>
-            <div>
-              <Label htmlFor="pass" className="font-display tracking-wider text-xs text-primary">كلمة المرور</Label>
-              <Input id="pass" type="password" placeholder="••••••••" className="mt-1 bg-input border-primary/30 focus:border-primary focus:ring-primary" />
+            <p className="mt-3 font-latin-display text-[10px] font-semibold tracking-[0.38em] text-primary/90 sm:text-[11px] sm:tracking-[0.42em]">
+              INFINITE CITY
+            </p>
+            <DialogHeader className="mt-5 space-y-2 text-center sm:text-center">
+              <DialogTitle className="font-display text-xl font-bold text-foreground sm:text-2xl">
+                دخول الموظفين
+              </DialogTitle>
+              <DialogDescription className="mx-auto max-w-[19rem] text-pretty text-sm leading-relaxed text-muted-foreground">
+                بوابة آمنة للأعضاء المعتمدين — الإدارة، الأجهزة الأمنية، والصحة.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="h-px bg-gradient-to-l from-transparent via-border to-transparent" aria-hidden />
+
+          <form
+            noValidate
+            className="space-y-4 px-6 py-6 sm:px-8"
+            onSubmit={(e: FormEvent) => {
+              e.preventDefault();
+              try {
+                const session = login(staffUser, staffPass);
+                if (session) {
+                  toast.success("تم الدخول بنجاح");
+                  setLoginOpen(false);
+                  setStaffUser("");
+                  setStaffPass("");
+                  navigate(getPostLoginDashboardPath(session.roles));
+                } else {
+                  toast.error("اسم المستخدم أو كلمة المرور غير صحيحة");
+                }
+              } catch (err) {
+                if (err instanceof Error && err.message === "IC_SESSION_STORAGE") {
+                  toast.error(
+                    "تعذر حفظ الجلسة في المتصفح. جرّب تعطيل حظر ملفات تعريف الارتباط لهذا الموقع، أو الخروج من وضع التصفح الخاص إن وُجد.",
+                  );
+                } else {
+                  toast.error("حدث خطأ أثناء الدخول");
+                  console.error(err);
+                }
+              }
+            }}
+          >
+            <div className="space-y-1.5 text-right">
+              <Label htmlFor="user" className="text-xs font-medium text-muted-foreground">
+                اسم المستخدم
+              </Label>
+              <Input
+                id="user"
+                autoComplete="username"
+                value={staffUser}
+                onChange={(ev) => setStaffUser(ev.target.value)}
+                placeholder="أدخل اسم المستخدم"
+                className="h-11 rounded-xl border-border/80 bg-background/60 text-right shadow-sm transition-colors placeholder:text-muted-foreground/50 focus-visible:border-primary/50 focus-visible:ring-primary/25"
+              />
             </div>
-            <Button className="w-full bg-gradient-neon text-primary-foreground font-display tracking-widest hover:shadow-glow-primary transition-all">
+            <div className="space-y-1.5 text-right">
+              <Label htmlFor="pass" className="text-xs font-medium text-muted-foreground">
+                كلمة المرور
+              </Label>
+              <Input
+                id="pass"
+                type="password"
+                autoComplete="current-password"
+                value={staffPass}
+                onChange={(ev) => setStaffPass(ev.target.value)}
+                placeholder="••••••••"
+                className="h-11 rounded-xl border-border/80 bg-background/60 text-right shadow-sm transition-colors placeholder:text-muted-foreground/50 focus-visible:border-primary/50 focus-visible:ring-primary/25"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="mt-1 h-11 w-full rounded-xl bg-gradient-neon font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-md transition-all hover:brightness-110 hover:shadow-[var(--glow-primary)] active:scale-[0.99]"
+            >
+              <Lock className="ms-2 h-4 w-4 opacity-90" />
               دخول آمن
             </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              قريباً — سيتم تفعيل النظام بعد ربط بوابة الدخول
-            </p>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>

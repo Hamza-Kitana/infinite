@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, type ReactNode } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,21 +20,12 @@ import { DEFAULT_ARAB_COUNTRY_CODE, arabCountries, getArabCountryLabel, isArabCo
 import { ARABIC_MONTHS, getFullYearsSinceBirth, parseBirthDateParts } from "@/lib/birthdate";
 import { cn, isValidArabicNamePart } from "@/lib/utils";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
+import { DiscordIcon } from "@/components/DiscordIcon";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 
 const TOTAL_STEPS = 10;
 /** نص جاهز للمستخدمين بدون سجل سابق أو بدون نبذة */
 const NONE_PLACEHOLDER = "لا يوجد";
-
-function DiscordGlyph({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928-1.793 6.4-2.246 6.4-2.246a.078.078 0 0 1 .075.05c.35 1.27.496 2.59.47 3.9a.077.077 0 0 0 .05.071 19.7 19.7 0 0 0 2.8.47.08.08 0 0 0 .077-.043 19.7 19.7 0 0 0 1.36-3.08.074.074 0 0 0-.041-.094 13.6 13.6 0 0 1-1.665-.795.076.076 0 0 1-.009-.128 12.66 12.66 0 0 0 1.07-.52.074.074 0 0 1 .078.005 19.74 19.74 0 0 0 4.02 2.51.077.077 0 0 0 .084-.028 19.88 19.88 0 0 0 2.85-5.29.074.074 0 0 0-.031-.088 19.65 19.65 0 0 0-2.48-4.28.074.074 0 0 0-.079-.023zm-9.67 12.95c-1.08 0-1.96-.97-1.96-2.18 0-1.19.86-2.18 1.96-2.18 1.1 0 1.97.99 1.96 2.18 0 1.21-.86 2.18-1.96 2.18zm7.88 0c-1.08 0-1.96-.97-1.96-2.18 0-1.19.87-2.18 1.96-2.18 1.1 0 1.97.99 1.96 2.18 0 1.21-.87 2.18-1.96 2.18z"
-      />
-    </svg>
-  );
-}
 
 type Gender = "" | "male" | "female";
 
@@ -62,17 +53,17 @@ const targets: Record<string, ApplicationTarget> = {
   },
   police: {
     title: "تقديم الشرطة",
-    subtitle: "تسجيل بيانات المرشح للقطاع العسكري / الشرطة.",
-    dashboardPath: "/police",
-    heroEyebrow: "POLICE DEPARTMENT",
+    subtitle: "تسجيل بيانات المرشح لفرع الشرطة ضمن وزارة الداخلية.",
+    dashboardPath: "/interior/police",
+    heroEyebrow: "MINISTRY OF INTERIOR — LSPD",
     heroTitleParts: ["تقديم", "الشرطة"],
   },
   ems: {
-    title: "تقديم الإسعاف",
+    title: "تقديم وزارة الصحة",
     subtitle: "تسجيل بيانات مرشحي الطاقم الطبي والإسعافي.",
-    dashboardPath: "/ems",
-    heroEyebrow: "EMERGENCY MEDICAL",
-    heroTitleParts: ["تقديم", "الإسعاف"],
+    dashboardPath: "/health",
+    heroEyebrow: "MINISTRY OF HEALTH",
+    heroTitleParts: ["تقديم", "وزارة الصحة"],
   },
   streamers: {
     title: "تقديم صناع المحتوى",
@@ -103,11 +94,11 @@ const targets: Record<string, ApplicationTarget> = {
     heroTitleParts: ["تقديم", "المبرمج"],
   },
   lawyer: {
-    title: "تقديم المحاماة",
-    subtitle: "أدخل بياناتك القانونية للانضمام إلى فريق المحاماة.",
-    dashboardPath: "/lawyer",
-    heroEyebrow: "LEGAL ADVOCACY",
-    heroTitleParts: ["تقديم", "المحاماة"],
+    title: "تقديم هيئة المحاماة",
+    subtitle: "أدخل بياناتك للانضمام إلى هيئة المحاماة ضمن وزارة العدل.",
+    dashboardPath: "/justice",
+    heroEyebrow: "MINISTRY OF JUSTICE — LEGAL",
+    heroTitleParts: ["تقديم", "هيئة المحاماة"],
   },
   gang: {
     title: "تقديم فتح عصابة",
@@ -136,8 +127,14 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 const ApplicationFormPage = () => {
   const { role = "" } = useParams();
+  const { submitApplication } = useApplicationsContent();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const finalSubmitStarted = useRef(false);
+
+  useEffect(() => {
+    finalSubmitStarted.current = false;
+  }, [role]);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState<Gender>("");
@@ -358,13 +355,66 @@ const ApplicationFormPage = () => {
   );
 
   const handleFinal = useCallback(() => {
+    if (finalSubmitStarted.current) return;
     if (!validateAllFields()) return;
+    finalSubmitStarted.current = true;
     setIsSubmitting(true);
-    window.setTimeout(() => {
+    const roleKey = targets[role] ? role : "citizen";
+    try {
+      const result = submitApplication({
+        roleKey,
+        targetTitle: target.title,
+        snapshot: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          gender: gender as "male" | "female",
+          birthSummaryLine,
+          ageSummaryLine,
+          countryCode: country,
+          discord: discord.trim(),
+          previousCities: previousCities.trim(),
+          experience: experience.trim(),
+          lawsAccepted,
+        },
+      });
+      if (result === "ok") {
+        setSubmitSuccess(true);
+      } else {
+        finalSubmitStarted.current = false;
+        if (result === "storage_quota") {
+          toast.error(
+            "مساحة تخزين المتصفح ممتلئة. احذف طلبات قديمة من لوحة الإدارة (طلبات التقديم) أو امسح بيانات الموقع من إعدادات المتصفح ثم أعد المحاولة.",
+          );
+        } else if (result === "storage_blocked") {
+          toast.error(
+            "المتصفح منع حفظ الطلب (وضع خاص صارم، أو حظر التخزين/ملفات تعريف الارتباط لهذا الموقع). فعّل التخزين المحلي للموقع أو جرّب متصفحاً آخر — لا يُنصح بوضع التصفح الخاص إذا كان يمنع التخزين.",
+          );
+        } else {
+          toast.error("تعذر حفظ الطلب. حدّث الصفحة وأعد المحاولة، أو تحقق من وحدة التخزين في المتصفح.");
+        }
+      }
+    } catch {
+      finalSubmitStarted.current = false;
+      toast.error("حدث خطأ أثناء الإرسال. أعد المحاولة.");
+    } finally {
       setIsSubmitting(false);
-      setSubmitSuccess(true);
-    }, 650);
-  }, [validateAllFields]);
+    }
+  }, [
+    validateAllFields,
+    role,
+    target.title,
+    firstName,
+    lastName,
+    gender,
+    birthSummaryLine,
+    ageSummaryLine,
+    country,
+    discord,
+    previousCities,
+    experience,
+    lawsAccepted,
+    submitApplication,
+  ]);
 
   const stepIntro = (n: number, title: string, hint: string) => (
     <div className="space-y-1 pb-4 text-right">
@@ -428,7 +478,7 @@ const ApplicationFormPage = () => {
                   asChild
                 >
                   <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
-                    <DiscordGlyph className="h-6 w-6 shrink-0" />
+                    <DiscordIcon className="h-6 w-6 shrink-0" />
                     فتح الديسكورد
                   </a>
                 </Button>

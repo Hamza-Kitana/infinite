@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
-import { vipCarsCatalog } from "@/data/vipCarsCatalog";
+import { useVipCarsContent } from "@/contexts/VipCarsContentContext";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -359,6 +359,7 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
 }
 
 const VipCarsPage = () => {
+  const { cars } = useVipCarsContent();
   const [selected, setSelected] = useState<VipCatalogCar | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -405,7 +406,7 @@ const VipCarsPage = () => {
       <main className="relative z-10 pb-24">
         <section className="mx-auto mt-8 max-w-[1600px] px-4 sm:mt-10 sm:px-6 lg:px-10">
           <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
-            {vipCarsCatalog.map((car) => (
+            {cars.map((car) => (
               <VipCarCompactCard key={car.id} car={car} onOpen={openCar} />
             ))}
           </div>
