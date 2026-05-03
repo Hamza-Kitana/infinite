@@ -81,7 +81,7 @@ const gangs: GangCard[] = [
       "العصابة التي تحمل اسم المدينة نفسها: جسر بين الفرق، وهوية بنفسجية موحّدة فوق الخلفيات المختلفة. غالبًا ما يكون حضورها إعلاميًا وتنسيقيًا قدر ما هو ميداني.",
     /** ليل بنفسجي / نيون — يتماشى مع لون إنفنتي */
     youtubeVideo: "https://www.youtube.com/watch?v=jSR2sTEnqFA",
-    logoImage: "/INF_LOGO.png",
+    logoImage: "/610d9d48-da54-4b32-b725-67419f2aeaaa.png",
     status: "taken",
     leaderName: "مجهول",
     brandColor: "#9333EA",
