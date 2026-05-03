@@ -11,7 +11,7 @@ const Hero = () => {
     <section
       id="hero"
       dir="rtl"
-      className="relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden px-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-[8.25rem] sm:pt-[9.25rem] md:pt-40 lg:pt-[10.5rem]"
+      className="relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden px-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-[6.75rem] sm:pt-[7.5rem] md:pt-[8.25rem] lg:pt-[9rem]"
     >
       {/* Background YouTube video */}
       <div className="absolute inset-0 z-10">
@@ -37,13 +37,13 @@ const Hero = () => {
         <div className="absolute inset-0 bg-gradient-cyber" />
       </div>
 
-      {/* Foreground content — إزاحة خفيفة للأسفل (شعار + كل ما تحته) */}
-      <motion.div className="relative z-20 container max-h-full min-h-0 w-full translate-y-4 px-3 text-center sm:translate-y-6 sm:px-4 md:translate-y-10 md:px-6">
+      {/* Foreground — أعلى قليلاً داخل الهيرو */}
+      <motion.div className="relative z-20 container max-h-full min-h-0 w-full -translate-y-3 px-3 text-center sm:-translate-y-5 sm:px-4 md:-translate-y-7 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="relative isolate mx-auto mb-4 flex h-36 w-44 items-center justify-center sm:mb-6 sm:h-52 sm:w-64"
+          className="relative isolate mx-auto mb-3 flex h-36 w-44 items-center justify-center sm:mb-4 sm:h-52 sm:w-64"
         >
           {!reduceMotion ? (
             <div
@@ -107,7 +107,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-3 inline-flex items-center gap-2 rounded-full glass-panel px-3 py-1.5 sm:mb-5 sm:px-4"
+          className="mb-2 inline-flex items-center gap-2 rounded-full glass-panel px-3 py-1.5 sm:mb-4 sm:px-4"
         >
           <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
           <span className="font-latin-display text-xs tracking-[0.3em] text-success">SERVER ONLINE</span>
@@ -159,7 +159,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="mx-auto mt-3 max-w-2xl px-1 font-body text-sm leading-snug text-muted-foreground sm:mt-6 sm:text-lg sm:leading-relaxed md:text-xl"
+          className="mx-auto mt-2 max-w-2xl px-1 font-body text-sm leading-snug text-muted-foreground sm:mt-4 sm:text-lg sm:leading-relaxed md:text-xl"
         >
           أهلا وسهلا بكم في مدينة إنفنتي، حيث تبدأ رحلتكم وتصنعون قصصكم بكل حرية ضمن أجواء واقعية مليئة بالتفاعل والمتعة.
         </motion.p>
@@ -168,7 +168,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 1.05 }}
-          className="mx-auto mt-5 max-w-[min(100%,52rem)] px-2 pb-2 pt-1 text-center sm:mt-8 md:mt-10"
+          className="mx-auto mt-4 max-w-[min(100%,52rem)] px-2 pb-2 pt-1 text-center sm:mt-6 md:mt-8"
         >
           <p className="flex flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto whitespace-nowrap px-0.5 py-0.5 font-body text-[11px] leading-snug text-foreground/85 [scrollbar-width:none] sm:gap-x-2 sm:text-xs [&::-webkit-scrollbar]:hidden">
             <span className="font-latin-display font-semibold text-foreground">© 2026 Infinite City</span>
