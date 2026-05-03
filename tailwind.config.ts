@@ -86,6 +86,24 @@ export default {
         "scan": { "0%": { transform: "translateY(-100%)" }, "100%": { transform: "translateY(100vh)" } },
         "grid-move": { "0%": { backgroundPosition: "0 0" }, "100%": { backgroundPosition: "60px 60px" } },
         "shimmer": { "0%": { backgroundPosition: "-200% 0" }, "100%": { backgroundPosition: "200% 0" } },
+        "godfather-glow": {
+          "0%,100%": {
+            boxShadow:
+              "0 0 0 1px rgba(220, 38, 38, 0.35), 0 0 60px -12px rgba(220, 38, 38, 0.35), 0 0 80px -20px rgba(168, 85, 247, 0.2)",
+          },
+          "50%": {
+            boxShadow:
+              "0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 70px -8px rgba(168, 85, 247, 0.35), 0 0 100px -15px rgba(220, 38, 38, 0.25)",
+          },
+        },
+        "godfather-float": {
+          "0%,100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+        "godfather-ring": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -98,6 +116,9 @@ export default {
         "scan": "scan 6s linear infinite",
         "grid-move": "grid-move 20s linear infinite",
         "shimmer": "shimmer 3s linear infinite",
+        "godfather-glow": "godfather-glow 5s ease-in-out infinite",
+        "godfather-float": "godfather-float 6s ease-in-out infinite",
+        "godfather-ring": "godfather-ring 22s linear infinite",
       },
     },
   },

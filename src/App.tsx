@@ -12,10 +12,8 @@ import StreamersPage from "./pages/StreamersPage.tsx";
 import EmsPage from "./pages/EmsPage.tsx";
 import PolicePage from "./pages/PolicePage.tsx";
 import OversightPage from "./pages/OversightPage.tsx";
-import ApplicationsPage from "./pages/ApplicationsPage.tsx";
 import GangHubPage from "./pages/GangHubPage.tsx";
 import GangsPage from "./pages/GangsPage.tsx";
-import VipWeaponsPage from "./pages/VipWeaponsPage.tsx";
 import VipCarsPage from "./pages/VipCarsPage.tsx";
 import JusticePage from "./pages/JusticePage.tsx";
 import DeveloperPage from "./pages/DeveloperPage.tsx";
@@ -57,10 +55,8 @@ const AppRoutes = () => {
         <Route path="/ems" element={<EmsPage />} />
         <Route path="/police" element={<PolicePage />} />
         <Route path="/oversight" element={<OversightPage />} />
-        <Route path="/applications" element={<ApplicationsPage />} />
         <Route path="/gang-vip" element={<GangHubPage />} />
         <Route path="/gangs" element={<GangsPage />} />
-        <Route path="/vip-weapons" element={<VipWeaponsPage />} />
         <Route path="/vip-cars" element={<VipCarsPage />} />
         <Route path="/justice" element={<JusticePage />} />
         <Route path="/contact" element={<ContactPage />} />

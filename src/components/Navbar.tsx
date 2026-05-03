@@ -6,13 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "react-router-dom";
 
-const serviceLinks = [
-  { label: "وظائف المؤسسات", to: "/applications" },
-  { label: "العصابات", to: "/gangs" },
-  { label: "أسلحة VIP", to: "/vip-weapons" },
-  { label: "سيارات VIP", to: "/vip-cars" },
-];
-
 const institutionLinks = [
   { label: "المسعفين", to: "/ems" },
   { label: "الشرطة", to: "/police" },
@@ -26,7 +19,6 @@ const Navbar = () => {
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
 
@@ -38,7 +30,6 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    setServicesOpen(false);
     setInstitutionsOpen(false);
     setOpen(false);
   }, [location.pathname]);
@@ -101,52 +92,30 @@ const Navbar = () => {
               صنّاع المحتوى
             </Link>
             <Link
-              to="/contact"
+              to="/gangs"
               className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/contact"
+                location.pathname === "/gangs"
                   ? "text-primary after:w-full"
                   : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
               }`}
             >
-              تواصل معنا
+              العصابات
+            </Link>
+            <Link
+              to="/vip-cars"
+              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                location.pathname === "/vip-cars"
+                  ? "text-primary after:w-full"
+                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+              }`}
+            >
+              سيارات VIP
             </Link>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => {
-                  setServicesOpen((prev) => !prev);
-                  setInstitutionsOpen(false);
-                }}
-                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-body"
-              >
-                خدماتنا
-                <ChevronDown className={`h-4 w-4 transition-transform ${servicesOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {servicesOpen && (
-                <div className="absolute top-full mt-3 right-0 w-64 rounded-xl border border-primary/30 bg-background/95 backdrop-blur-xl p-2 shadow-xl">
-                  {serviceLinks.map((item) => (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
-                        location.pathname === item.to
-                          ? "bg-primary/15 text-primary"
-                          : "text-muted-foreground hover:bg-primary/10 hover:text-foreground"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
                   setInstitutionsOpen((prev) => !prev);
-                  setServicesOpen(false);
                 }}
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-body"
               >
@@ -172,6 +141,16 @@ const Navbar = () => {
                 </div>
               )}
             </div>
+            <Link
+              to="/contact"
+              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                location.pathname === "/contact"
+                  ? "text-primary after:w-full"
+                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+              }`}
+            >
+              تواصل معنا
+            </Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -225,23 +204,19 @@ const Navbar = () => {
                 صنّاع المحتوى
               </Link>
               <Link
-                to="/contact"
+                to="/gangs"
                 onClick={() => setOpen(false)}
                 className="py-2 text-foreground hover:text-primary transition-colors"
               >
-                تواصل معنا
+                العصابات
               </Link>
-              <div className="pt-2 pb-1 text-xs tracking-[0.2em] text-primary font-display">خدماتنا</div>
-              {serviceLinks.map((l) => (
-                <Link
-                  key={l.to}
-                  to={l.to}
-                  onClick={() => setOpen(false)}
-                  className="py-2 text-foreground hover:text-primary transition-colors"
-                >
-                  {l.label}
-                </Link>
-              ))}
+              <Link
+                to="/vip-cars"
+                onClick={() => setOpen(false)}
+                className="py-2 text-foreground hover:text-primary transition-colors"
+              >
+                سيارات VIP
+              </Link>
               <div className="pt-2 pb-1 text-xs tracking-[0.2em] text-primary font-display">المؤسسات</div>
               {institutionLinks.map((l) => (
                 <Link
@@ -253,6 +228,13 @@ const Navbar = () => {
                   {l.label}
                 </Link>
               ))}
+              <Link
+                to="/contact"
+                onClick={() => setOpen(false)}
+                className="py-2 text-foreground hover:text-primary transition-colors"
+              >
+                تواصل معنا
+              </Link>
               <Button asChild className="bg-gradient-neon text-primary-foreground">
                 <Link to="/apply/citizen" onClick={() => setOpen(false)}>
                   قدّم الآن

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="br-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14532D"/>
+      <stop offset="45%" stop-color="#16A34A"/>
+      <stop offset="100%" stop-color="#052E16"/>
+    </linearGradient>
+    <linearGradient id="br-sun" x1="50%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#FDE047" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FDE047" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="560" fill="url(#br-bg)"/>
+  <ellipse cx="200" cy="120" rx="140" ry="80" fill="url(#br-sun)"/>
+  <!-- terraced blocks hint -->
+  <g opacity="0.35" fill="#000000">
+    <rect x="100" y="280" width="200" height="40"/>
+    <rect x="80" y="320" width="240" height="40"/>
+    <rect x="60" y="360" width="280" height="40"/>
+    <rect x="40" y="400" width="320" height="40"/>
+  </g>
+  <g opacity="0.25" fill="#000000">
+    <rect x="1100" y="300" width="180" height="36"/>
+    <rect x="1080" y="336" width="220" height="36"/>
+    <rect x="1060" y="372" width="260" height="36"/>
+  </g>
+  <path fill="#022C22" opacity="0.5" d="M0 400 L160 380 L320 400 L480 360 L640 390 L800 350 L960 400 L1120 370 L1280 410 L1440 380 L1600 400 L1600 560 L0 560 Z"/>
+  <text x="80" y="150" fill="#BBF7D0" font-family="Impact, Arial Black, sans-serif" font-size="58" letter-spacing="0.04em">BRAZILIANS</text>
+  <text x="80" y="210" fill="#DCFCE7" font-family="Segoe UI, Arial, sans-serif" font-size="26">'D(1'2JDJHF  %JB'9 'D-J · #.61 H3'-'*</text>
+  <text x="80" y="468" fill="#4ADE80" font-family="Impact, Arial Black, sans-serif" font-size="46" letter-spacing="0.12em" opacity="0.35">FAVELA PULSE</text>
+</svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="mc-bg" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#292524"/>
+      <stop offset="40%" stop-color="#92400E"/>
+      <stop offset="100%" stop-color="#451A03"/>
+    </linearGradient>
+    <pattern id="mc-asphalt" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#1C1917"/>
+      <circle cx="1" cy="1" r="0.6" fill="#44403C" opacity="0.4"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="560" fill="url(#mc-bg)"/>
+  <rect width="1600" height="560" fill="url(#mc-asphalt)" opacity="0.45"/>
+  <!-- road perspective -->
+  <path fill="#000000" opacity="0.35" d="M800 560 L920 200 L880 200 L800 480 L720 200 L680 200 Z"/>
+  <path fill="none" stroke="#D97706" stroke-width="3" stroke-dasharray="28 18" opacity="0.5" d="M800 520 L860 240"/>
+  <!-- horizon -->
+  <path fill="#0C0A09" opacity="0.65" d="M0 380 L200 340 L400 360 L600 320 L800 350 L1000 310 L1200 350 L1400 330 L1600 360 L1600 560 L0 560 Z"/>
+  <text x="80" y="145" fill="#FBBF24" font-family="Impact, Arial Black, sans-serif" font-size="56" letter-spacing="0.05em">THE LOST MC</text>
+  <text x="80" y="205" fill="#D6D3D1" font-family="Segoe UI, Arial, sans-serif" font-size="26">0' DH3* %E 3J  #3AD* · HD'! 'D71JB</text>
+  <text x="80" y="465" fill="#78716C" font-family="Impact, Arial Black, sans-serif" font-size="44" letter-spacing="0.14em" opacity="0.45">MOTOR FREEWAY</text>
+</svg>

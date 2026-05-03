@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="yk-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="55%" stop-color="#991B1B"/>
+      <stop offset="100%" stop-color="#450A0A"/>
+    </linearGradient>
+    <pattern id="yk-stripes" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect width="20" height="40" fill="#FFFFFF" opacity="0.04"/>
+    </pattern>
+    <linearGradient id="yk-vignette" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.55"/>
+      <stop offset="45%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.75"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="560" fill="url(#yk-bg)"/>
+  <rect width="1600" height="560" fill="url(#yk-stripes)"/>
+  <!-- skyline hint -->
+  <path fill="#000000" opacity="0.35" d="M0 420 L120 340 L200 380 L280 300 L360 360 L440 280 L520 340 L600 260 L680 400 L760 320 L840 380 L920 300 L1000 360 L1080 280 L1160 340 L1240 300 L1320 380 L1400 320 L1480 360 L1560 300 L1600 340 L1600 560 L0 560 Z"/>
+  <rect width="1600" height="560" fill="url(#yk-vignette)"/>
+  <!-- abstract kamon-style mark -->
+  <g transform="translate(1180 120)" opacity="0.9">
+    <circle cx="0" cy="0" r="72" fill="none" stroke="#FECACA" stroke-width="4" opacity="0.8"/>
+    <rect x="-36" y="-36" width="72" height="72" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.5" transform="rotate(45)"/>
+  </g>
+  <text x="80" y="160" fill="#FCA5A5" font-family="Impact, Arial Black, sans-serif" font-size="72" letter-spacing="0.08em">YAKUZA</text>
+  <text x="80" y="230" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="28" opacity="0.85">'DJ'CH2'  .7 #-E1 ù GJ() 'D4'19</text>
+  <text x="80" y="480" fill="#FECACA" font-family="Impact, Arial Black, sans-serif" font-size="52" letter-spacing="0.15em" opacity="0.35">RED TERRITORY</text>
+</svg>

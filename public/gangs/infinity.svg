@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="inf-bg" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#581C87"/>
+      <stop offset="40%" stop-color="#9333EA"/>
+      <stop offset="100%" stop-color="#6B21A8"/>
+    </linearGradient>
+    <radialGradient id="inf-glow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#E9D5FF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#9333EA" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="inf-dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#FFFFFF" opacity="0.12"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="560" fill="url(#inf-bg)"/>
+  <rect width="1600" height="560" fill="url(#inf-dots)"/>
+  <ellipse cx="800" cy="220" rx="380" ry="160" fill="url(#inf-glow)"/>
+  <!-- infinity hint -->
+  <path fill="none" stroke="#C4B5FD" stroke-width="5" opacity="0.5" d="M660 240 C660 180 720 140 800 140 C880 140 940 180 940 240 C940 300 880 340 800 340 C760 340 720 320 700 290"/>
+  <path fill="none" stroke="#C4B5FD" stroke-width="5" opacity="0.5" d="M940 240 C940 180 1000 140 1080 140 C1160 140 1220 180 1220 240 C1220 300 1160 340 1080 340 C1020 340 980 310 940 270"/>
+  <line x1="700" y1="290" x2="980" y2="270" stroke="#C4B5FD" stroke-width="5" opacity="0.45"/>
+  <path fill="#000000" opacity="0.4" d="M0 420 L140 380 L260 410 L400 360 L520 400 L660 350 L800 410 L940 360 L1080 400 L1220 370 L1360 410 L1500 380 L1600 420 L1600 560 L0 560 Z"/>
+  <text x="80" y="155" fill="#F3E8FF" font-family="Impact, Arial Black, sans-serif" font-size="74" letter-spacing="0.12em">INFINITY</text>
+  <text x="80" y="218" fill="#DDD6FE" font-family="Segoe UI, Arial, sans-serif" font-size="26">%FAF*J  GHJ) 'DE/JF) ù (FA3,J 3'-)</text>
+  <text x="80" y="475" fill="#A78BFA" font-family="Impact, Arial Black, sans-serif" font-size="46" letter-spacing="0.18em" opacity="0.35">CITY LINK</text>
+</svg>
