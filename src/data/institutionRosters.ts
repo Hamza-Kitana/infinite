@@ -132,45 +132,6 @@ export const oversightRoster: InstitutionRosterData = {
   ],
 };
 
-export const justiceRoster: InstitutionRosterData = {
-  leader: {
-    name: "المستشار الحاكم",
-    title: "رئيس مؤسسة وزارة العدل",
-    image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=500&q=80",
-    tagline: "التمثيل القضائي الأعلى والالتزام الكامل بدستور Infinite City.",
-    bio: "يرأس التوجه العام للوزارة، الالتزام بدستور المدينة، وتنسيق القضايا الإستراتيجية والموارد البشرية للقضاة والموظفين القانونيين.",
-    highlights: [
-      "اعتماد السياسات العامة للمحاكم والدوائر القضائية.",
-      "الإشراف على القضايا ذات الأثر الواسع والارتباط بالأمن العام.",
-      "تمثيل الوزارة أمام المجالس التشريعية داخل السيرفر عند الحاجة.",
-    ],
-  },
-  deputy: {
-    name: "وكيل الوزارة للشؤون القانونية",
-    title: "نائب رئيس المؤسسة",
-    image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=500&q=80",
-    tagline: "مسارات العقوبات، التوجيهات التنظيمية، والملفات الحساسة.",
-    bio: "يشرف على مسارات العقوبات والتوجيهات التنظيمية، ويمثل الوزارة في الملفات الحساسة، ويدعم الرئيس في توحيد تفسير القوانين بين المحاكم.",
-    highlights: [
-      "مراجعة مشاريع اللوائح الداخلية قبل اعتمادها من الرئيس.",
-      "التنسيق مع الشرطة والنيابة في القضايا الجنائية المعقدة.",
-      "إعداد ملخصات دورية للتعديلات المقترحة على الدستور الداخلي.",
-    ],
-  },
-  members: [
-    { image: face(21), title: "القاضي إيكليبس", subtitle: "قضايا الأمن والجرائم المنظمة", borderColor: "#B45309", gradient: g("#92400E")(145) },
-    { image: face(48), title: "القاضية لومين", subtitle: "المدني والتعويضات", borderColor: "#D97706", gradient: g("#78350F")(165) },
-    { image: face(53), title: "كاتب العدل فيكس", subtitle: "التوثيق والإجراءات", borderColor: "#F59E0B", gradient: g("#B45309")(200) },
-    { image: face(37), title: "القاضي ماربل", subtitle: "جنح ومخالفات خفيفة", borderColor: "#EA580C", gradient: g("#9A3412")(155) },
-    { image: face(42), title: "القاضية سيلين", subtitle: "رهائن وسرقات منظمات", borderColor: "#D97706", gradient: g("#92400E")(170) },
-    { image: face(58), title: "كاتب العدل برايم", subtitle: "عقود شركات وأراضي", borderColor: "#B45309", gradient: g("#78350F")(185) },
-    { image: face(24), title: "المستشار كراون", subtitle: "استئناف وتفتيش قضائي", borderColor: "#F59E0B", gradient: g("#C2410C")(160) },
-    { image: face(35), title: "الكاتبة عدل رايز", subtitle: "توثيق يدوي وسريع", borderColor: "#EA580C", gradient: g("#92400E")(175) },
-    { image: face(63), title: "القاضي ستون", subtitle: "جرائم إلكترونية وهكر", borderColor: "#D97706", gradient: g("#B45309")(165) },
-    { image: face(39), title: "القاضية إيدن", subtitle: "سلاح وتصاريح خاصة", borderColor: "#FBBF24", gradient: g("#78350F")(190) },
-  ],
-};
-
 export const lawyerRoster: InstitutionRosterData = {
   leader: {
     name: "المحامي جاستس",

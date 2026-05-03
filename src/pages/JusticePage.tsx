@@ -12,9 +12,6 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import InstitutionHero from "@/components/InstitutionHero";
-import { InstitutionRoster } from "@/components/InstitutionRoster";
-import { justiceRoster } from "@/data/institutionRosters";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -207,33 +204,40 @@ const JusticePage = () => {
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
 
-      <InstitutionHero
-        badgeEn="MINISTRY OF JUSTICE"
-        alt="دستور المدينة — Infinite City"
-        title={
-          <>
+      {/* Hero — نفس أسلوب صفحة صنّاع المحتوى (GIF + تدرجات + عنوان) */}
+      <section className="relative h-[46vh] min-h-[300px] max-h-[520px] overflow-hidden">
+        <img
+          src="/INF-CONECT-LOGO.gif"
+          alt="دستور المدينة — Infinite City"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = "/placeholder.svg";
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/10 to-background/85" />
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-background/55 to-transparent backdrop-blur-sm" />
+        <div className="absolute inset-x-0 -bottom-8 h-32 bg-gradient-to-t from-background/90 via-background/60 to-transparent backdrop-blur-sm" />
+        <div className="absolute inset-x-0 bottom-1 flex flex-col items-center justify-center gap-2 px-4 text-center sm:bottom-3 md:bottom-4">
+          <p className="font-display text-xs tracking-[0.35em] text-primary/95 drop-shadow-[0_4px_18px_hsl(var(--background)/0.95)]">
+            MINISTRY OF JUSTICE
+          </p>
+          <h1 className="font-display text-4xl font-bold md:text-6xl drop-shadow-[0_8px_24px_hsl(var(--background)/0.85)]">
             <span className="text-gradient-neon">دستور</span>{" "}
             <span className="text-foreground">المدينة</span>
-          </>
-        }
-      />
+          </h1>
+        </div>
+      </section>
 
       {/* Intro + search + tabs */}
       <main className="relative z-10 pb-24">
         <div className="mx-auto max-w-6xl px-4 md:px-8 xl:px-12">
-          <InstitutionRoster
-            {...justiceRoster}
-            membersTitle="كادر وزارة العدل"
-            membersSubtitle="قضاة ومسؤولون يدعمون تطبيق دستور المدينة."
-            chromaRadius={560}
-            className="mt-10"
-          />
           <motion.div
             initial={reduceMotion ? false : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-40px" }}
             transition={{ duration: 0.6 }}
-            className="relative mt-10 overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-card/90 via-background/95 to-card/80 p-8 shadow-[0_24px_80px_-20px_hsl(var(--primary)/0.25)] md:mt-12 md:p-10"
+            className="relative overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-card/90 via-background/95 to-card/80 p-8 shadow-[0_24px_80px_-20px_hsl(var(--primary)/0.25)] md:p-10"
           >
             <div className="pointer-events-none absolute -left-32 top-0 h-64 w-64 rounded-full bg-primary/15 blur-[100px]" />
             <div className="pointer-events-none absolute -right-20 bottom-0 h-56 w-56 rounded-full bg-secondary/12 blur-[90px]" />
