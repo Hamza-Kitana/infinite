@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -104,6 +105,23 @@ export default {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
+        /** VIP سيارات — خلفية الكرت المتحركة */
+        "vip-mesh-drift": {
+          "0%,100%": { transform: "translate(0%, 0%) scale(1)" },
+          "33%": { transform: "translate(7%, -9%) scale(1.07)" },
+          "66%": { transform: "translate(-6%, 6%) scale(0.97)" },
+        },
+        "vip-sheen-sweep": {
+          "0%": { transform: "translateX(-150%) skewX(-16deg)", opacity: "0" },
+          "22%": { opacity: "0.92" },
+          "78%": { opacity: "0.85" },
+          "100%": { transform: "translateX(320%) skewX(-16deg)", opacity: "0" },
+        },
+        /** إطار الكرت VIP — يتحرك لون التدرّج */
+        "vip-gradient-shift": {
+          "0%,100%": { backgroundPosition: "0% 40%" },
+          "50%": { backgroundPosition: "100% 60%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -119,8 +137,11 @@ export default {
         "godfather-glow": "godfather-glow 5s ease-in-out infinite",
         "godfather-float": "godfather-float 6s ease-in-out infinite",
         "godfather-ring": "godfather-ring 22s linear infinite",
+        "vip-mesh-drift": "vip-mesh-drift 17s ease-in-out infinite",
+        "vip-sheen-sweep": "vip-sheen-sweep 8s ease-in-out infinite",
+        "vip-gradient-shift": "vip-gradient-shift 9s ease-in-out infinite",
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

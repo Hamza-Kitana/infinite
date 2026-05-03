@@ -244,7 +244,7 @@ const ShapeBlur = ({
       renderer.dispose();
       renderer.forceContextLoss();
     };
-  }, [variation, pixelRatioProp, shapeSize, roundness, borderSize, circleSize, circleEdge]);
+  }, [variation, pixelRatioProp, shapeSize, roundness, borderSize, circleSize, circleEdge, color]);
 
   return <div ref={mountRef} className={className} style={{ width: "100%", height: "100%" }} />;
 };
