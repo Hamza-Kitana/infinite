@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Menu, X, Lock, ChevronDown } from "lucide-react";
+import { Menu, X, Lock, ChevronDown, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useLocation } from "react-router-dom";
+import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoContext";
 
 const institutionLinks = [
   { label: "المسعفين", to: "/ems" },
@@ -21,6 +22,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const heroBgVideo = useOptionalHeroBackgroundVideo();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -38,13 +40,13 @@ const Navbar = () => {
     <>
       <header
         dir="rtl"
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
+        className={`fixed inset-x-0 top-0 z-[100] transition-all duration-500 ${
           scrolled
-            ? "py-2 bg-background/70 backdrop-blur-xl border-b border-primary/20"
-            : "py-4 bg-transparent"
+            ? "border-b border-primary/20 bg-background/70 py-2 backdrop-blur-xl"
+            : "bg-transparent py-4"
         }`}
       >
-        <div className="w-full px-4 md:px-8 xl:px-12 flex items-center justify-between gap-4">
+        <div className="flex w-full items-center justify-between gap-4 px-4 md:px-8 xl:px-12">
           <div className="flex items-center gap-3">
             <Link to="/" className="group inline-block leading-none" aria-label="العودة للرئيسية">
               <img
@@ -55,8 +57,8 @@ const Navbar = () => {
               />
             </Link>
             <div className="leading-tight">
-              <div className="font-latin-display font-bold text-base tracking-widest text-foreground">INFINITE</div>
-              <div className="font-latin-display text-[10px] tracking-[0.3em] text-primary -mt-1">C I T Y</div>
+              <div className="font-latin-display text-base font-bold tracking-widest text-foreground">INFINITE</div>
+              <div className="-mt-1 font-latin-display text-[10px] tracking-[0.3em] text-primary">C I T Y</div>
             </div>
           </div>
 
@@ -177,6 +179,40 @@ const Navbar = () => {
             </button>
           </div>
         </div>
+
+        {heroBgVideo && location.pathname === "/" ? (
+          <div className="pointer-events-none absolute inset-x-0 top-full z-[110] bg-transparent py-2">
+            <div className="pointer-events-auto flex w-full items-center pl-4 md:pl-8 xl:pl-12">
+              <div className="ms-auto mr-3 flex max-w-[17rem] shrink-0 items-center gap-2 rounded-xl border-0 bg-transparent px-2.5 py-2 shadow-none ring-0 sm:mr-4 md:mr-5">
+                <button
+                  type="button"
+                  onClick={heroBgVideo.handleMuteToggle}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-primary transition-colors hover:bg-primary/10"
+                  aria-label={heroBgVideo.muted ? "إلغاء كتم الصوت" : "كتم الصوت"}
+                >
+                  {heroBgVideo.muted || heroBgVideo.volume === 0 ? (
+                    <VolumeX className="h-3.5 w-3.5" />
+                  ) : (
+                    <Volume2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 font-latin-display text-[9px] uppercase tracking-[0.2em] text-primary/85">Volume</div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={heroBgVideo.volume}
+                    onChange={(e) => heroBgVideo.handleVolumeChange(Number(e.target.value))}
+                    className="h-1.5 w-full cursor-pointer accent-primary"
+                    aria-label="مستوى صوت الفيديو"
+                  />
+                </div>
+                <span className="shrink-0 font-latin-display text-[10px] tabular-nums text-primary">{heroBgVideo.volume}%</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Mobile */}
         {open && (
