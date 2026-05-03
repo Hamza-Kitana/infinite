@@ -1,8 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Facebook, Ghost, Instagram, Sparkles, Youtube } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import ReflectiveCard from "@/components/ReflectiveCard";
-import { Button } from "@/components/ui/button";
 
 const streamers = [
   {
@@ -25,6 +24,13 @@ const streamers = [
     bio: "بث مباشر على Kick.",
     streamUrl: "https://kick.com/produbai",
     image: "/02685ed8-6c04-4c89-993c-06f81df59b63-fullsize.webp",
+  },
+  {
+    name: "جون سيرا",
+    role: "صانع محتوى معتمد",
+    bio: "بث مباشر على Kick.",
+    streamUrl: "https://kick.com/quabeh",
+    image: "/image-6-1.png",
   },
   {
     name: "اسمر",
@@ -123,11 +129,21 @@ const streamers = [
     streamUrl: "https://kick.com/harbash12",
     image: "/9f018b3a-2793-4749-b5b3-bab3ecb8e830-fullsize.webp",
   },
+  {
+    name: "ابو يوسف",
+    role: "صانع محتوى معتمد",
+    bio: "بث مباشر على Kick.",
+    streamUrl: "https://kick.com/abuyousef1",
+    image: "/INF_LOGO.png",
+  },
 ];
 
-const featuredStreamerName = "جيمس مورفي";
-const featuredStreamer = streamers.find((streamer) => streamer.name === featuredStreamerName);
-const otherStreamers = streamers.filter((streamer) => streamer.name !== featuredStreamerName);
+/** جيمس مورفي ثم ابو يوسف في بداية الشبكة، ثم باقي القائمة بنفس الترتيب الأصلي */
+const PRIORITY_NAMES = ["جيمس مورفي", "ابو يوسف"] as const;
+const streamersForGrid = [
+  ...PRIORITY_NAMES.map((name) => streamers.find((s) => s.name === name)).filter(Boolean),
+  ...streamers.filter((s) => !(PRIORITY_NAMES as readonly string[]).includes(s.name)),
+] as typeof streamers;
 
 const StreamersPage = () => {
   return (
@@ -163,81 +179,8 @@ const StreamersPage = () => {
               لكل صانع محتوى بطاقة تعريفية مختصرة مع رابط البث المباشر الخاص فيه.
             </p>
 
-            {featuredStreamer && (
-              <div className="mt-6">
-                <div className="glass-panel rounded-2xl border border-primary/35 bg-gradient-to-br from-primary/10 via-background/70 to-background/55 p-4 md:p-6">
-                  <div className="grid items-center gap-6 md:grid-cols-[400px_1fr]">
-                    <div className="order-1 md:order-2 flex justify-center md:justify-end md:pr-1">
-                      <img
-                        src={featuredStreamer.image}
-                        alt={featuredStreamer.name}
-                        className="h-[350px] w-full max-w-[400px] rounded-2xl object-cover border-2 border-primary/45 shadow-[0_10px_36px_hsl(var(--primary)/0.26)]"
-                        loading="lazy"
-                      />
-                    </div>
-
-                    <div className="order-2 md:order-1 text-center md:text-right">
-                      <div className="inline-flex items-center rounded-full border border-primary/35 bg-primary/10 px-3 py-1 text-xs font-display tracking-[0.18em] text-primary">
-                        THE KING
-                      </div>
-                      <h3 className="mt-3 font-display text-4xl md:text-5xl font-bold">{featuredStreamer.name}</h3>
-                      <p className="mt-2 text-primary font-display tracking-[0.16em]">{featuredStreamer.role}</p>
-                      <p className="mt-3 text-muted-foreground leading-8 max-w-2xl md:mr-0 md:ml-auto">
-                        صانع محتوى مميز في المدينة. تابع قنواته الرسمية على المنصات التالية.
-                      </p>
-
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                        <a
-                          href={featuredStreamer.socials?.youtube ?? "https://youtube.com"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/55 bg-background/55 px-4 py-3 text-sm transition-colors hover:border-primary/45 hover:bg-background/75"
-                        >
-                          <Youtube className="h-4 w-4 text-red-400" />
-                          يوتيوب
-                        </a>
-                        <a
-                          href={featuredStreamer.socials?.instagram ?? "https://instagram.com"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/55 bg-background/55 px-4 py-3 text-sm transition-colors hover:border-primary/45 hover:bg-background/75"
-                        >
-                          <Instagram className="h-4 w-4 text-secondary" />
-                          انستغرام
-                        </a>
-                        <a
-                          href={featuredStreamer.socials?.snapchat ?? "https://snapchat.com"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/55 bg-background/55 px-4 py-3 text-sm transition-colors hover:border-primary/45 hover:bg-background/75"
-                        >
-                          <Ghost className="h-4 w-4 text-yellow-300" />
-                          سناب شات
-                        </a>
-                        <a
-                          href={featuredStreamer.socials?.facebook ?? "https://facebook.com"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/55 bg-background/55 px-4 py-3 text-sm transition-colors hover:border-primary/45 hover:bg-background/75"
-                        >
-                          <Facebook className="h-4 w-4 text-blue-400" />
-                          فيسبوك
-                        </a>
-                      </div>
-
-                      <Button asChild className="mt-5 w-full sm:w-auto bg-gradient-neon text-primary-foreground font-display tracking-widest">
-                        <a href={featuredStreamer.streamUrl} target="_blank" rel="noreferrer">
-                          رابط بث Kick
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {otherStreamers.map((streamer) => (
+              {streamersForGrid.map((streamer) => (
                 <ReflectiveCard key={streamer.name} {...streamer} />
               ))}
             </div>
