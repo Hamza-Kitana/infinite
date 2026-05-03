@@ -11,7 +11,7 @@ const Hero = () => {
     <section
       id="hero"
       dir="rtl"
-      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden pt-[9.25rem] sm:pt-40 lg:pt-[10.5rem]"
+      className="relative flex h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden px-0 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] pt-[8.25rem] sm:pt-[9.25rem] md:pt-40 lg:pt-[10.5rem]"
     >
       {/* Background YouTube video */}
       <div className="absolute inset-0 z-10">
@@ -38,12 +38,12 @@ const Hero = () => {
       </div>
 
       {/* Foreground content — إزاحة خفيفة للأسفل (شعار + كل ما تحته) */}
-      <motion.div className="relative z-20 container translate-y-8 px-4 text-center sm:translate-y-10 md:translate-y-12">
+      <motion.div className="relative z-20 container max-h-full min-h-0 w-full translate-y-4 px-3 text-center sm:translate-y-6 sm:px-4 md:translate-y-10 md:px-6">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="relative isolate mx-auto mb-8 h-52 w-64 flex items-center justify-center"
+          className="relative isolate mx-auto mb-4 flex h-36 w-44 items-center justify-center sm:mb-6 sm:h-52 sm:w-64"
         >
           {!reduceMotion ? (
             <div
@@ -74,7 +74,7 @@ const Hero = () => {
           <motion.img
             src="/INF_LOGO.png"
             alt="Infinite City Logo"
-            className="relative z-10 h-48 w-48 object-contain select-none"
+            className="relative z-10 h-32 w-32 select-none object-contain sm:h-48 sm:w-48"
             loading="eager"
             animate={
               reduceMotion
@@ -107,7 +107,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel mb-6"
+          className="mb-3 inline-flex items-center gap-2 rounded-full glass-panel px-3 py-1.5 sm:mb-5 sm:px-4"
         >
           <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
           <span className="font-latin-display text-xs tracking-[0.3em] text-success">SERVER ONLINE</span>
@@ -117,7 +117,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.4 }}
-          className="group font-display font-black text-5xl md:text-7xl lg:text-8xl leading-none tracking-tight"
+          className="group font-display text-[clamp(1.85rem,8vw,2.85rem)] font-black leading-none tracking-tight sm:text-5xl md:text-7xl lg:text-8xl"
         >
           <motion.span
             className="block text-foreground neon-text font-latin-display"
@@ -159,7 +159,7 @@ const Hero = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.8 }}
-          className="mt-8 max-w-2xl mx-auto text-lg md:text-xl text-muted-foreground font-body"
+          className="mx-auto mt-3 max-w-2xl px-1 font-body text-sm leading-snug text-muted-foreground sm:mt-6 sm:text-lg sm:leading-relaxed md:text-xl"
         >
           أهلا وسهلا بكم في مدينة إنفنتي، حيث تبدأ رحلتكم وتصنعون قصصكم بكل حرية ضمن أجواء واقعية مليئة بالتفاعل والمتعة.
         </motion.p>
@@ -168,28 +168,28 @@ const Hero = () => {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.75, delay: 1.05 }}
-          className="mt-16 sm:mt-20 mx-auto max-w-[min(100%,52rem)] px-2 pb-16 text-center text-[11px] leading-relaxed text-muted-foreground sm:text-xs"
+          className="mx-auto mt-5 max-w-[min(100%,52rem)] px-2 pb-2 pt-1 text-center sm:mt-8 md:mt-10"
         >
-          <p className="flex flex-nowrap items-center justify-center gap-x-2 overflow-x-auto whitespace-nowrap px-1 pb-1 font-body [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="font-latin-display font-medium text-foreground/90">© 2026 Infinite City</span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+          <p className="flex flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto whitespace-nowrap px-0.5 py-0.5 font-body text-[11px] leading-snug text-foreground/85 [scrollbar-width:none] sm:gap-x-2 sm:text-xs [&::-webkit-scrollbar]:hidden">
+            <span className="font-latin-display font-semibold text-foreground">© 2026 Infinite City</span>
+            <span className="select-none text-muted-foreground/55" aria-hidden>
               ·
             </span>
-            <span>جميع الحقوق محفوظة</span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+            <span className="text-foreground/90">جميع الحقوق محفوظة</span>
+            <span className="select-none text-muted-foreground/55" aria-hidden>
               ·
             </span>
-            <span className="tracking-wide">صُنع بعناية لمجتمع إنفينيتي سيتي</span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+            <span className="tracking-wide text-foreground/88">صُنع بعناية لمجتمع إنفينيتي سيتي</span>
+            <span className="select-none text-muted-foreground/55" aria-hidden>
               ·
             </span>
-            <span>
+            <span className="text-foreground/90">
               المبرمج:{" "}
               <a
                 href="https://hamza-kitana.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-latin-display font-medium text-primary underline-offset-2 transition-colors hover:text-primary/85 hover:underline"
+                className="font-latin-display font-semibold text-primary underline-offset-2 transition-colors hover:text-primary/90 hover:underline"
               >
                 Hamza Kitana
               </a>

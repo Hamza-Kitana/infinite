@@ -40,25 +40,30 @@ const Navbar = () => {
     <>
       <header
         dir="rtl"
-        className={`fixed inset-x-0 top-0 z-[100] transition-all duration-500 ${
+        className={`fixed inset-x-0 top-0 z-[100] pt-[env(safe-area-inset-top,0px)] transition-all duration-500 ${
           scrolled
             ? "border-b border-primary/20 bg-background/70 py-2 backdrop-blur-xl"
-            : "bg-transparent py-4"
+            : "bg-transparent py-3 sm:py-4"
         }`}
       >
-        <div className="flex w-full items-center justify-between gap-4 px-4 md:px-8 xl:px-12">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="group inline-block leading-none" aria-label="العودة للرئيسية">
+        {/* z أعلى من شريط الصوت (z-110) حتى دروبداون المؤسسات والروابط تُنقَط فوقه */}
+        <div className="relative z-[120] flex w-full min-w-0 items-center justify-between gap-2 pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] sm:gap-4 md:px-8 xl:px-12">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <Link to="/" className="group inline-block shrink-0 leading-none" aria-label="العودة للرئيسية">
               <img
                 src="/INF_LOGO.png"
                 alt="Infinite City Logo"
-                className="h-10 w-10 object-contain drop-shadow-[0_0_22px_hsl(var(--primary)/0.95)]"
+                className="h-9 w-9 object-contain drop-shadow-[0_0_22px_hsl(var(--primary)/0.95)] sm:h-10 sm:w-10"
                 loading="eager"
               />
             </Link>
-            <div className="leading-tight">
-              <div className="font-latin-display text-base font-bold tracking-widest text-foreground">INFINITE</div>
-              <div className="-mt-1 font-latin-display text-[10px] tracking-[0.3em] text-primary">C I T Y</div>
+            <div className="min-w-0 leading-tight">
+              <div className="truncate font-latin-display text-sm font-bold tracking-widest text-foreground sm:text-base">
+                INFINITE
+              </div>
+              <div className="-mt-1 font-latin-display text-[9px] tracking-[0.28em] text-primary sm:text-[10px] sm:tracking-[0.3em]">
+                C I T Y
+              </div>
             </div>
           </div>
 
@@ -126,7 +131,7 @@ const Navbar = () => {
               </button>
 
               {institutionsOpen && (
-                <div className="absolute top-full mt-3 right-0 w-64 rounded-xl border border-primary/30 bg-background/95 backdrop-blur-xl p-2 shadow-xl">
+                <div className="absolute top-full z-[130] mt-3 right-0 w-64 rounded-xl border border-primary/30 bg-background/95 backdrop-blur-xl p-2 shadow-xl">
                   {institutionLinks.map((item) => (
                     <Link
                       key={item.to}
@@ -171,8 +176,9 @@ const Navbar = () => {
               تسجيل دخول
             </Button>
             <button
+              type="button"
               onClick={() => setOpen(!open)}
-              className="lg:hidden p-2 text-foreground"
+              className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg p-2 text-foreground touch-manipulation active:bg-primary/10 lg:hidden"
               aria-label="القائمة"
             >
               {open ? <X /> : <Menu />}
@@ -181,13 +187,13 @@ const Navbar = () => {
         </div>
 
         {heroBgVideo && location.pathname === "/" ? (
-          <div className="pointer-events-none absolute inset-x-0 top-full z-[110] bg-transparent py-2">
-            <div className="pointer-events-auto flex w-full items-center pl-4 md:pl-8 xl:pl-12">
-              <div className="ms-auto mr-3 flex max-w-[17rem] shrink-0 items-center gap-2 rounded-xl border-0 bg-transparent px-2.5 py-2 shadow-none ring-0 sm:mr-4 md:mr-5">
+          <div className="pointer-events-none absolute inset-x-0 top-full z-[110] bg-transparent py-1.5 sm:py-2">
+            <div className="pointer-events-auto flex w-full min-w-0 items-center pl-[max(0.75rem,env(safe-area-inset-left,0px))] md:pl-8 xl:pl-12">
+              <div className="ms-auto mr-[max(0.75rem,env(safe-area-inset-right,0px))] flex max-w-[min(100%-1rem,17rem)] shrink-0 items-center gap-2 rounded-xl border-0 bg-transparent px-2 py-2 shadow-none ring-0 sm:mr-4 md:mr-5">
                 <button
                   type="button"
                   onClick={heroBgVideo.handleMuteToggle}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent text-primary transition-colors hover:bg-primary/10"
+                  className="inline-flex h-9 w-9 shrink-0 touch-manipulation items-center justify-center rounded-lg border-0 bg-transparent text-primary transition-colors hover:bg-primary/10 sm:h-8 sm:w-8"
                   aria-label={heroBgVideo.muted ? "إلغاء كتم الصوت" : "كتم الصوت"}
                 >
                   {heroBgVideo.muted || heroBgVideo.volume === 0 ? (
@@ -216,40 +222,40 @@ const Navbar = () => {
 
         {/* Mobile */}
         {open && (
-          <div className="lg:hidden glass-panel mx-4 mt-2 rounded-xl p-4 animate-fade-in">
-            <nav className="flex flex-col gap-3">
+          <div className="glass-panel relative z-[125] mx-4 mt-2 max-h-[min(72vh,calc(100dvh-8rem))] overflow-y-auto overscroll-contain rounded-xl p-4 animate-fade-in lg:hidden">
+            <nav className="flex flex-col gap-0.5 sm:gap-1">
               <Link
                 to="/"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 الرئيسية
               </Link>
               <Link
                 to="/justice"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 القوانين
               </Link>
               <Link
                 to="/streamers"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 صنّاع المحتوى
               </Link>
               <Link
                 to="/gangs"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 العصابات
               </Link>
               <Link
                 to="/vip-cars"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 سيارات VIP
               </Link>
@@ -259,7 +265,7 @@ const Navbar = () => {
                   key={l.to}
                   to={l.to}
                   onClick={() => setOpen(false)}
-                  className="py-2 text-foreground hover:text-primary transition-colors"
+                  className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
                 >
                   {l.label}
                 </Link>
@@ -267,18 +273,19 @@ const Navbar = () => {
               <Link
                 to="/contact"
                 onClick={() => setOpen(false)}
-                className="py-2 text-foreground hover:text-primary transition-colors"
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
               >
                 تواصل معنا
               </Link>
-              <Button asChild className="bg-gradient-neon text-primary-foreground">
+              <Button asChild className="w-full touch-manipulation bg-gradient-neon text-primary-foreground">
                 <Link to="/apply/citizen" onClick={() => setOpen(false)}>
                   قدّم الآن
                 </Link>
               </Button>
               <Button
+                type="button"
                 onClick={() => { setOpen(false); setLoginOpen(true); }}
-                className="bg-primary text-primary-foreground hover:bg-primary-glow"
+                className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow"
               >
                 <Lock className="h-4 w-4 ml-2" /> تسجيل دخول
               </Button>

@@ -1,27 +1,31 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import InstitutionHero from "@/components/InstitutionHero";
+import { InstitutionRoster } from "@/components/InstitutionRoster";
+import { oversightRoster } from "@/data/institutionRosters";
 import { Eye, FileCheck2, Scale } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 
 const OversightPage = () => {
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
-      <main className="pt-32 pb-20">
-        <section className="w-full px-4 md:px-8 xl:px-12">
-          <div className="glass-panel rounded-2xl p-8 md:p-12">
-            <span className="font-display text-xs tracking-[0.35em] text-primary">OVERSIGHT</span>
-            <h1 className="mt-4 font-display text-4xl md:text-6xl font-bold">
-              صفحة <span className="text-gradient-neon">الرقابة</span>
-            </h1>
-            <p className="mt-5 text-lg text-muted-foreground max-w-3xl">
-              قسم الرقابة مسؤول عن الجودة والانضباط ومتابعة سير العمل داخل الفصائل المختلفة.
-            </p>
-            <Button asChild className="mt-6 bg-gradient-neon text-primary-foreground font-display tracking-widest">
-              <Link to="/apply/oversight">التقديم لهذه المؤسسة</Link>
-            </Button>
-          </div>
+      <InstitutionHero
+        badgeEn="OVERSIGHT"
+        alt="الرقابة — Infinite City"
+        title={
+          <>
+            صفحة <span className="text-gradient-neon">الرقابة</span>
+          </>
+        }
+      />
+      <main className="pb-20">
+        <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
+          <InstitutionRoster
+            {...oversightRoster}
+            membersTitle="أعضاء الرقابة"
+            membersSubtitle="فريق التدقيق والمراجعة الميدانية."
+            chromaRadius={560}
+          />
         </section>
 
         <section className="w-full px-4 md:px-8 xl:px-12 mt-10 grid md:grid-cols-3 gap-5">

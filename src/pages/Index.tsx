@@ -5,9 +5,9 @@ import { HeroBackgroundVideoProvider } from "@/contexts/HeroBackgroundVideoConte
 const Index = () => {
   return (
     <HeroBackgroundVideoProvider>
-      <div className="min-h-screen bg-background text-foreground antialiased">
+      <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-background text-foreground antialiased">
         <Navbar />
-        <main>
+        <main className="min-h-0 flex-1 overflow-hidden">
           <Hero />
         </main>
       </div>

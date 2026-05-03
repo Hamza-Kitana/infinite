@@ -76,12 +76,19 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground;
     font-family: 'Tajawal', system-ui, sans-serif;
     overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100dvh;
+    min-height: 100svh;
   }
 
   h1, h2, h3, h4, .font-display {

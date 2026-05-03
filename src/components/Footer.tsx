@@ -18,7 +18,7 @@ const Footer = () => {
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-primary/50 to-transparent" />
 
-      <div className="w-full px-4 py-14 md:px-8 xl:px-12">
+      <div className="w-full px-4 py-14 pb-[max(3rem,calc(env(safe-area-inset-bottom,0px)+2rem))] md:px-8 xl:px-12">
         <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-5">
             <div className="flex items-center gap-3">
