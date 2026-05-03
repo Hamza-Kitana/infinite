@@ -1,7 +1,15 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Trash2, UserPlus, X } from "lucide-react";
+import { Pencil, Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +32,7 @@ import {
   addManagedUser,
   loadManagedUsers,
   removeManagedUser,
+  updateManagedUser,
   type ManagedStaffRole,
 } from "@/staff/staffDirectory";
 import { appendActivityLog } from "@/lib/activityLog";
@@ -43,6 +52,12 @@ function roleLabel(role: ManagedStaffRole): string {
   return BASE_ROLES.find((r) => r.value === role)?.label ?? role;
 }
 
+function rolesPickerHasMore(selected: Set<ManagedStaffRole>): boolean {
+  const baseLeft = BASE_ROLES.some((b) => !selected.has(b.value));
+  const rosterLeft = INSTITUTION_ROSTER_STAFF_ROLES.some((r) => !selected.has(r));
+  return baseLeft || rosterLeft;
+}
+
 const StaffUsersPage = () => {
   const { isSuperAdmin, user } = useAuth();
   const [users, setUsers] = useState(() => loadManagedUsers());
@@ -54,13 +69,23 @@ const StaffUsersPage = () => {
   /** إعادة ضبط القائمة المنسدلة بعد كل اختيار ليعود placeholder */
   const [rolePickerKey, setRolePickerKey] = useState(0);
 
+  type EditFormState = {
+    id: string;
+    username: string;
+    password: string;
+    roles: Set<ManagedStaffRole>;
+  };
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<EditFormState | null>(null);
+  const [editRolePickerKey, setEditRolePickerKey] = useState(0);
+
   const list = useMemo(() => users, [users]);
 
-  const hasAvailableRoles = useMemo(() => {
-    const baseLeft = BASE_ROLES.some((b) => !selectedRoles.has(b.value));
-    const rosterLeft = INSTITUTION_ROSTER_STAFF_ROLES.some((r) => !selectedRoles.has(r));
-    return baseLeft || rosterLeft;
-  }, [selectedRoles]);
+  const hasAvailableRoles = useMemo(() => rolesPickerHasMore(selectedRoles), [selectedRoles]);
+  const editHasAvailableRoles = useMemo(
+    () => (editForm ? rolesPickerHasMore(editForm.roles) : false),
+    [editForm],
+  );
 
   if (!isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
@@ -155,6 +180,93 @@ const StaffUsersPage = () => {
     toast.success("تم الحذف");
   };
 
+  const openEdit = (id: string, uname: string, roles: ManagedStaffRole[]) => {
+    setEditForm({
+      id,
+      username: uname,
+      password: "",
+      roles: new Set(roles),
+    });
+    setEditRolePickerKey((k) => k + 1);
+    setEditOpen(true);
+  };
+
+  const addEditRoleFromPicker = (value: string) => {
+    const r = value as ManagedStaffRole;
+    setEditForm((prev) => (prev ? { ...prev, roles: new Set([...prev.roles, r]) } : prev));
+    setEditRolePickerKey((k) => k + 1);
+  };
+
+  const removeEditRole = (r: ManagedStaffRole) => {
+    setEditForm((prev) => {
+      if (!prev) return prev;
+      if (prev.roles.size <= 1) {
+        toast.error("يجب الإبقاء على دور واحد على الأقل");
+        return prev;
+      }
+      const next = new Set(prev.roles);
+      next.delete(r);
+      return { ...prev, roles: next };
+    });
+  };
+
+  const handleEditSave = (e: FormEvent) => {
+    e.preventDefault();
+    if (!editForm) return;
+    const u = editForm.username.trim();
+    if (u.length < 2) {
+      toast.error("اسم المستخدم قصير جداً");
+      return;
+    }
+    if (u.toLowerCase() === SUPER_ADMIN_USERNAME.toLowerCase()) {
+      toast.error("هذا الاسم محجوز لحساب الإدارة");
+      return;
+    }
+    if (
+      loadManagedUsers().some((x) => x.id !== editForm.id && x.username.toLowerCase() === u.toLowerCase())
+    ) {
+      toast.error("هذا الاسم مستخدم مسبقاً لمستخدم آخر");
+      return;
+    }
+    const roles = Array.from(editForm.roles);
+    if (roles.length === 0) {
+      toast.error("اختر دوراً واحداً على الأقل");
+      return;
+    }
+    const patch: { username: string; roles: ManagedStaffRole[]; password?: string } = {
+      username: u,
+      roles,
+    };
+    if (editForm.password.trim().length > 0) {
+      patch.password = editForm.password;
+    }
+    try {
+      updateManagedUser(editForm.id, patch);
+    } catch (err) {
+      const quotaFull =
+        err instanceof DOMException && (err.name === "QuotaExceededError" || err.code === 22);
+      toast.error(
+        quotaFull
+          ? "تعذر الحفظ بعد محاولة تفريغ المساحة. امسح بيانات الموقع من المتصفح أو احذف محتوى كبير من التخزين المحلي."
+          : "تعذر الحفظ: تحقق من إعدادات التخزين في المتصفح.",
+      );
+      return;
+    }
+    refresh();
+    try {
+      appendActivityLog(
+        user?.username ?? "super_admin",
+        "تعديل مستخدم موظف",
+        `${u} — أدوار: ${roles.map(roleLabel).join("، ")}${patch.password ? " — تم تغيير كلمة المرور" : ""}`,
+      );
+    } catch {
+      /* ignore */
+    }
+    toast.success("تم حفظ التعديلات");
+    setEditOpen(false);
+    setEditForm(null);
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-10">
       <div className="text-right">
@@ -209,6 +321,7 @@ const StaffUsersPage = () => {
           >
             <SelectTrigger
               id="role-picker"
+              type="button"
               className="mt-1.5 border-slate-200 text-right dark:border-slate-700 [&>span]:text-right"
               dir="rtl"
             >
@@ -273,6 +386,132 @@ const StaffUsersPage = () => {
         </Button>
       </form>
 
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) setEditForm(null);
+        }}
+      >
+        <DialogContent dir="rtl" className="max-h-[min(90dvh,40rem)] overflow-y-auto text-right sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display">تعديل مستخدم</DialogTitle>
+            <DialogDescription>غيّر اسم المستخدم والأدوار؛ اترك كلمة المرور فارغة إن لم ترد تغييرها.</DialogDescription>
+          </DialogHeader>
+          {editForm ? (
+            <form onSubmit={handleEditSave} className="space-y-4" noValidate>
+              <div>
+                <Label htmlFor="edit-user">اسم المستخدم</Label>
+                <Input
+                  id="edit-user"
+                  value={editForm.username}
+                  onChange={(e) => setEditForm((prev) => (prev ? { ...prev, username: e.target.value } : prev))}
+                  className="mt-1.5 border-slate-200 dark:border-slate-700"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-pass">كلمة مرور جديدة (اختياري)</Label>
+                <Input
+                  id="edit-pass"
+                  type="password"
+                  value={editForm.password}
+                  onChange={(e) => setEditForm((prev) => (prev ? { ...prev, password: e.target.value } : prev))}
+                  className="mt-1.5 border-slate-200 dark:border-slate-700"
+                  autoComplete="new-password"
+                  placeholder="اتركها فارغة للإبقاء على الحالية"
+                />
+              </div>
+              <div className="space-y-3">
+                <Label htmlFor="edit-role-picker">إضافة دور</Label>
+                <Select
+                  key={editRolePickerKey}
+                  required={false}
+                  disabled={!editHasAvailableRoles}
+                  onValueChange={(v) => {
+                    if (v) addEditRoleFromPicker(v);
+                  }}
+                >
+                  <SelectTrigger
+                    id="edit-role-picker"
+                    type="button"
+                    className="mt-1.5 border-slate-200 text-right dark:border-slate-700 [&>span]:text-right"
+                    dir="rtl"
+                  >
+                    <SelectValue
+                      placeholder={
+                        editHasAvailableRoles ? "اختر دوراً لإضافته" : "تم اختيار كل الأدوار المتاحة"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl" className="max-h-[min(70vh,24rem)]">
+                    {BASE_ROLES.some((b) => !editForm.roles.has(b.value)) ? (
+                      <SelectGroup>
+                        <SelectLabel className="text-right">أدوار عامة</SelectLabel>
+                        {BASE_ROLES.filter((b) => !editForm.roles.has(b.value)).map((b) => (
+                          <SelectItem key={b.value} value={b.value} className="text-right">
+                            {b.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : null}
+                    {INSTITUTION_ROSTER_STAFF_ROLES.some((r) => !editForm.roles.has(r)) ? (
+                      <SelectGroup>
+                        <SelectLabel className="text-right">طواقم المؤسسات</SelectLabel>
+                        {INSTITUTION_ROSTER_STAFF_ROLES.filter((r) => !editForm.roles.has(r)).map((r) => (
+                          <SelectItem key={r} value={r} className="text-right">
+                            {institutionRosterStaffRoleLabelAr(r)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+                <div>
+                  <p className="mb-2 text-xs font-medium text-slate-500 dark:text-slate-400">الأدوار المختارة</p>
+                  <div className="flex min-h-[2.5rem] flex-wrap justify-end gap-2 rounded-xl border border-slate-100 bg-slate-50/90 p-3 dark:border-slate-800 dark:bg-slate-950/50">
+                    {Array.from(editForm.roles).map((r) => (
+                      <span
+                        key={r}
+                        className={cn(
+                          "inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm",
+                          "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/80 dark:text-sky-100",
+                        )}
+                      >
+                        <span className="truncate">{roleLabel(r)}</span>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-full p-0.5 text-sky-700 transition-colors hover:bg-sky-200/80 dark:text-sky-200 dark:hover:bg-sky-800"
+                          aria-label={`إزالة ${roleLabel(r)}`}
+                          onClick={() => removeEditRole(r)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setEditOpen(false);
+                    setEditForm(null);
+                  }}
+                >
+                  إلغاء
+                </Button>
+                <Button type="submit" className="bg-sky-600 text-white hover:bg-sky-700">
+                  حفظ التعديلات
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900/50">
         <div className="border-b border-slate-100 px-4 py-3 text-right font-display text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
           المستخدمون ({list.length})
@@ -292,16 +531,28 @@ const StaffUsersPage = () => {
                     {u.roles.map((role) => roleLabel(role)).join(" · ")}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                  onClick={() => handleRemove(u.id, u.username)}
-                >
-                  <Trash2 className="h-4 w-4 ms-1" />
-                  حذف
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-200 dark:border-slate-600"
+                    onClick={() => openEdit(u.id, u.username, u.roles)}
+                  >
+                    <Pencil className="h-4 w-4 ms-1" />
+                    تعديل
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                    onClick={() => handleRemove(u.id, u.username)}
+                  >
+                    <Trash2 className="h-4 w-4 ms-1" />
+                    حذف
+                  </Button>
+                </div>
               </li>
             ))
           )}
