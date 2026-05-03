@@ -25,6 +25,15 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
+/** عند فتح أي مسار جديد نرجع التمرير لأعلى الصفحة */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 const AppRoutes = () => {
   const location = useLocation();
   const [showBootLoader, setShowBootLoader] = useState(true);
@@ -35,6 +44,7 @@ const AppRoutes = () => {
 
   return (
     <>
+      <ScrollToTop />
       <AnimatePresence>
         {showBootLoader ? (
           <BootLoader key={location.pathname} onComplete={() => setShowBootLoader(false)} />
