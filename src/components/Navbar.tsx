@@ -100,6 +100,16 @@ const Navbar = () => {
             >
               صنّاع المحتوى
             </Link>
+            <Link
+              to="/contact"
+              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                location.pathname === "/contact"
+                  ? "text-primary after:w-full"
+                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+              }`}
+            >
+              تواصل معنا
+            </Link>
             <div className="relative">
               <button
                 type="button"
@@ -213,6 +223,13 @@ const Navbar = () => {
                 className="py-2 text-foreground hover:text-primary transition-colors"
               >
                 صنّاع المحتوى
+              </Link>
+              <Link
+                to="/contact"
+                onClick={() => setOpen(false)}
+                className="py-2 text-foreground hover:text-primary transition-colors"
+              >
+                تواصل معنا
               </Link>
               <div className="pt-2 pb-1 text-xs tracking-[0.2em] text-primary font-display">خدماتنا</div>
               {serviceLinks.map((l) => (

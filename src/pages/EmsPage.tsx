@@ -42,17 +42,39 @@ const EmsPage = () => {
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
-      <main className="pt-32 pb-20">
-        <section className="w-full px-4 md:px-8 xl:px-12">
-          <div className="glass-panel rounded-2xl p-8 md:p-12">
-            <span className="font-display text-xs tracking-[0.35em] text-primary">EMS DIVISION</span>
-            <h1 className="mt-4 font-display text-4xl md:text-6xl font-bold">
-              صفحة <span className="text-gradient-neon">المسعفين</span>
-            </h1>
-            <p className="mt-5 text-lg text-muted-foreground max-w-3xl">
+
+      {/* Hero — نفس أسلوب القوانين وصنّاع المحتوى */}
+      <section className="relative h-[46vh] min-h-[300px] max-h-[520px] overflow-hidden">
+        <img
+          src="/INF-CONECT-LOGO.gif"
+          alt="المسعفين — Infinite City"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = "/placeholder.svg";
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/10 to-background/85" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_90%_55%_at_50%_40%,hsl(160_84%_39%/0.09),transparent_55%)]" />
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-background/55 to-transparent backdrop-blur-sm" />
+        <div className="absolute inset-x-0 -bottom-8 h-32 bg-gradient-to-t from-background/90 via-background/60 to-transparent backdrop-blur-sm" />
+        <div className="absolute inset-x-0 bottom-1 flex flex-col items-center justify-center gap-2 px-4 text-center sm:bottom-3 md:bottom-4">
+          <p className="font-display text-xs tracking-[0.32em] text-primary/95 drop-shadow-[0_4px_18px_hsl(var(--background)/0.95)]">
+            EMERGENCY MEDICAL SERVICES
+          </p>
+          <h1 className="font-display text-4xl font-bold md:text-6xl drop-shadow-[0_8px_24px_hsl(var(--background)/0.85)]">
+            <span className="text-gradient-neon">المسعفين</span>
+          </h1>
+        </div>
+      </section>
+
+      <main className="pb-20">
+        <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
+          <div className="glass-panel rounded-2xl border border-primary/25 bg-gradient-to-br from-card/90 via-background/95 to-card/75 p-8 md:p-12">
+            <p className="text-lg text-muted-foreground max-w-3xl leading-relaxed">
               مركز شامل لطاقم الإسعاف: التدريب، البروتوكولات، الجداول، والاستجابة للحالات الحرجة.
             </p>
-            <Button asChild className="mt-6 bg-gradient-neon text-primary-foreground font-display tracking-widest">
+            <Button asChild className="mt-6 bg-gradient-neon text-primary-foreground font-display tracking-widest shadow-[0_0_28px_hsl(var(--primary)/0.35)]">
               <Link to="/apply/ems">التقديم لهذه المؤسسة</Link>
             </Button>
           </div>

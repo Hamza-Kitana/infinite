@@ -12,28 +12,28 @@
   :root {
     /* Core surfaces - deep space night */
     --background: 240 30% 4%;
-    --foreground: 180 100% 92%;
+    --foreground: 265 22% 94%;
 
     --card: 240 35% 7%;
-    --card-foreground: 180 100% 92%;
+    --card-foreground: 265 22% 94%;
 
     --popover: 240 40% 6%;
-    --popover-foreground: 180 100% 92%;
+    --popover-foreground: 265 22% 94%;
 
-    /* Purple neon - primary brand */
-    --primary: 275 100% 66%;
-    --primary-foreground: 240 30% 4%;
-    --primary-glow: 275 100% 78%;
+    /* بنفسجي — الهوية الأساسية (بدون ميل زهري) */
+    --primary: 272 88% 64%;
+    --primary-foreground: 260 35% 6%;
+    --primary-glow: 272 95% 74%;
 
-    /* Magenta neon - accent */
-    --secondary: 320 100% 60%;
-    --secondary-foreground: 0 0% 100%;
+    /* بنفسجي أعمق للتباين الثانوي — بدل الماجنتا */
+    --secondary: 268 78% 54%;
+    --secondary-foreground: 265 40% 98%;
 
-    --muted: 240 25% 12%;
-    --muted-foreground: 220 20% 65%;
+    --muted: 250 22% 13%;
+    --muted-foreground: 265 14% 68%;
 
-    --accent: 280 100% 65%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 278 85% 58%;
+    --accent-foreground: 265 40% 98%;
 
     --destructive: 0 95% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -43,22 +43,22 @@
 
     --border: 240 40% 18%;
     --input: 240 35% 12%;
-    --ring: 275 100% 66%;
+    --ring: 272 88% 64%;
 
     --radius: 0.75rem;
 
-    /* Gradients */
-    --gradient-neon: linear-gradient(135deg, hsl(275 100% 66%), hsl(295 100% 70%), hsl(320 100% 60%));
+    /* تدرج بنفسجي فقط — بدون وردي/زهري */
+    --gradient-neon: linear-gradient(135deg, hsl(268 95% 62%), hsl(275 92% 60%), hsl(282 85% 56%));
     --gradient-cyber: linear-gradient(180deg, hsl(240 30% 4% / 0), hsl(240 30% 4% / 0.85) 60%, hsl(240 30% 4%));
-    --gradient-grid: linear-gradient(hsl(275 100% 66% / 0.08) 1px, transparent 1px),
-                     linear-gradient(90deg, hsl(275 100% 66% / 0.08) 1px, transparent 1px);
-    --gradient-glow: radial-gradient(circle at 50% 50%, hsl(275 100% 66% / 0.35), transparent 60%);
+    --gradient-grid: linear-gradient(hsl(272 88% 64% / 0.09) 1px, transparent 1px),
+                     linear-gradient(90deg, hsl(272 88% 64% / 0.09) 1px, transparent 1px);
+    --gradient-glow: radial-gradient(circle at 50% 50%, hsl(272 88% 64% / 0.32), transparent 60%);
 
     /* Shadows / glows */
-    --glow-primary: 0 0 40px hsl(275 100% 66% / 0.6), 0 0 80px hsl(275 100% 66% / 0.3);
-    --glow-secondary: 0 0 40px hsl(320 100% 60% / 0.6), 0 0 80px hsl(320 100% 60% / 0.3);
-    --glow-accent: 0 0 40px hsl(280 100% 65% / 0.6);
-    --shadow-cyber: 0 20px 60px -10px hsl(275 100% 66% / 0.4);
+    --glow-primary: 0 0 40px hsl(272 88% 64% / 0.55), 0 0 80px hsl(272 88% 64% / 0.28);
+    --glow-secondary: 0 0 40px hsl(268 78% 54% / 0.45), 0 0 80px hsl(268 78% 54% / 0.22);
+    --glow-accent: 0 0 40px hsl(278 85% 58% / 0.45), 0 0 80px hsl(278 85% 58% / 0.22);
+    --shadow-cyber: 0 20px 60px -10px hsl(272 88% 64% / 0.38);
 
     /* Motion */
     --ease-cyber: cubic-bezier(0.16, 1, 0.3, 1);

@@ -1,5 +1,4 @@
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { motion } from "framer-motion";
 import { User, Shield, HeartPulse, ArrowLeft, Eye, Scale, Code2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -92,49 +91,15 @@ const apps = [
 ];
 
 const Applications = () => {
-  const ref = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
-  const headerX = useTransform(scrollYProgress, [0, 0.5], [-80, 0]);
-  const headerOpacity = useTransform(scrollYProgress, [0, 0.3], [0, 1]);
-  const lineWidth = useTransform(scrollYProgress, [0.1, 0.5], ["0%", "100%"]);
-  const glowRightY = useTransform(scrollYProgress, [0, 1], [70, -70]);
-  const glowLeftY = useTransform(scrollYProgress, [0, 1], [-50, 50]);
-
   return (
-    <section ref={ref} id="apply" dir="rtl" className="relative z-20 py-32 overflow-hidden bg-background">
-      {/* Fully opaque base layer so background model never appears */}
+    <section id="apply" dir="rtl" className="relative z-20 overflow-hidden bg-background pb-24 pt-10 md:pt-14">
       <div className="absolute inset-0 z-0 bg-background" />
-      {/* Animated dual-color background */}
-      <motion.div
-        style={{ y: glowRightY }}
-        className="absolute -top-24 -right-24 z-0 h-[460px] w-[460px] rounded-full blur-[110px] pointer-events-none bg-primary"
-      >
-        <div className="h-full w-full rounded-full" />
-      </motion.div>
-      <motion.div
-        style={{ y: glowLeftY }}
-        className="absolute -bottom-24 -left-24 z-0 h-[460px] w-[460px] rounded-full blur-[110px] pointer-events-none bg-secondary"
-      >
-        <div className="h-full w-full rounded-full" />
-      </motion.div>
-      <div className="absolute inset-0 z-0 bg-gradient-to-b from-background via-background to-background pointer-events-none" />
+      <motion.div className="pointer-events-none absolute -top-24 -right-24 z-0 h-[460px] w-[460px] rounded-full bg-primary blur-[110px]" />
+      <motion.div className="pointer-events-none absolute -bottom-24 -left-24 z-0 h-[460px] w-[460px] rounded-full bg-secondary blur-[110px]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-background via-background to-background" />
 
-      <div className="w-full px-4 md:px-8 xl:px-12 relative z-10">
-        <motion.div
-          style={{ x: headerX, opacity: headerOpacity }}
-          className="max-w-3xl mb-16"
-        >
-          <span className="font-display text-xs tracking-[0.4em] text-secondary">// التقديمات</span>
-          <h2 className="mt-4 font-display font-bold text-4xl md:text-6xl">
-            اختر <span className="text-gradient-neon">طريقك</span>
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            ثلاث بوابات لدخول المدينة. كل واحدة تفتح عالم مختلف.
-          </p>
-          <motion.div style={{ width: lineWidth }} className="mt-6 h-px bg-gradient-neon" />
-        </motion.div>
-
-        <div className="grid md:grid-cols-3 gap-6">
+      <div className="relative z-10 w-full px-4 md:px-8 xl:px-12">
+        <div className="grid gap-6 md:grid-cols-3">
           {apps.map((app, i) => (
             <motion.div
               key={app.title}

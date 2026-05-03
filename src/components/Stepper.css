@@ -1,0 +1,173 @@
+/* Stepper — Infinite City theme (uses CSS variables from index.css) */
+
+.stepper-outer {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+.step-circle-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: none;
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border) / 0.85);
+  background: hsl(var(--card) / 0.65);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    0 20px 25px -5px hsl(0 0% 0% / 0.35),
+    0 10px 10px -5px hsl(0 0% 0% / 0.2),
+    0 0 40px hsl(var(--primary) / 0.08);
+}
+
+/* بوكس التقديم: زوايا ناعمة + حدود واضحة */
+.step-circle-container.step-circle-container--sharp {
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border-color: hsl(var(--primary) / 0.35);
+  background: hsl(var(--background) / 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    0 12px 40px -12px hsl(0 0% 0% / 0.55),
+    0 0 0 1px hsl(var(--primary) / 0.12),
+    0 0 48px hsl(var(--primary) / 0.1);
+}
+
+.step-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 1.75rem 1.5rem 1rem;
+}
+
+.step-content-default {
+  position: relative;
+  overflow: hidden;
+}
+
+.step-default {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.footer-container {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: 1.75rem;
+}
+
+.footer-nav {
+  margin-top: 1.75rem;
+  display: flex;
+}
+
+.footer-nav.spread {
+  justify-content: space-between;
+}
+
+.footer-nav.end {
+  justify-content: flex-end;
+}
+
+.stepper-back-button {
+  transition: color 350ms ease, opacity 200ms ease;
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.4rem 0.65rem;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+  background: transparent;
+  border: none;
+}
+
+.stepper-back-button:hover {
+  color: hsl(var(--foreground));
+}
+
+.stepper-back-button.inactive {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.stepper-next-button {
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--gradient-neon);
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.45rem 1.25rem;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 24px hsl(var(--primary) / 0.35);
+}
+
+.stepper-next-button:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 0 32px hsl(var(--primary) / 0.45);
+}
+
+.stepper-next-button:active {
+  transform: scale(0.98);
+}
+
+.step-indicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.step-indicator-inner {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.active-dot {
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+  background-color: hsl(var(--primary-foreground));
+}
+
+.step-number {
+  font-size: 0.8rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.step-connector {
+  position: relative;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  height: 0.125rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: hsl(var(--muted));
+}
+
+.step-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.check-icon {
+  height: 1rem;
+  width: 1rem;
+  color: hsl(var(--primary-foreground));
+}

@@ -20,6 +20,7 @@ import VipCarsPage from "./pages/VipCarsPage.tsx";
 import JusticePage from "./pages/JusticePage.tsx";
 import DeveloperPage from "./pages/DeveloperPage.tsx";
 import LawyerPage from "./pages/LawyerPage.tsx";
+import ContactPage from "./pages/ContactPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const AppRoutes = () => {
         <Route path="/vip-weapons" element={<VipWeaponsPage />} />
         <Route path="/vip-cars" element={<VipCarsPage />} />
         <Route path="/justice" element={<JusticePage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
         <Route path="/lawyer" element={<LawyerPage />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

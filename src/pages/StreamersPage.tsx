@@ -202,7 +202,7 @@ const StreamersPage = () => {
                           rel="noreferrer"
                           className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/55 bg-background/55 px-4 py-3 text-sm transition-colors hover:border-primary/45 hover:bg-background/75"
                         >
-                          <Instagram className="h-4 w-4 text-pink-400" />
+                          <Instagram className="h-4 w-4 text-secondary" />
                           انستغرام
                         </a>
                         <a
