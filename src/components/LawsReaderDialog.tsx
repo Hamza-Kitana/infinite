@@ -228,7 +228,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
           </DialogFooter>
         ) : (
           <DialogFooter className="shrink-0 flex-col gap-4 border-t border-primary/25 bg-card/50 px-7 py-4 sm:flex-col md:px-8 md:py-5">
-            <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-between" dir="ltr">
               <Button
                 type="button"
                 variant="outline"

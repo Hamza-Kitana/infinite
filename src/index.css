@@ -20,12 +20,12 @@
     --popover: 240 40% 6%;
     --popover-foreground: 265 22% 94%;
 
-    /* بنفسجي — الهوية الأساسية (بدون ميل زهري) */
+    /* البنفسجي الأساسي للموقع الرئيسي (أوضح من نسخة لوحة التحكم) */
     --primary: 272 88% 64%;
-    --primary-foreground: 260 35% 6%;
-    --primary-glow: 272 95% 74%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 268 78% 54%;
 
-    /* بنفسجي أعمق للتباين الثانوي — بدل الماجنتا */
+    /* درجات مساندة أوضح للموقع الرئيسي */
     --secondary: 268 78% 54%;
     --secondary-foreground: 265 40% 98%;
 
@@ -48,7 +48,7 @@
     --radius: 0.75rem;
 
     /* تدرج بنفسجي فقط — بدون وردي/زهري */
-    --gradient-neon: linear-gradient(135deg, hsl(268 95% 62%), hsl(275 92% 60%), hsl(282 85% 56%));
+    --gradient-neon: linear-gradient(135deg, hsl(272 88% 64%), hsl(268 78% 54%), hsl(278 85% 58%));
     --gradient-cyber: linear-gradient(180deg, hsl(240 30% 4% / 0), hsl(240 30% 4% / 0.85) 60%, hsl(240 30% 4%));
     --gradient-grid: linear-gradient(hsl(272 88% 64% / 0.09) 1px, transparent 1px),
                      linear-gradient(90deg, hsl(272 88% 64% / 0.09) 1px, transparent 1px);

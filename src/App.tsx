@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import BootLoader from "@/components/BootLoader";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PublicUserProvider } from "@/contexts/PublicUserContext";
 import { LawsContentProvider } from "@/contexts/LawsContentContext";
 import { StreamersContentProvider } from "@/contexts/StreamersContentContext";
 import { GangsContentProvider } from "@/contexts/GangsContentContext";
@@ -24,11 +25,13 @@ import InstitutionRosterEditorPage from "./pages/admin/InstitutionRosterEditorPa
 import InstitutionRosterHubPage from "./pages/admin/InstitutionRosterHubPage.tsx";
 import ApplicationsReviewPage from "./pages/admin/ApplicationsReviewPage.tsx";
 import ActivityLogPage from "./pages/admin/ActivityLogPage.tsx";
+import AboutManagerPage from "./pages/admin/AboutManagerPage.tsx";
+import TicketsManagerPage from "./pages/admin/TicketsManagerPage.tsx";
+import FooterManagerPage from "./pages/admin/FooterManagerPage.tsx";
 import Index from "./pages/Index.tsx";
 import ApplicationFormPage from "./pages/ApplicationFormPage.tsx";
 import StreamersPage from "./pages/StreamersPage.tsx";
 import HealthPage from "./pages/HealthPage.tsx";
-import InteriorHubPage from "./pages/InteriorHubPage.tsx";
 import InteriorDepartmentPage from "./pages/InteriorDepartmentPage.tsx";
 import OversightPage from "./pages/OversightPage.tsx";
 import GangHubPage from "./pages/GangHubPage.tsx";
@@ -38,6 +41,8 @@ import JusticePage from "./pages/JusticePage.tsx";
 import LawsPage from "./pages/LawsPage.tsx";
 import DeveloperPage from "./pages/DeveloperPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
+import ProfilePage from "./pages/ProfilePage.tsx";
+import TicketsPage from "./pages/TicketsPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { INSTITUTION_ROSTER_STAFF_ROLES } from "@/data/institutionBranches";
 
@@ -74,7 +79,7 @@ const AppRoutes = () => {
         <Route path="/streamers" element={<StreamersPage />} />
         <Route path="/health" element={<HealthPage />} />
         <Route path="/ems" element={<Navigate to="/health" replace />} />
-        <Route path="/interior" element={<InteriorHubPage />} />
+        <Route path="/interior" element={<Navigate to="/interior/police" replace />} />
         <Route path="/interior/:dept" element={<InteriorDepartmentPage />} />
         <Route path="/police" element={<Navigate to="/interior/police" replace />} />
         <Route path="/oversight" element={<OversightPage />} />
@@ -84,6 +89,8 @@ const AppRoutes = () => {
         <Route path="/justice" element={<JusticePage />} />
         <Route path="/laws" element={<LawsPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
         <Route
           path="/dashboard"
@@ -95,6 +102,14 @@ const AppRoutes = () => {
                 "streamer_manager",
                 "gang_manager",
                 "vip_cars_manager",
+                "about_manager",
+                "ticket_support_manager",
+                "ticket_admin_inquiry_manager",
+                "ticket_player_complaint_manager",
+                "ticket_compensation_manager",
+                "ticket_store_manager",
+                "ticket_general_manager",
+                "footer_manager",
                 ...INSTITUTION_ROSTER_STAFF_ROLES,
                 "application_reviewer",
               ]}
@@ -166,6 +181,58 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="about"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "about_manager"]}>
+                <AboutManagerPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="footer"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "footer_manager"]}>
+                <FooterManagerPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="tickets"
+            element={
+              <RequireStaffAuth
+                allowRoles={[
+                  "super_admin",
+                  "ticket_support_manager",
+                  "ticket_admin_inquiry_manager",
+                  "ticket_player_complaint_manager",
+                  "ticket_compensation_manager",
+                  "ticket_store_manager",
+                  "ticket_general_manager",
+                ]}
+              >
+                <TicketsManagerPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="tickets/:ticketType"
+            element={
+              <RequireStaffAuth
+                allowRoles={[
+                  "super_admin",
+                  "ticket_support_manager",
+                  "ticket_admin_inquiry_manager",
+                  "ticket_player_complaint_manager",
+                  "ticket_compensation_manager",
+                  "ticket_store_manager",
+                  "ticket_general_manager",
+                ]}
+              >
+                <TicketsManagerPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
             path="applications"
             element={
               <RequireStaffAuth allowRoles={["super_admin", "application_reviewer"]}>
@@ -188,6 +255,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PublicUserProvider>
         <AuthProvider>
           <ApplicationsContentProvider>
           <LawsContentProvider>
@@ -203,6 +271,7 @@ const App = () => {
           </LawsContentProvider>
           </ApplicationsContentProvider>
         </AuthProvider>
+        </PublicUserProvider>
       </BrowserRouter>
     </TooltipProvider>
   );

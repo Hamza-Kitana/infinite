@@ -7,27 +7,16 @@ import { Button } from "@/components/ui/button";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { cn } from "@/lib/utils";
-
-const pillars = [
-  {
-    icon: Sparkles,
-    title: "تجربة RP عميقة",
-    body: "قصص، أدوار، ومؤسسات تعطي كل جلسة معنى — من المواطن البسيط إلى القطاعات الحكومية والعصابات.",
-  },
-  {
-    icon: Users,
-    title: "مجتمع واعٍ",
-    body: "لاعبون يحترمون القوانين والقصة؛ الإدارة تعمل على بيئة عادلة، شفافة، وقريبة من اللاعبين.",
-  },
-  {
-    icon: HeartHandshake,
-    title: "دعم وفريق",
-    body: "نسعى لأن تكون المدينة مساحة مريحة للعب الجاد مع مسارات واضحة للانضمام والمتابعة.",
-  },
-] as const;
+import { useAboutPageContent } from "@/lib/aboutPageContent";
 
 const ContactPage = () => {
   const reduceMotion = useReducedMotion();
+  const content = useAboutPageContent();
+  const pillars = [
+    { icon: Sparkles, ...content.pillars[0] },
+    { icon: Users, ...content.pillars[1] },
+    { icon: HeartHandshake, ...content.pillars[2] },
+  ];
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
@@ -48,10 +37,11 @@ const ContactPage = () => {
         <div className="absolute inset-x-0 -bottom-8 h-32 bg-gradient-to-t from-background/90 via-background/60 to-transparent backdrop-blur-sm" />
         <div className="absolute inset-x-0 bottom-1 flex flex-col items-center justify-center gap-2 px-4 text-center sm:bottom-3 md:bottom-4">
           <p className="font-display text-xs tracking-[0.35em] text-primary/95 drop-shadow-[0_4px_18px_hsl(var(--background)/0.95)]">
-            WHO WE ARE
+            {content.heroEyebrow}
           </p>
           <h1 className="font-display text-4xl font-bold md:text-6xl drop-shadow-[0_8px_24px_hsl(var(--background)/0.85)]">
-            <span className="text-gradient-neon">من</span> <span className="text-foreground">نحن</span>
+            <span className="text-gradient-neon">{content.heroTitleA}</span>{" "}
+            <span className="text-foreground">{content.heroTitleB}</span>
           </h1>
         </div>
       </section>
@@ -70,13 +60,12 @@ const ContactPage = () => {
             <div className="pointer-events-none absolute -left-32 top-0 h-64 w-64 rounded-full bg-primary/15 blur-[100px]" />
             <div className="pointer-events-none absolute -right-20 bottom-0 h-56 w-56 rounded-full bg-secondary/12 blur-[90px]" />
             <div className="relative text-right">
-              <p className="font-display text-xs tracking-[0.28em] text-primary/90">من نحن</p>
+              <p className="font-display text-xs tracking-[0.28em] text-primary/90">{content.aboutEyebrow}</p>
               <h2 id="about-heading" className="mt-2 font-display text-2xl font-bold md:text-4xl">
-                Infinite City <span className="text-gradient-neon">RP</span>
+                {content.aboutTitle}
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">
-                نحن فريق ومجتمع يجمع حول مدينة رول بلاي عربية طموحة: قوانين واضحة، وزارات ومؤسسات، وشوارع مليئة بالقصص. هدفنا أن تكون
-                كل جلسة قريبة من الواقع الترفيهي — احترام للقصة، ولللاعب، وللوقت الذي يقضيه الجميع هنا.
+                {content.aboutBody}
               </p>
             </div>
           </motion.section>
@@ -94,9 +83,9 @@ const ContactPage = () => {
                   <Target className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-display text-lg font-bold md:text-xl">رؤيتنا</h3>
+                  <h3 className="font-display text-lg font-bold md:text-xl">{content.visionTitle}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground md:text-base">
-                    مدينة متجددة يتحكم فيها اللاعبون بقراراتهم، ضمن إطار RP محترم — حيث الإدارة تضع الإطار والمجتمع يملأه بالحياة.
+                    {content.visionBody}
                   </p>
                 </div>
               </div>
@@ -113,9 +102,9 @@ const ContactPage = () => {
                   <MessagesSquare className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-display text-lg font-bold md:text-xl">كيف نعمل</h3>
+                  <h3 className="font-display text-lg font-bold md:text-xl">{content.workTitle}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground md:text-base">
-                    قنوات رسمية للتقديم والدعم، وجولة قوانين موحّدة للجميع. نؤمن بالشفافية: تعرف اللاعب ما المتوقع قبل أن يخطو داخل المدينة.
+                    {content.workBody}
                   </p>
                 </div>
               </div>
@@ -131,10 +120,10 @@ const ContactPage = () => {
           >
             <div className="mb-6 text-right">
               <h3 className="font-display text-xl font-bold md:text-2xl">
-                ما الذي <span className="text-gradient-neon">يميّزنا</span>
+                {content.featuresTitle}
               </h3>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-                ثلاثة محاور نبني عليها تجربة المدينة يوماً بعد يوم.
+                {content.featuresSubtitle}
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -176,11 +165,10 @@ const ContactPage = () => {
                 <DiscordIcon className="h-10 w-10 md:h-12 md:w-12" />
               </div>
               <h2 id="discord-heading" className="mt-8 font-display text-2xl font-bold md:text-3xl">
-                تواصل معنا عبر <span className="text-[#aab3ff]">الديسكورد</span>
+                {content.discordTitle}
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                السيرفر هو نقطة التقاء اللاعبين والإدارة: تقديم الطلبات، المقابلات، الدعم، والإعلانات. انضم للمجتمع الرسمي وابقَ على اطلاع
-                بكل جديد.
+                {content.discordBody}
               </p>
               <Button
                 type="button"
@@ -189,11 +177,11 @@ const ContactPage = () => {
               >
                 <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
                   <DiscordIcon className="h-5 w-5 shrink-0" />
-                  انضم إلى سيرفر الديسكورد
+                  {content.discordButtonLabel}
                 </a>
               </Button>
               <p className="mt-6 max-w-md text-xs text-muted-foreground/90 md:text-sm">
-                الفريق متواجد يومياً؛ وقت الرد قد يختلف حسب الضغط. للاستفسارات العاجلة استخدم القنوات المعتمدة داخل السيرفر بعد الانضمام.
+                {content.discordFootnote}
               </p>
             </div>
           </motion.section>
@@ -208,9 +196,9 @@ const ContactPage = () => {
             <div className="flex items-start gap-4 text-right">
               <Sparkles className="mt-1 h-8 w-8 shrink-0 text-primary" />
               <div>
-                <h3 className="font-display text-lg font-bold md:text-xl">جديد وتريد الانضمام؟</h3>
+                <h3 className="font-display text-lg font-bold md:text-xl">{content.ctaTitle}</h3>
                 <p className="mt-2 text-sm text-muted-foreground md:text-base">
-                  ابدأ بتعبئة طلب المواطن أو القطاع المناسب؛ بعد الإرسال ستجد تعليمات المتابعة على الديسكورد.
+                  {content.ctaBody}
                 </p>
               </div>
             </div>
@@ -218,7 +206,7 @@ const ContactPage = () => {
               asChild
               className="mt-6 w-full shrink-0 bg-gradient-neon font-display tracking-wide text-primary-foreground md:mt-0 md:w-auto md:min-w-[11rem]"
             >
-              <Link to="/apply/citizen">قدّم طلبك الآن</Link>
+              <Link to="/apply/citizen">{content.ctaButtonLabel}</Link>
             </Button>
           </motion.div>
         </div>

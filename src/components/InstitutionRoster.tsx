@@ -6,6 +6,7 @@ export type RosterPerson = {
   title: string;
   image: string;
   bio: string;
+  hidden?: boolean;
   /** سطر توضيحي تحت المنصب */
   tagline?: string;
   /** نقاط مسؤوليات أو مجالات عمل */
@@ -15,7 +16,7 @@ export type RosterPerson = {
 type InstitutionRosterProps = {
   leader: RosterPerson;
   deputy: RosterPerson;
-  members: ChromaGridItem[];
+  members: (ChromaGridItem & { hidden?: boolean })[];
   /** نص الشارة على صورة القائد (افتراضي: رئيس المؤسسة) */
   leaderBadge?: string;
   /** نص الشارة على صورة النائب (افتراضي: نائب الرئيس) */
@@ -114,7 +115,10 @@ export function InstitutionRoster({
   chromaRadius = 520,
   className,
 }: InstitutionRosterProps) {
-  const n = members.length;
+  const visibleLeader = !leader.hidden;
+  const visibleDeputy = !deputy.hidden;
+  const visibleMembers = members.filter((m) => !m.hidden);
+  const n = visibleMembers.length;
   const cols = chromaColumns ?? (n <= 1 ? 1 : n === 2 ? 2 : 3);
 
   return (
@@ -126,18 +130,24 @@ export function InstitutionRoster({
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:ms-auto">{leadershipIntro}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8 xl:gap-10">
-        <LeadershipCard
-          person={leader}
-          roleLabel={leaderBadge}
-          accentBarClass="from-primary via-primary/70 to-secondary/40"
-        />
-        <LeadershipCard
-          person={deputy}
-          roleLabel={deputyBadge}
-          accentBarClass="from-secondary via-secondary/70 to-primary/40"
-        />
-      </div>
+      {visibleLeader || visibleDeputy ? (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8 xl:gap-10">
+          {visibleLeader ? (
+            <LeadershipCard
+              person={leader}
+              roleLabel={leaderBadge}
+              accentBarClass="from-primary via-primary/70 to-secondary/40"
+            />
+          ) : null}
+          {visibleDeputy ? (
+            <LeadershipCard
+              person={deputy}
+              roleLabel={deputyBadge}
+              accentBarClass="from-secondary via-secondary/70 to-primary/40"
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       {n > 0 ? (
         <div className="mt-12 md:mt-16">
@@ -147,7 +157,7 @@ export function InstitutionRoster({
           </div>
           <div className="min-h-[min(70vh,620px)] w-full py-2 md:min-h-[520px]">
             <ChromaGrid
-              items={members}
+              items={visibleMembers}
               radius={chromaRadius}
               columns={cols}
               damping={0.55}

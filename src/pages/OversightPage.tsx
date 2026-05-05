@@ -5,9 +5,13 @@ import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
 import { Eye, FileCheck2, Scale } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const OversightPage = () => {
   const roster = useInstitutionRoster("oversight");
+  const visibility = useSiteVisibility();
+  if (!visibility.institutions.oversight) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">

@@ -3,6 +3,7 @@ export type LawRuleItem = {
   id: number;
   title: string;
   description: string;
+  hidden?: boolean;
 };
 
 export type RuleVariant = "primary" | "secondary" | "accent" | "magenta";
@@ -24,6 +25,7 @@ export type LawTabSectionRules = {
   subtitle: string;
   icon: string;
   variant: RuleVariant;
+  hidden?: boolean;
   rules: LawRuleItem[];
 };
 
@@ -35,6 +37,7 @@ export type LawTabSectionPenalties = {
   subtitle: string;
   icon: string;
   variant: RuleVariant;
+  hidden?: boolean;
   penalties: PenaltiesBlock;
 };
 

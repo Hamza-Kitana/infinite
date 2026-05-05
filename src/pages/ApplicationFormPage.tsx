@@ -22,6 +22,8 @@ import { cn, isValidArabicNamePart } from "@/lib/utils";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
+import { Navigate } from "react-router-dom";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const TOTAL_STEPS = 10;
 /** نص جاهز للمستخدمين بدون سجل سابق أو بدون نبذة */
@@ -128,6 +130,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 const ApplicationFormPage = () => {
   const { role = "" } = useParams();
   const { submitApplication } = useApplicationsContent();
+  const visibility = useSiteVisibility();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const finalSubmitStarted = useRef(false);
@@ -154,6 +157,20 @@ const ApplicationFormPage = () => {
     if (t) return t;
     return targets.citizen;
   }, [role]);
+
+  const roleVisible = useMemo(() => {
+    if (!targets[role]) return true;
+    if (role === "streamers") return visibility.pages.streamers;
+    if (role === "gang") return visibility.pages.gangs;
+    if (role === "vip") return visibility.pages.vipCars;
+    if (role === "justice" || role === "lawyer") return visibility.institutions.justice_lawyers;
+    if (role === "developer") return visibility.institutions.developer;
+    if (role === "oversight") return visibility.institutions.oversight;
+    if (role === "ems") return visibility.institutions.health;
+    if (role === "police") return visibility.institutions.interior_police;
+    return true;
+  }, [role, visibility]);
+
 
   const yearOptions = useMemo(() => {
     const cy = new Date().getFullYear();
@@ -429,6 +446,10 @@ const ApplicationFormPage = () => {
   const fieldWrap = (children: ReactNode) => (
     <div className="mx-auto w-full max-w-lg py-2">{children}</div>
   );
+
+  if (!roleVisible) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">

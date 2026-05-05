@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, ImagePlus, Plus, RotateCcw, Trash2, Video } from "lucide-react";
+import { GripVertical, ImagePlus, Plus, Trash2, Video } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +51,7 @@ import { appendActivityLog } from "@/lib/activityLog";
 import type { StreamerEntry } from "@/types/streamersSchema";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { setPageVisible, useSiteVisibility } from "@/lib/siteVisibility";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -67,10 +68,12 @@ function SortableStreamerRow({
   entry,
   active,
   onSelect,
+  onEdit,
 }: {
   entry: StreamerEntry;
   active: boolean;
   onSelect: () => void;
+  onEdit: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.id,
@@ -82,14 +85,14 @@ function SortableStreamerRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-stretch gap-2 rounded-xl border bg-card/60 p-2 text-right transition-shadow",
-        active ? "border-primary/50 ring-1 ring-primary/30" : "border-primary/15",
+        "flex items-stretch gap-2 rounded-xl border bg-white/95 p-2 text-right shadow-sm transition-shadow",
+        active ? "border-violet-400 ring-1 ring-violet-300" : "border-violet-200",
         isDragging && "z-20 opacity-90 shadow-lg",
       )}
     >
       <button
         type="button"
-        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/25 text-muted-foreground cursor-grab touch-manipulation active:cursor-grabbing"
+        className="inline-flex w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 active:cursor-grabbing"
         aria-label="سحب للترتيب"
         {...attributes}
         {...listeners}
@@ -100,13 +103,27 @@ function SortableStreamerRow({
         <img
           src={entry.image}
           alt=""
-          className="h-12 w-12 shrink-0 rounded-lg object-cover border border-primary/20"
+          className="h-12 w-12 shrink-0 rounded-lg border border-violet-200 object-cover"
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display font-semibold">{entry.name}</p>
-          <p className="truncate text-xs text-muted-foreground">{entry.role}</p>
+          <p className="truncate font-display font-semibold text-slate-900">{entry.name}</p>
+          <p className="truncate text-xs text-slate-600">{entry.role}</p>
         </div>
+        {entry.hidden ? (
+          <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-display text-slate-700">
+            مخفي
+          </span>
+        ) : null}
       </button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-9 shrink-0 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+        onClick={onEdit}
+      >
+        تعديل
+      </Button>
     </div>
   );
 }
@@ -117,12 +134,16 @@ const emptyForm: Omit<StreamerEntry, "id"> = {
   bio: "",
   streamUrl: "",
   image: "/placeholder.svg",
+  hidden: false,
 };
 
 const StreamersEditorPage = () => {
   const { user } = useAuth();
-  const { items, reorder, add, update, remove, resetToDefaults } = useStreamersContent();
+  const { items, reorder, add, update, remove } = useStreamersContent();
+  const visibility = useSiteVisibility();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Omit<StreamerEntry, "id"> & { id?: string }>(emptyForm);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -139,16 +160,51 @@ const StreamersEditorPage = () => {
     }
   }, [items, selectedId]);
 
+  useEffect(() => {
+    const sourceIds = items.map((x) => x.id);
+    setOrderedIds((prev) => {
+      if (prev.length === 0) return sourceIds;
+      const kept = prev.filter((id) => sourceIds.includes(id));
+      const added = sourceIds.filter((id) => !kept.includes(id));
+      return [...kept, ...added];
+    });
+  }, [items]);
+
+  const displayedItems = useMemo(() => {
+    const byId = new Map(items.map((x) => [x.id, x]));
+    return orderedIds.map((id) => byId.get(id)).filter((x): x is StreamerEntry => Boolean(x));
+  }, [items, orderedIds]);
+
+  const filteredItems = displayedItems.filter((entry) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return `${entry.name} ${entry.streamUrl}`.toLowerCase().includes(q);
+  });
+
+  const hasPendingOrderChanges =
+    orderedIds.length === items.length && orderedIds.some((id, i) => id !== items[i]?.id);
+
   const selected = items.find((x) => x.id === selectedId) ?? null;
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const oldIndex = items.findIndex((x) => x.id === active.id);
-    const newIndex = items.findIndex((x) => x.id === over.id);
+    const oldIndex = filteredItems.findIndex((x) => x.id === active.id);
+    const newIndex = filteredItems.findIndex((x) => x.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    reorder(oldIndex, newIndex);
-    toast.success("تم تحديث الترتيب");
+    const targetId = filteredItems[newIndex]?.id;
+    if (!targetId) return;
+
+    setOrderedIds((prev) => {
+      const movingId = String(active.id);
+      const from = prev.indexOf(movingId);
+      const to = prev.indexOf(targetId);
+      if (from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const openNew = () => {
@@ -164,6 +220,7 @@ const StreamersEditorPage = () => {
       bio: s.bio,
       streamUrl: s.streamUrl,
       image: s.image,
+      hidden: !!s.hidden,
     });
     setDialogOpen(true);
   };
@@ -199,6 +256,7 @@ const StreamersEditorPage = () => {
       bio: editing.bio.trim(),
       streamUrl,
       image: editing.image.trim() || "/placeholder.svg",
+      hidden: !!editing.hidden,
     };
     if (editing.id) {
       update(editing.id, payload);
@@ -214,181 +272,184 @@ const StreamersEditorPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2">
-            <Video className="h-7 w-7 text-primary" />
+          <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold text-slate-900">
+            <Video className="h-7 w-7 text-violet-700" />
             ستريمر منجر — صنّاع المحتوى
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-slate-600">
             أضف، عدّل، احذف، ورتّب البطاقات. الصور تُخزَّن في المتصفح (رفع يتحول إلى Data URL). التحديث يظهر في{" "}
-            <a href="/streamers" target="_blank" rel="noreferrer" className="text-primary underline-offset-4 hover:underline">
+            <a href="/streamers" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
               /streamers
             </a>{" "}
             فوراً.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={openNew}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            onClick={() => setPageVisible("streamers", !visibility.pages.streamers)}
+          >
+            {visibility.pages.streamers ? "إخفاء صفحة الستريمرز" : "إظهار صفحة الستريمرز"}
+          </Button>
+          {hasPendingOrderChanges ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              onClick={() => {
+                const working = items.map((x) => x.id);
+                for (let targetIndex = 0; targetIndex < orderedIds.length; targetIndex += 1) {
+                  const wantedId = orderedIds[targetIndex];
+                  const currentIndex = working.indexOf(wantedId);
+                  if (currentIndex < 0 || currentIndex === targetIndex) continue;
+                  reorder(currentIndex, targetIndex);
+                  const [moved] = working.splice(currentIndex, 1);
+                  working.splice(targetIndex, 0, moved);
+                }
+                toast.success("تم حفظ الترتيب");
+              }}
+            >
+              حفظ الترتيب
+            </Button>
+          ) : null}
+          <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={openNew}>
             <Plus className="ms-1 h-4 w-4" /> صانع جديد
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="border-warning/40 text-warning">
-                <RotateCcw className="ms-1 h-4 w-4" /> استعادة الافتراضي
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
-              <AlertDialogHeader className="text-right">
-                <AlertDialogTitle>استعادة القائمة الأصلية؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                  سيُستبدل كل المحتوى الحالي بالقائمة الافتراضية من المشروع.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:justify-start">
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    resetToDefaults();
-                    toast.success("تمت الاستعادة");
-                  }}
-                >
-                  تأكيد
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_1fr]">
-        <div className="space-y-3">
-          <p className="font-display text-xs tracking-wide text-muted-foreground">الترتيب (اسحب)</p>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={items.map((x) => x.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2">
-                {items.map((entry) => (
+      <div className="space-y-3 rounded-2xl border border-violet-200/80 bg-white/85 p-4 shadow-[0_18px_44px_-28px_rgba(54,22,79,0.45)]">
+        <div className="text-right">
+          <Label htmlFor="streamer-search" className="text-slate-700">بحث بالاسم أو رابط البث</Label>
+          <Input
+            id="streamer-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="mt-1.5 border-violet-200 bg-violet-50/35 text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+            placeholder="اكتب اسم الستريمر أو جزء من رابط البث..."
+            autoComplete="off"
+            dir="rtl"
+          />
+        </div>
+        <p className="font-display text-xs tracking-wide text-slate-500">الترتيب (اسحب)</p>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={filteredItems.map((x) => x.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {filteredItems.length > 0 ? (
+                filteredItems.map((entry) => (
                   <SortableStreamerRow
                     key={entry.id}
                     entry={entry}
                     active={selectedId === entry.id}
                     onSelect={() => setSelectedId(entry.id)}
+                    onEdit={() => openEdit(entry)}
                   />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-
-        <div className="min-w-0 space-y-4 rounded-2xl border border-primary/20 bg-card/40 p-4 sm:p-6">
-          {!selected ? (
-            <p className="text-center text-muted-foreground">لا يوجد صنّاع محتوى.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary/15 pb-4">
-                <div className="text-right">
-                  <h2 className="font-display text-xl font-bold">{selected.name}</h2>
-                  <p className="text-sm text-muted-foreground">{selected.streamUrl}</p>
+                ))
+              ) : (
+                <div className="rounded-xl border border-violet-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500">
+                  لا توجد نتائج مطابقة للبحث.
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => openEdit(selected)}>
-                    تعديل كامل
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" size="sm">
-                        <Trash2 className="ms-1 h-4 w-4" /> حذف
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent dir="rtl">
-                      <AlertDialogHeader className="text-right">
-                        <AlertDialogTitle>حذف {selected.name}؟</AlertDialogTitle>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter className="gap-2 sm:justify-start">
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => {
-                            appendActivityLog(user?.username ?? "—", "ستريمرز: حذف", selected.name);
-                            remove(selected.id);
-                            setSelectedId(null);
-                            toast.success("تم الحذف");
-                          }}
-                        >
-                          حذف
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
-                <img
-                  src={selected.image}
-                  alt=""
-                  className="aspect-square w-full max-w-[140px] rounded-xl object-cover border border-primary/25 mx-auto sm:mx-0"
-                />
-                <div className="space-y-2 text-right text-sm">
-                  <p>
-                    <span className="text-muted-foreground">الدور:</span> {selected.role}
-                  </p>
-                  <p className="leading-relaxed text-muted-foreground">{selected.bio}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[min(90dvh,90svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-primary/25 bg-card p-0 shadow-[0_24px_64px_-16px_hsl(240_40%_2%/0.88)] sm:w-full lg:max-w-5xl"
+          className="flex max-h-[min(90dvh,90svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-violet-300 bg-[#f7f1fc] p-0 shadow-[0_24px_64px_-24px_rgba(54,22,79,0.55)] sm:w-full lg:max-w-5xl"
         >
-          <div className="shrink-0 border-b border-border/60 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,hsl(var(--primary)/0.14),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
+          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
             <DialogHeader className="space-y-1.5 text-right sm:text-right">
-              <DialogTitle className="font-display text-xl font-bold sm:text-2xl">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
                 {editing.id ? "تعديل صانع محتوى" : "صانع محتوى جديد"}
               </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
-                البيانات تُحفظ في المتصفح — اربط البث والصورة ثم احفظ.
+              <DialogDescription className="text-sm leading-relaxed text-slate-600">
+                البيانات تُحفظ في المتصفح — عبّئ بيانات البث وارفع الصورة ثم احفظ.
               </DialogDescription>
             </DialogHeader>
+            {editing.id ? (
+              <div className="mt-3 flex justify-end">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
+                      <Trash2 className="ms-1 h-4 w-4" />
+                      حذف الستريمر
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader className="text-right">
+                      <AlertDialogTitle>حذف {editing.name || "الستريمر"}؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        سيتم حذف العنصر نهائياً من القائمة.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:justify-start">
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          if (!editing.id) return;
+                          appendActivityLog(user?.username ?? "—", "ستريمرز: حذف", editing.name || editing.id);
+                          remove(editing.id);
+                          setSelectedId((prev) => (prev === editing.id ? null : prev));
+                          setDialogOpen(false);
+                          toast.success("تم حذف الستريمر");
+                        }}
+                      >
+                        تأكيد الحذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ) : null}
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8">
-            <EditorDialogSection title="البطاقة">
+            <EditorDialogSection
+              title="البطاقة"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+            >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الاسم</Label>
+                <Label className="text-xs font-medium text-slate-600">الاسم</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.name}
                   onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الدور (على البطاقة)</Label>
+                <Label className="text-xs font-medium text-slate-600">الدور (على البطاقة)</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.role}
                   onChange={(e) => setEditing((p) => ({ ...p, role: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">نبذة</Label>
+                <Label className="text-xs font-medium text-slate-600">نبذة</Label>
                 <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[88px]")}
+                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[88px] border-violet-200 bg-white text-slate-900")}
                   value={editing.bio}
                   onChange={(e) => setEditing((p) => ({ ...p, bio: e.target.value }))}
                 />
               </div>
             </EditorDialogSection>
 
-            <EditorDialogSection title="البث">
+            <EditorDialogSection
+              title="البث"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+            >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">رابط البث (Kick أو غيره)</Label>
+                <Label className="text-xs font-medium text-slate-600">رابط البث (Kick أو غيره)</Label>
                 <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
+                  className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   dir="ltr"
                   value={editing.streamUrl}
                   onChange={(e) => setEditing((p) => ({ ...p, streamUrl: e.target.value }))}
@@ -396,18 +457,14 @@ const StreamersEditorPage = () => {
               </div>
             </EditorDialogSection>
 
-            <EditorDialogSection title="الصورة">
+            <EditorDialogSection
+              title="الصورة"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+            >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">مسار أو رابط</Label>
-                <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
-                  dir="ltr"
-                  placeholder="/hg.webp أو https://..."
-                  value={editing.image.startsWith("data:") ? "" : editing.image}
-                  onChange={(e) => setEditing((p) => ({ ...p, image: e.target.value }))}
-                />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  رفع ملف من الجهاز يتجاوز الرابط أعلاه ويُحفظ مع «حفظ التغييرات».
+                <Label className="text-xs font-medium text-slate-600">رفع الصورة</Label>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  يتم اعتماد الصورة من رفع الملف فقط (بدون روابط).
                 </p>
                 <input
                   ref={fileRef}
@@ -421,34 +478,47 @@ const StreamersEditorPage = () => {
                 />
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
-                  className="mt-1 rounded-lg"
+                  className="mt-1 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
                   onClick={() => fileRef.current?.click()}
                 >
                   <ImagePlus className="ms-2 h-4 w-4" />
                   رفع صورة من الجهاز
                 </Button>
                 {editing.image.startsWith("data:") ? (
-                  <p className="text-xs text-primary">تم اختيار صورة مرفوعة — اضغط حفظ لتثبيتها.</p>
+                  <p className="text-xs text-violet-700">تم اختيار صورة مرفوعة — اضغط حفظ لتثبيتها.</p>
                 ) : null}
               </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-primary/25 bg-background/40 p-3">
+              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-violet-300 bg-white/70 p-3">
                 <img
                   src={editing.image || "/placeholder.svg"}
                   alt=""
-                  className="max-h-40 max-w-full rounded-md border border-border/60 object-contain"
+                  className="max-h-40 max-w-full rounded-md border border-violet-200 object-contain"
                 />
               </div>
             </EditorDialogSection>
           </div>
 
-          <div className="shrink-0 border-t border-border/60 bg-background/85 px-6 py-4 backdrop-blur-sm sm:px-8">
+          <div className="shrink-0 border-t border-violet-200 bg-white/80 px-6 py-4 backdrop-blur-sm sm:px-8">
             <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-start sm:gap-3">
-              <Button type="button" variant="outline" className="rounded-lg sm:min-w-[7rem]" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setEditing((prev) => ({ ...prev, hidden: !prev.hidden }))}
+              >
+                {editing.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setDialogOpen(false)}
+              >
                 إلغاء
               </Button>
-              <Button type="button" className="rounded-lg sm:min-w-[7rem]" onClick={saveDialog}>
+              <Button type="button" className="rounded-lg bg-[#36164f] text-white hover:bg-[#2f1344] sm:min-w-[7rem]" onClick={saveDialog}>
                 حفظ التغييرات
               </Button>
             </DialogFooter>

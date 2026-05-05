@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Car, GripVertical, ImagePlus, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Car, GripVertical, ImagePlus, Plus, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +58,7 @@ import { appendActivityLog } from "@/lib/activityLog";
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { setPageVisible, useSiteVisibility } from "@/lib/siteVisibility";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -71,9 +72,10 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 function suggestId(name: string, existingIds: string[]): string {
-  const fromLatin = name
-    .normalize("NFKD")
-    .replace(/[^\x00-\x7F]/g, "")
+  const asciiOnly = Array.from(name.normalize("NFKD"))
+    .filter((ch) => ch.charCodeAt(0) <= 0x7f)
+    .join("");
+  const fromLatin = asciiOnly
     .replace(/[^\w]+/g, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase()
@@ -96,10 +98,12 @@ function SortableCarRow({
   car,
   active,
   onSelect,
+  onEdit,
 }: {
   car: VipCatalogCar;
   active: boolean;
   onSelect: () => void;
+  onEdit: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: car.id,
@@ -111,14 +115,14 @@ function SortableCarRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-stretch gap-2 rounded-xl border bg-card/60 p-2 text-right transition-shadow",
-        active ? "border-primary/50 ring-1 ring-primary/30" : "border-primary/15",
+        "flex items-stretch gap-2 rounded-xl border bg-violet-50/75 p-2 text-right transition-shadow",
+        active ? "border-violet-400 ring-1 ring-violet-300" : "border-violet-200",
         isDragging && "z-20 opacity-90 shadow-lg",
       )}
     >
       <button
         type="button"
-        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/25 text-muted-foreground cursor-grab touch-manipulation active:cursor-grabbing"
+        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 cursor-grab touch-manipulation active:cursor-grabbing"
         aria-label="سحب للترتيب"
         {...attributes}
         {...listeners}
@@ -129,14 +133,19 @@ function SortableCarRow({
         <img
           src={car.thumbnailUrl}
           alt=""
-          className="h-12 w-16 shrink-0 rounded-lg object-cover border border-primary/20"
+          className="h-12 w-16 shrink-0 rounded-lg object-cover border border-violet-200"
         />
         <div className="min-w-0 flex-1">
           <p className="truncate font-display font-semibold">{car.name}</p>
-          <p className="truncate font-mono text-[10px] text-muted-foreground" dir="ltr">
+          <p className="truncate font-mono text-[10px] text-slate-600" dir="ltr">
             {car.id} · ${car.priceUsd}
           </p>
         </div>
+        {car.hidden ? (
+          <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700">
+            مخفية
+          </span>
+        ) : null}
         <span
           className={cn(
             "shrink-0 rounded-md px-1.5 py-0.5 font-display text-[10px]",
@@ -146,6 +155,15 @@ function SortableCarRow({
           {car.taken ? "مأخوذة" : "متاحة"}
         </span>
       </button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-9 shrink-0 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+        onClick={onEdit}
+      >
+        تعديل
+      </Button>
     </div>
   );
 }
@@ -160,6 +178,7 @@ const emptyCar = (): VipCatalogCar => ({
   description: "",
   modifiable: true,
   taken: false,
+  hidden: false,
   stats: {
     topSpeed: "~250 كم/س",
     acceleration: "~5 ث · 0→100",
@@ -169,8 +188,12 @@ const emptyCar = (): VipCatalogCar => ({
 
 const VipCarsEditorPage = () => {
   const { user } = useAuth();
-  const { cars, reorder, add, update, remove, resetToDefaults } = useVipCarsContent();
+  const { cars, reorder, add, update, remove } = useVipCarsContent();
+  const visibility = useSiteVisibility();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [takenFilter, setTakenFilter] = useState<"all" | "taken" | "available">("all");
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isNew, setIsNew] = useState(false);
   const [editing, setEditing] = useState<VipCatalogCar>(emptyCar());
@@ -190,16 +213,50 @@ const VipCarsEditorPage = () => {
     }
   }, [cars, selectedId]);
 
-  const selected = cars.find((c) => c.id === selectedId) ?? null;
+  useEffect(() => {
+    const sourceIds = cars.map((c) => c.id);
+    setOrderedIds((prev) => {
+      if (prev.length === 0) return sourceIds;
+      const kept = prev.filter((id) => sourceIds.includes(id));
+      const added = sourceIds.filter((id) => !kept.includes(id));
+      return [...kept, ...added];
+    });
+  }, [cars]);
+
+  const displayedCars = useMemo(() => {
+    const byId = new Map(cars.map((c) => [c.id, c]));
+    return orderedIds.map((id) => byId.get(id)).filter((c): c is VipCatalogCar => Boolean(c));
+  }, [cars, orderedIds]);
+
+  const filteredCars = displayedCars.filter((c) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q || `${c.name} ${c.id} ${c.priceUsd}`.toLowerCase().includes(q);
+    const matchesTaken = takenFilter === "all" ? true : takenFilter === "taken" ? c.taken : !c.taken;
+    return matchesSearch && matchesTaken;
+  });
+
+  const hasPendingOrderChanges =
+    orderedIds.length === cars.length && orderedIds.some((id, i) => id !== cars[i]?.id);
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const oldIndex = cars.findIndex((c) => c.id === active.id);
-    const newIndex = cars.findIndex((c) => c.id === over.id);
+    const oldIndex = filteredCars.findIndex((c) => c.id === active.id);
+    const newIndex = filteredCars.findIndex((c) => c.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    reorder(oldIndex, newIndex);
-    toast.success("تم تحديث الترتيب");
+    const targetId = filteredCars[newIndex]?.id;
+    if (!targetId) return;
+
+    setOrderedIds((prev) => {
+      const movingId = String(active.id);
+      const from = prev.indexOf(movingId);
+      const to = prev.indexOf(targetId);
+      if (from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const openNew = () => {
@@ -274,6 +331,7 @@ const VipCarsEditorPage = () => {
       description: editing.description.trim(),
       modifiable: editing.modifiable,
       taken: editing.taken,
+      hidden: !!editing.hidden,
       stats: {
         topSpeed: editing.stats.topSpeed.trim() || "—",
         acceleration: editing.stats.acceleration.trim() || "—",
@@ -306,149 +364,162 @@ const VipCarsEditorPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2">
-            <Car className="h-7 w-7 text-primary" />
+          <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold text-slate-900">
+            <Car className="h-7 w-7 text-violet-700" />
             مدير سيارات VIP
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-slate-600">
             نفس حقول كتالوج السيارات الحالية. التعديل يظهر في{" "}
-            <a href="/vip-cars" target="_blank" rel="noreferrer" className="text-primary underline-offset-4 hover:underline">
+            <a href="/vip-cars" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
               /vip-cars
             </a>{" "}
             مباشرةً.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={openNew}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            onClick={() => setPageVisible("vipCars", !visibility.pages.vipCars)}
+          >
+            {visibility.pages.vipCars ? "إخفاء صفحة سيارات VIP" : "إظهار صفحة سيارات VIP"}
+          </Button>
+          {hasPendingOrderChanges ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              onClick={() => {
+                const working = cars.map((c) => c.id);
+                for (let targetIndex = 0; targetIndex < orderedIds.length; targetIndex += 1) {
+                  const wantedId = orderedIds[targetIndex];
+                  const currentIndex = working.indexOf(wantedId);
+                  if (currentIndex < 0 || currentIndex === targetIndex) continue;
+                  reorder(currentIndex, targetIndex);
+                  const [moved] = working.splice(currentIndex, 1);
+                  working.splice(targetIndex, 0, moved);
+                }
+                toast.success("تم حفظ الترتيب");
+              }}
+            >
+              حفظ الترتيب
+            </Button>
+          ) : null}
+          <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={openNew}>
             <Plus className="ms-1 h-4 w-4" /> سيارة جديدة
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="border-warning/40 text-warning">
-                <RotateCcw className="ms-1 h-4 w-4" /> استعادة الافتراضي
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
-              <AlertDialogHeader className="text-right">
-                <AlertDialogTitle>استعادة الكتالوج الأصلي؟</AlertDialogTitle>
-                <AlertDialogDescription>سيُستبدل كل المحتوى الحالي بالبيانات الافتراضية للمشروع.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:justify-start">
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    resetToDefaults();
-                    toast.success("تمت الاستعادة");
-                  }}
-                >
-                  تأكيد
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_1fr]">
-        <div className="space-y-3">
-          <p className="font-display text-xs tracking-wide text-muted-foreground">الترتيب (اسحب)</p>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={cars.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2">
-                {cars.map((car) => (
+      <div className="space-y-3 rounded-2xl border border-violet-200/80 bg-white/85 p-4 shadow-[0_18px_44px_-28px_rgba(54,22,79,0.45)]">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="text-right">
+          <Label htmlFor="vip-search" className="text-slate-700">بحث بالاسم أو المعرف أو السعر</Label>
+          <Input
+            id="vip-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="mt-1.5 border-violet-200 bg-violet-50/35 text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+            placeholder="اكتب اسم السيارة أو المعرف..."
+            autoComplete="off"
+          />
+        </div>
+          <div className="text-right">
+            <Label className="text-slate-700">حالة السيارات</Label>
+            <Select value={takenFilter} onValueChange={(v) => setTakenFilter(v as "all" | "taken" | "available")}>
+              <SelectTrigger className="mt-1.5 border-violet-200 bg-violet-50/35 text-slate-900 [&>span]:text-slate-900 data-[placeholder]:text-slate-700">
+                <SelectValue className="text-slate-900 data-[placeholder]:text-slate-700" />
+              </SelectTrigger>
+              <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">الكل</SelectItem>
+                <SelectItem value="taken" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">المأخوذة فقط</SelectItem>
+                <SelectItem value="available" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">غير المأخوذة فقط</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="font-display text-xs tracking-wide text-slate-500">الترتيب (اسحب)</p>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={filteredCars.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {filteredCars.length > 0 ? (
+                filteredCars.map((car) => (
                   <SortableCarRow
                     key={car.id}
                     car={car}
                     active={selectedId === car.id}
                     onSelect={() => setSelectedId(car.id)}
+                    onEdit={() => openEdit(car)}
                   />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-
-        <div className="min-w-0 space-y-4 rounded-2xl border border-primary/20 bg-card/40 p-4 sm:p-6">
-          {!selected ? (
-            <p className="text-center text-muted-foreground">لا توجد سيارات.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary/15 pb-4">
-                <div className="text-right min-w-0">
-                  <h2 className="font-display text-xl font-bold">{selected.name}</h2>
-                  <p className="font-mono text-xs text-muted-foreground" dir="ltr">
-                    {selected.id}
-                  </p>
+                ))
+              ) : (
+                <div className="rounded-xl border border-violet-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500">
+                  لا توجد نتائج مطابقة للبحث.
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => openEdit(selected)}>
-                    تعديل كامل
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" size="sm">
-                        <Trash2 className="ms-1 h-4 w-4" /> حذف
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent dir="rtl">
-                      <AlertDialogHeader className="text-right">
-                        <AlertDialogTitle>حذف {selected.name}؟</AlertDialogTitle>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter className="gap-2 sm:justify-start">
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => {
-                            remove(selected.id);
-                            setSelectedId(null);
-                            toast.success("تم الحذف");
-                          }}
-                        >
-                          حذف
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                <img
-                  src={selected.thumbnailUrl}
-                  alt=""
-                  className="h-24 w-32 rounded-xl object-cover border border-primary/25"
-                />
-                <p className="min-w-0 flex-1 text-sm text-muted-foreground leading-relaxed">{selected.description}</p>
-              </div>
-            </>
-          )}
-        </div>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-primary/25 bg-card p-0 shadow-[0_24px_64px_-16px_hsl(240_40%_2%/0.88)] sm:w-full lg:max-w-5xl"
+          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-violet-300 bg-[#f7f1fc] p-0 shadow-[0_24px_64px_-24px_rgba(54,22,79,0.55)] sm:w-full lg:max-w-5xl"
         >
-          <div className="shrink-0 border-b border-border/60 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,hsl(var(--primary)/0.14),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
+          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
             <DialogHeader className="space-y-1.5 text-right sm:text-right">
-              <DialogTitle className="font-display text-xl font-bold sm:text-2xl">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
                 {isNew ? "سيارة VIP جديدة" : "تعديل السيارة"}
               </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+              <DialogDescription className="text-sm leading-relaxed text-slate-600">
                 املأ الأقسام بالترتيب، ثم احفظ — يظهر التحديث فوراً في صفحة الكتالوج.
               </DialogDescription>
             </DialogHeader>
+            {!isNew ? (
+              <div className="mt-3 flex justify-end">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
+                      <Trash2 className="ms-1 h-4 w-4" />
+                      حذف السيارة
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader className="text-right">
+                      <AlertDialogTitle>حذف {editing.name || "السيارة"}؟</AlertDialogTitle>
+                      <AlertDialogDescription>سيتم حذف السيارة نهائياً من القائمة.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:justify-start">
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          remove(editing.id);
+                          setSelectedId((prev) => (prev === editing.id ? null : prev));
+                          setDialogOpen(false);
+                          toast.success("تم حذف السيارة");
+                        }}
+                      >
+                        تأكيد الحذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ) : null}
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8">
             <EditorDialogSection title="التعريف">
               {isNew ? (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">المعرّف (اختياري)</Label>
+                <Label className="text-xs font-medium text-slate-600">المعرّف (اختياري)</Label>
                   <Input
-                    className={cn(editorDialogMonoClass, "mt-1.5")}
+                    className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     dir="ltr"
                     placeholder="my-car"
                     value={editing.id}
@@ -459,13 +530,13 @@ const VipCarsEditorPage = () => {
                       }))
                     }
                   />
-                  <p className="text-[11px] text-muted-foreground">اتركه فارغاً ليُولَّد تلقائياً من الاسم.</p>
+                  <p className="text-[11px] text-slate-500">اتركه فارغاً ليُولَّد تلقائياً من الاسم.</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">المعرّف</Label>
+                  <Label className="text-xs font-medium text-slate-600">المعرّف</Label>
                   <Input
-                    className={cn(editorDialogMonoClass, "mt-1.5 opacity-80")}
+                    className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900 opacity-80")}
                     dir="ltr"
                     value={editing.id}
                     readOnly
@@ -473,17 +544,17 @@ const VipCarsEditorPage = () => {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الاسم</Label>
+                <Label className="text-xs font-medium text-slate-600">الاسم</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.name}
                   onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الاسم بالإنجليزية (اختياري)</Label>
+                <Label className="text-xs font-medium text-slate-600">الاسم بالإنجليزية (اختياري)</Label>
                 <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
+                  className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   dir="ltr"
                   value={editing.nameEn ?? ""}
                   onChange={(e) => setEditing((p) => ({ ...p, nameEn: e.target.value }))}
@@ -494,23 +565,23 @@ const VipCarsEditorPage = () => {
             <EditorDialogSection title="السعر والحالة">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">السعر (USD)</Label>
+                  <Label className="text-xs font-medium text-slate-600">السعر (USD)</Label>
                   <Input
                     type="number"
                     min={0}
-                    className={cn(editorDialogMonoClass, "mt-1.5")}
+                    className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     dir="ltr"
                     value={editing.priceUsd}
                     onChange={(e) => setEditing((p) => ({ ...p, priceUsd: Number(e.target.value) }))}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">قابلة للتعديل داخل اللعبة</Label>
+                  <Label className="text-xs font-medium text-slate-600">قابلة للتعديل داخل اللعبة</Label>
                   <Select
                     value={editing.modifiable ? "yes" : "no"}
                     onValueChange={(v) => setEditing((p) => ({ ...p, modifiable: v === "yes" }))}
                   >
-                    <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5")}>
+                    <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -520,12 +591,12 @@ const VipCarsEditorPage = () => {
                   </Select>
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs font-medium text-muted-foreground">حالة السيارة</Label>
+                  <Label className="text-xs font-medium text-slate-600">حالة السيارة</Label>
                   <Select
                     value={editing.taken ? "yes" : "no"}
                     onValueChange={(v) => setEditing((p) => ({ ...p, taken: v === "yes" }))}
                   >
-                    <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5")}>
+                    <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -539,9 +610,9 @@ const VipCarsEditorPage = () => {
 
             <EditorDialogSection title="الوصف">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">نص الوصف</Label>
+                <Label className="text-xs font-medium text-slate-600">نص الوصف</Label>
                 <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[100px]")}
+                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[100px] border-violet-200 bg-white text-slate-900")}
                   value={editing.description}
                   onChange={(e) => setEditing((p) => ({ ...p, description: e.target.value }))}
                 />
@@ -551,9 +622,9 @@ const VipCarsEditorPage = () => {
             <EditorDialogSection title="إحصائيات العرض (نص)">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">أقصى سرعة</Label>
+                  <Label className="text-xs font-medium text-slate-600">أقصى سرعة</Label>
                   <Input
-                    className={cn(editorDialogInputClass, "mt-1.5")}
+                    className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     value={editing.stats.topSpeed}
                     onChange={(e) =>
                       setEditing((p) => ({ ...p, stats: { ...p.stats, topSpeed: e.target.value } }))
@@ -561,9 +632,9 @@ const VipCarsEditorPage = () => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">التسارع</Label>
+                  <Label className="text-xs font-medium text-slate-600">التسارع</Label>
                   <Input
-                    className={cn(editorDialogInputClass, "mt-1.5")}
+                    className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     value={editing.stats.acceleration}
                     onChange={(e) =>
                       setEditing((p) => ({ ...p, stats: { ...p.stats, acceleration: e.target.value } }))
@@ -584,12 +655,12 @@ const VipCarsEditorPage = () => {
                   ] as const
                 ).map(([k, label]) => (
                   <div key={k} className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+                    <Label className="text-xs font-medium text-slate-600">{label}</Label>
                     <Input
                       type="number"
                       min={0}
                       max={100}
-                      className={cn(editorDialogMonoClass, "mt-1.5")}
+                      className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                       dir="ltr"
                       value={editing.stats.performance[k]}
                       onChange={(e) =>
@@ -612,13 +683,7 @@ const VipCarsEditorPage = () => {
 
             <EditorDialogSection title="صورة الغلاف">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">رابط الصورة</Label>
-                <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
-                  dir="ltr"
-                  value={editing.thumbnailUrl.startsWith("data:") ? "" : editing.thumbnailUrl}
-                  onChange={(e) => setEditing((p) => ({ ...p, thumbnailUrl: e.target.value }))}
-                />
+                <Label className="text-xs font-medium text-slate-600">رفع صورة الغلاف</Label>
                 <input
                   ref={thumbRef}
                   type="file"
@@ -631,39 +696,26 @@ const VipCarsEditorPage = () => {
                 />
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
-                  className="mt-2 rounded-lg"
+                  className="mt-2 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
                   onClick={() => thumbRef.current?.click()}
                 >
                   <ImagePlus className="ms-2 h-4 w-4" /> رفع غلاف من الجهاز
                 </Button>
               </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-primary/25 bg-background/40 p-3">
+              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-violet-300 bg-white/70 p-3">
                 <img
                   src={editing.thumbnailUrl || "/placeholder.svg"}
                   alt=""
-                  className="max-h-36 max-w-full rounded-md border border-border/60 object-contain"
+                  className="max-h-36 max-w-full rounded-md border border-violet-200 object-contain"
                 />
               </div>
             </EditorDialogSection>
 
             <EditorDialogSection title="معرض الصور">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">رابط لكل سطر</Label>
-                <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[100px] font-mono text-sm")}
-                  dir="ltr"
-                  value={galleryText}
-                  onChange={(e) => {
-                    setGalleryText(e.target.value);
-                    const lines = e.target.value
-                      .split("\n")
-                      .map((l) => l.trim())
-                      .filter(Boolean);
-                    setEditing((p) => ({ ...p, galleryUrls: lines }));
-                  }}
-                />
+                <Label className="text-xs font-medium text-slate-600">إضافة صور للمعرض</Label>
                 <input
                   ref={galleryRef}
                   type="file"
@@ -678,21 +730,37 @@ const VipCarsEditorPage = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="mt-2 rounded-lg"
+                  className="mt-2 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
                   onClick={() => galleryRef.current?.click()}
                 >
                   <ImagePlus className="ms-2 h-4 w-4" /> إضافة صورة للمعرض
                 </Button>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  عدد صور المعرض الحالية: {editing.galleryUrls.length}
+                </p>
               </div>
             </EditorDialogSection>
           </div>
 
-          <div className="shrink-0 border-t border-border/60 bg-background/85 px-6 py-4 backdrop-blur-sm sm:px-8">
+          <div className="shrink-0 border-t border-violet-200 bg-white/80 px-6 py-4 backdrop-blur-sm sm:px-8">
             <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-start sm:gap-3">
-              <Button type="button" variant="outline" className="rounded-lg sm:min-w-[7rem]" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setEditing((p) => ({ ...p, hidden: !p.hidden }))}
+              >
+                {editing.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setDialogOpen(false)}
+              >
                 إلغاء
               </Button>
-              <Button type="button" className="rounded-lg sm:min-w-[7rem]" onClick={saveDialog}>
+              <Button type="button" className="rounded-lg bg-[#36164f] text-white hover:bg-[#2f1344] sm:min-w-[7rem]" onClick={saveDialog}>
                 حفظ التغييرات
               </Button>
             </DialogFooter>

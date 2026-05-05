@@ -19,6 +19,8 @@ export type VipCatalogCar = {
   description: string;
   modifiable: boolean;
   taken: boolean;
+  /** مخفية من العرض في الموقع العام */
+  hidden?: boolean;
   stats: {
     /** السرعة القصوى المعروضة */
     topSpeed: string;

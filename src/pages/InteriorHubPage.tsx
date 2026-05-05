@@ -22,7 +22,7 @@ const departments: {
   },
   {
     to: "/interior/sheriff",
-    title: "الشرف",
+    title: "الشيرف",
     desc: "Sheriff — مقاطعة، طرق سريعة، وتكتيك ميداني مع الشرطة.",
     icon: BadgeCheck,
   },

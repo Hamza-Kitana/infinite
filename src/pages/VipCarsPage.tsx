@@ -18,7 +18,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   CircleStop,
   Gauge,
@@ -31,6 +31,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
 import { useVipCarsContent } from "@/contexts/VipCarsContentContext";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -360,6 +361,8 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
 
 const VipCarsPage = () => {
   const { cars } = useVipCarsContent();
+  const visibility = useSiteVisibility();
+  const visibleCars = cars.filter((c) => !c.hidden);
   const [selected, setSelected] = useState<VipCatalogCar | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -372,6 +375,8 @@ const VipCarsPage = () => {
     setDialogOpen(open);
     if (!open) setSelected(null);
   };
+
+  if (!visibility.pages.vipCars) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
@@ -406,7 +411,7 @@ const VipCarsPage = () => {
       <main className="relative z-10 pb-24">
         <section className="mx-auto mt-8 max-w-[1600px] px-4 sm:mt-10 sm:px-6 lg:px-10">
           <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
-            {cars.map((car) => (
+            {visibleCars.map((car) => (
               <VipCarCompactCard key={car.id} car={car} onOpen={openCar} />
             ))}
           </div>

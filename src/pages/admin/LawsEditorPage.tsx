@@ -22,7 +22,6 @@ import {
   ChevronUp,
   GripVertical,
   Plus,
-  RotateCcw,
   Trash2,
 } from "lucide-react";
 import {
@@ -63,6 +62,7 @@ import { sectionItemCount } from "@/lib/lawsUtils";
 import type { LawTabSection, LawTabSectionRules, PenaltiesBlock, RuleVariant } from "@/types/lawsSchema";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { setPageVisible, useSiteVisibility } from "@/lib/siteVisibility";
 
 const variants: { value: RuleVariant; label: string }[] = [
   { value: "primary", label: "أساسي" },
@@ -70,6 +70,55 @@ const variants: { value: RuleVariant; label: string }[] = [
   { value: "accent", label: "مميز" },
   { value: "magenta", label: "مختلط" },
 ];
+
+function ConfirmDeleteButton({
+  label = "حذف",
+  title = "تأكيد الحذف",
+  description = "هل تريد المتابعة؟",
+  onConfirm,
+  iconOnly = false,
+}: {
+  label?: string;
+  title?: string;
+  description?: string;
+  onConfirm: () => void;
+  iconOnly?: boolean;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        {iconOnly ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0 border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+          >
+            {label}
+          </Button>
+        )}
+      </AlertDialogTrigger>
+      <AlertDialogContent dir="rtl">
+        <AlertDialogHeader className="text-right">
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="gap-2 sm:justify-start">
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>تأكيد الحذف</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 function SortableSectionRow({
   section,
@@ -92,14 +141,14 @@ function SortableSectionRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-stretch gap-2 rounded-xl border bg-card/60 p-2 text-right transition-shadow",
-        active ? "border-primary/50 ring-1 ring-primary/30" : "border-primary/15",
+        "flex items-stretch gap-2 rounded-xl border bg-white/95 p-2 text-right shadow-sm transition-shadow",
+        active ? "border-violet-400 ring-1 ring-violet-300" : "border-violet-200",
         isDragging && "z-20 opacity-90 shadow-lg",
       )}
     >
       <button
         type="button"
-        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/25 text-muted-foreground touch-manipulation cursor-grab active:cursor-grabbing"
+        className="inline-flex w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 active:cursor-grabbing"
         aria-label="سحب لترتيب القسم"
         {...attributes}
         {...listeners}
@@ -112,10 +161,15 @@ function SortableSectionRow({
         className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-right"
       >
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {section.hidden ? (
+            <span className="rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700">
+              مخفي
+            </span>
+          ) : null}
           <span
             className={cn(
               "rounded-md px-1.5 py-0.5 font-display text-[10px]",
-              section.kind === "penalties" ? "bg-secondary/20 text-secondary" : "bg-primary/15 text-primary",
+              section.kind === "penalties" ? "bg-violet-100 text-violet-700" : "bg-violet-200 text-violet-800",
             )}
           >
             {section.kind === "penalties" ? "عقوبات" : "بطاقات"}
@@ -123,7 +177,7 @@ function SortableSectionRow({
           <span className="font-display font-semibold">{section.label}</span>
           <span className="text-xs text-muted-foreground">({count})</span>
         </div>
-        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{section.short}</p>
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">{section.short}</p>
       </button>
     </div>
   );
@@ -133,12 +187,14 @@ function SortableRuleRow({
   id,
   rule,
   onEdit,
-  onDelete,
+  onConfirmDelete,
+  onToggleHidden,
 }: {
   id: string;
-  rule: { id: number; title: string; description: string };
+  rule: { id: number; title: string; description: string; hidden?: boolean };
   onEdit: () => void;
-  onDelete: () => void;
+  onConfirmDelete: () => void;
+  onToggleHidden: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -148,13 +204,13 @@ function SortableRuleRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-start gap-2 rounded-lg border border-border/80 bg-background/50 p-3",
-        isDragging && "shadow-md ring-1 ring-primary/30",
+        "flex items-start gap-2 rounded-lg border border-violet-200 bg-white/90 p-3",
+        isDragging && "shadow-md ring-1 ring-violet-300",
       )}
     >
       <button
         type="button"
-        className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground cursor-grab touch-manipulation"
+        className="mt-0.5 inline-flex h-9 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-md border border-dashed border-violet-300 text-slate-500"
         aria-label="سحب لترتيب القانون"
         {...attributes}
         {...listeners}
@@ -163,21 +219,52 @@ function SortableRuleRow({
       </button>
       <div className="min-w-0 flex-1 text-right">
         <p className="font-display text-sm font-semibold leading-snug">{rule.title}</p>
-        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{rule.description}</p>
+        <p className="mt-1 line-clamp-2 text-xs text-slate-600">{rule.description}</p>
+        {rule.hidden ? <p className="mt-1 text-[11px] text-slate-500">هذا القانون مخفي من الموقع</p> : null}
       </div>
       <div className="flex shrink-0 flex-col gap-1">
-        <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={onEdit}>
-          تعديل
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 border-violet-200 bg-white text-xs text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+          onClick={onToggleHidden}
+        >
+          {rule.hidden ? "إظهار" : "إخفاء"}
         </Button>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="h-8 text-xs text-destructive hover:text-destructive"
-          onClick={onDelete}
+          className="h-8 border-violet-200 bg-white text-xs text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+          onClick={onEdit}
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          تعديل
         </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader className="text-right">
+              <AlertDialogTitle>تأكيد حذف القانون</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيتم حذف القانون نهائياً من هذا القسم. هل تريد المتابعة؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:justify-start">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirmDelete}>تأكيد الحذف</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -206,7 +293,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
           {block.warningLevels.map((w, idx) => (
             <div
               key={`w-${idx}`}
-              className="grid gap-2 rounded-lg border border-primary/15 bg-card/40 p-3 sm:grid-cols-[auto_1fr_1fr_auto]"
+              className="grid gap-2 rounded-lg border border-violet-200 bg-violet-50/65 p-3 sm:grid-cols-[auto_1fr_1fr_auto]"
             >
               <div className="flex flex-row gap-1 sm:flex-col">
                 <Button
@@ -247,6 +334,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 </Button>
               </div>
               <Input
+                className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={w.title}
                 onChange={(e) =>
                   patch((b) => ({
@@ -259,6 +347,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 placeholder="العنوان"
               />
               <Input
+                className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={w.duration}
                 onChange={(e) =>
                   patch((b) => ({
@@ -270,11 +359,11 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }
                 placeholder="المدة"
               />
-              <Button
-                type="button"
-                variant="outline"
-                className="text-destructive"
-                onClick={() =>
+              <ConfirmDeleteButton
+                iconOnly
+                title="حذف الإنذار"
+                description="سيتم حذف هذا الإنذار من القائمة."
+                onConfirm={() =>
                   patch((b) => ({
                     ...b,
                     warningLevels: b.warningLevels
@@ -282,16 +371,15 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                       .map((x, i) => ({ ...x, id: i + 1 })),
                   }))
                 }
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              />
             </div>
           ))}
         </div>
         <Button
           type="button"
-          variant="secondary"
+          variant="outline"
           size="sm"
+          className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
           onClick={() =>
             patch((b) => ({
               ...b,
@@ -312,6 +400,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
           {block.specificPenalties.map((sp, idx) => (
             <div key={`sp-${idx}`} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
               <Input
+                className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={sp.title}
                 onChange={(e) =>
                   patch((b) => ({
@@ -323,6 +412,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }
               />
               <Input
+                className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={sp.penalty}
                 onChange={(e) =>
                   patch((b) => ({
@@ -334,11 +424,10 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }
               />
               <div className="sm:col-span-2 flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-destructive"
-                  onClick={() =>
+                <ConfirmDeleteButton
+                  title="حذف العقوبة"
+                  description="سيتم حذف هذه العقوبة المحددة."
+                  onConfirm={() =>
                     patch((b) => ({
                       ...b,
                       specificPenalties: b.specificPenalties
@@ -346,17 +435,16 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                         .map((x, i) => ({ ...x, id: i + 1 })),
                     }))
                   }
-                >
-                  حذف
-                </Button>
+                />
               </div>
             </div>
           ))}
         </div>
         <Button
           type="button"
-          variant="secondary"
+          variant="outline"
           size="sm"
+          className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
           onClick={() =>
             patch((b) => ({
               ...b,
@@ -377,7 +465,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
           {block.robberyPeopleRules.map((row, idx) => (
             <div key={`rp-${idx}`} className="flex gap-2">
               <Input
-                className="flex-1"
+                className="flex-1 border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={row.label}
                 onChange={(e) =>
                   patch((b) => ({
@@ -389,7 +477,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }
               />
               <Input
-                className="w-24"
+                className="w-24 border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={row.value}
                 onChange={(e) =>
                   patch((b) => ({
@@ -400,26 +488,24 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                   }))
                 }
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-destructive shrink-0"
-                onClick={() =>
+              <ConfirmDeleteButton
+                iconOnly
+                title="حذف صف"
+                description="سيتم حذف هذا الصف من عدد الأشخاص بالسرقات."
+                onConfirm={() =>
                   patch((b) => ({
                     ...b,
                     robberyPeopleRules: b.robberyPeopleRules.filter((_, i) => i !== idx),
                   }))
                 }
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              />
             </div>
           ))}
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
             onClick={() =>
               patch((b) => ({
                 ...b,
@@ -436,7 +522,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
           {block.directPoliceUnitsRules.map((row, idx) => (
             <div key={`dp-${idx}`} className="flex gap-2">
               <Input
-                className="flex-1"
+                className="flex-1 border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={row.label}
                 onChange={(e) =>
                   patch((b) => ({
@@ -448,7 +534,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }
               />
               <Input
-                className="w-24"
+                className="w-24 border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
                 value={row.value}
                 onChange={(e) =>
                   patch((b) => ({
@@ -459,26 +545,24 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                   }))
                 }
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-destructive shrink-0"
-                onClick={() =>
+              <ConfirmDeleteButton
+                iconOnly
+                title="حذف صف"
+                description="سيتم حذف هذا الصف من وحدات الشرطة المباشرة."
+                onConfirm={() =>
                   patch((b) => ({
                     ...b,
                     directPoliceUnitsRules: b.directPoliceUnitsRules.filter((_, i) => i !== idx),
                   }))
                 }
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              />
             </div>
           ))}
           <Button
             type="button"
             size="sm"
             variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
             onClick={() =>
               patch((b) => ({
                 ...b,
@@ -496,7 +580,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
         {block.safeZones.map((z, idx) => (
           <div key={`sz-${idx}`} className="flex gap-2">
             <Input
-              className="w-20 shrink-0 text-lg"
+              className="w-20 shrink-0 border-violet-200 bg-white text-lg text-slate-900 placeholder:text-slate-400"
               value={z.icon}
               onChange={(e) =>
                 patch((b) => ({
@@ -507,6 +591,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
               placeholder="🏥"
             />
             <Input
+              className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
               value={z.label}
               onChange={(e) =>
                 patch((b) => ({
@@ -515,26 +600,24 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
                 }))
               }
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-destructive shrink-0"
-              onClick={() =>
+            <ConfirmDeleteButton
+              iconOnly
+              title="حذف منطقة"
+              description="سيتم حذف هذه المنطقة الآمنة."
+              onConfirm={() =>
                 patch((b) => ({
                   ...b,
                   safeZones: b.safeZones.filter((_, i) => i !== idx),
                 }))
               }
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            />
           </div>
         ))}
         <Button
           type="button"
           size="sm"
           variant="outline"
+          className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
           onClick={() =>
             patch((b) => ({
               ...b,
@@ -551,6 +634,7 @@ function PenaltiesBlockEditor({ sectionId, block }: { sectionId: string; block: 
 
 const LawsEditorPage = () => {
   const { user } = useAuth();
+  const visibility = useSiteVisibility();
   const {
     sections,
     reorderSections,
@@ -562,7 +646,6 @@ const LawsEditorPage = () => {
     addRule,
     updateRule,
     deleteRule,
-    resetToDefaults,
   } = useLawsContent();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -579,6 +662,15 @@ const LawsEditorPage = () => {
     ruleId?: number;
     title: string;
     description: string;
+  } | null>(null);
+  const [sectionEditOpen, setSectionEditOpen] = useState(false);
+  const [sectionEdit, setSectionEdit] = useState<{
+    label: string;
+    short: string;
+    subtitle: string;
+    icon: string;
+    variant: RuleVariant;
+    hidden: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -628,6 +720,40 @@ const LawsEditorPage = () => {
   const openAddRule = () => {
     if (!selected || selected.kind !== "rules") return;
     setRuleDialog({ mode: "add", title: "", description: "" });
+  };
+
+  const openSectionEdit = (section: LawTabSection) => {
+    setSelectedId(section.id);
+    setSectionEdit({
+      label: section.label,
+      short: section.short,
+      subtitle: section.subtitle,
+      icon: section.icon,
+      variant: section.variant,
+      hidden: !!section.hidden,
+    });
+    setSectionEditOpen(true);
+  };
+
+  const saveSectionEdit = () => {
+    if (!selected || !sectionEdit) return;
+    const label = sectionEdit.label.trim();
+    const short = sectionEdit.short.trim();
+    if (!label || !short) {
+      toast.error("العنوان والاختصار مطلوبان");
+      return;
+    }
+    updateSectionMeta(selected.id, {
+      label,
+      short,
+      subtitle: sectionEdit.subtitle.trim() || label,
+      icon: sectionEdit.icon,
+      variant: sectionEdit.variant,
+      hidden: sectionEdit.hidden,
+    });
+    appendActivityLog(user?.username ?? "—", "قوانين: تعديل قسم", label);
+    toast.success("تم حفظ تعديل القسم");
+    setSectionEditOpen(false);
   };
 
   const openEditRule = (ruleId: number, title: string, description: string) => {
@@ -697,58 +823,39 @@ const LawsEditorPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2">
-            <BookOpen className="h-7 w-7 text-primary" />
+          <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold text-slate-900">
+            <BookOpen className="h-7 w-7 text-violet-700" />
             تحرير القوانين
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-slate-600">
             التغييرات تُحفظ فوراً وتظهر في صفحة{" "}
-            <a href="/laws" target="_blank" rel="noreferrer" className="text-primary underline-offset-4 hover:underline">
+            <a href="/laws" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
               /laws
             </a>{" "}
             مباشرةً (وباقي التبويبات عند التبديل أو تحديث الصفحة).
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={() => setAddOpen(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            onClick={() => setPageVisible("laws", !visibility.pages.laws)}
+          >
+            {visibility.pages.laws ? "إخفاء صفحة القوانين" : "إظهار صفحة القوانين"}
+          </Button>
+          <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={() => setAddOpen(true)}>
             <Plus className="ms-1 h-4 w-4" /> قسم جديد
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="border-warning/40 text-warning">
-                <RotateCcw className="ms-1 h-4 w-4" /> استعادة الافتراضي
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
-              <AlertDialogHeader className="text-right">
-                <AlertDialogTitle>استعادة القوانين من المصدر الأصلي؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                  سيُستبدل كل المحتوى المخصص بالبيانات الافتراضية من المشروع. لا يمكن التراجع تلقائياً.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:justify-start">
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    resetToDefaults();
-                    appendActivityLog(user?.username ?? "—", "قوانين: استعادة الافتراضي", "كل الأقسام");
-                    toast.success("تمت الاستعادة");
-                  }}
-                >
-                  تأكيد
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_1fr]">
-        <div className="space-y-3">
-          <p className="font-display text-xs tracking-wide text-muted-foreground">ترتيب الأقسام (اسحب)</p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,300px)_1fr]">
+        <div className="space-y-3 rounded-2xl border border-violet-200/80 bg-white/85 p-4 shadow-[0_18px_44px_-28px_rgba(54,22,79,0.45)]">
+          <p className="font-display text-xs tracking-wide text-slate-500">ترتيب الأقسام (اسحب)</p>
           <DndContext sensors={sectionSensors} collisionDetection={closestCenter} onDragEnd={onSectionDragEnd}>
             <SortableContext items={sections.map((s) => s.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
@@ -766,73 +873,37 @@ const LawsEditorPage = () => {
           </DndContext>
         </div>
 
-        <div className="min-w-0 space-y-6 rounded-2xl border border-primary/20 bg-card/40 p-4 sm:p-6">
+        <div className="min-w-0 space-y-6 rounded-2xl border border-violet-200/80 bg-white/90 p-4 shadow-[0_18px_44px_-28px_rgba(54,22,79,0.45)] sm:p-6">
           {!selected ? (
-            <p className="text-center text-muted-foreground">لا توجد أقسام.</p>
+            <p className="text-center text-slate-500">لا توجد أقسام.</p>
           ) : (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary/15 pb-4">
-                <div className="text-right min-w-0 flex-1 space-y-3">
-                  <Label>عنوان القسم</Label>
-                  <Input
-                    value={selected.label}
-                    onChange={(e) => updateSectionMeta(selected.id, { label: e.target.value })}
-                    className="mt-1"
-                  />
-                  <Label>الاختصار (جوال)</Label>
-                  <Input
-                    value={selected.short}
-                    onChange={(e) => updateSectionMeta(selected.id, { short: e.target.value })}
-                    className="mt-1"
-                  />
-                  <Label>المقدمة تحت العنوان</Label>
-                  <Textarea
-                    value={selected.subtitle}
-                    onChange={(e) => updateSectionMeta(selected.id, { subtitle: e.target.value })}
-                    className="mt-1 min-h-[72px]"
-                  />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <Label>أيقونة التبويب</Label>
-                      <Select
-                        value={selected.icon}
-                        onValueChange={(v) => updateSectionMeta(selected.id, { icon: v })}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent dir="rtl">
-                          {LAW_ICON_OPTIONS.map((name) => (
-                            <SelectItem key={name} value={name}>
-                              {name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>نمط البطاقات</Label>
-                      <Select
-                        value={selected.variant}
-                        onValueChange={(v) => updateSectionMeta(selected.id, { variant: v as RuleVariant })}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent dir="rtl">
-                          {variants.map((v) => (
-                            <SelectItem key={v.value} value={v.value}>
-                              {v.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-violet-200 pb-4">
+                <div className="text-right min-w-0 flex-1">
+                  <p className="font-display text-xl font-bold text-slate-900">{selected.label}</p>
+                  <p className="mt-1 text-sm text-slate-600">{selected.short}</p>
+                  <p className="mt-2 text-xs text-slate-500">{selected.subtitle}</p>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                    onClick={() => updateSectionMeta(selected.id, { hidden: !selected.hidden })}
+                  >
+                    {selected.hidden ? "إظهار القسم" : "إخفاء القسم"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                    onClick={() => openSectionEdit(selected)}
+                  >
+                    تعديل القسم
+                  </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button type="button" variant="destructive" size="sm">
+                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
                       <Trash2 className="ms-1 h-4 w-4" /> حذف القسم
                     </Button>
                   </AlertDialogTrigger>
@@ -856,13 +927,14 @@ const LawsEditorPage = () => {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                </div>
               </div>
 
               {selected.kind === "rules" ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-display text-lg font-bold">قوانين هذا القسم</h3>
-                    <Button type="button" size="sm" onClick={openAddRule}>
+                    <h3 className="font-display text-lg font-bold text-slate-900">قوانين هذا القسم</h3>
+                    <Button type="button" size="sm" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={openAddRule}>
                       <Plus className="ms-1 h-4 w-4" /> إضافة قانون
                     </Button>
                   </div>
@@ -882,7 +954,8 @@ const LawsEditorPage = () => {
                             id={`${selected.id}::${r.id}`}
                             rule={r}
                             onEdit={() => openEditRule(r.id, r.title, r.description)}
-                            onDelete={() => {
+                            onToggleHidden={() => updateRule(selected.id, r.id, { hidden: !r.hidden })}
+                            onConfirmDelete={() => {
                               appendActivityLog(
                                 user?.username ?? "—",
                                 "قوانين: حذف قانون",
@@ -906,46 +979,58 @@ const LawsEditorPage = () => {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl sm:max-w-2xl">
+        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] sm:max-w-2xl">
           <DialogHeader className="text-right">
-            <DialogTitle>قسم جديد</DialogTitle>
-            <DialogDescription>اختر نوع القسم ثم العناوين.</DialogDescription>
+            <DialogTitle className="text-slate-900">قسم جديد</DialogTitle>
+            <DialogDescription className="text-slate-600">اختر نوع القسم ثم العناوين.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-right">
             <div>
-              <Label>النوع</Label>
+              <Label className="text-slate-700">النوع</Label>
               <Select value={addKind} onValueChange={(v) => setAddKind(v as "rules" | "penalties")}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 data-[placeholder]:text-slate-700 [&>span]:text-slate-900">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="rules">بطاقات قوانين (شبكة)</SelectItem>
-                  <SelectItem value="penalties">قسم عقوبات (إنذارات وجداول)</SelectItem>
+                <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
+                  <SelectItem value="rules" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">بطاقات قوانين (شبكة)</SelectItem>
+                  <SelectItem value="penalties" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">قسم عقوبات (إنذارات وجداول)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>العنوان</Label>
-              <Input className="mt-1" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+              <Label className="text-slate-700">العنوان</Label>
+              <Input
+                className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+              />
             </div>
             <div>
-              <Label>الاختصار</Label>
-              <Input className="mt-1" value={newShort} onChange={(e) => setNewShort(e.target.value)} />
+              <Label className="text-slate-700">الاختصار</Label>
+              <Input
+                className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                value={newShort}
+                onChange={(e) => setNewShort(e.target.value)}
+              />
             </div>
             <div>
-              <Label>المقدمة</Label>
-              <Textarea className="mt-1" value={newSubtitle} onChange={(e) => setNewSubtitle(e.target.value)} />
+              <Label className="text-slate-700">المقدمة</Label>
+              <Textarea
+                className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                value={newSubtitle}
+                onChange={(e) => setNewSubtitle(e.target.value)}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label>أيقونة</Label>
+                <Label className="text-slate-700">أيقونة</Label>
                 <Select value={newIcon} onValueChange={setNewIcon}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 data-[placeholder]:text-slate-700 [&>span]:text-slate-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent dir="rtl">
+                  <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
                     {LAW_ICON_OPTIONS.map((name) => (
-                      <SelectItem key={name} value={name}>
+                      <SelectItem key={name} value={name} className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">
                         {name}
                       </SelectItem>
                     ))}
@@ -953,14 +1038,14 @@ const LawsEditorPage = () => {
                 </Select>
               </div>
               <div>
-                <Label>نمط البطاقات</Label>
+                <Label className="text-slate-700">نمط البطاقات</Label>
                 <Select value={newVariant} onValueChange={(v) => setNewVariant(v as RuleVariant)}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 data-[placeholder]:text-slate-700 [&>span]:text-slate-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent dir="rtl">
+                  <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
                     {variants.map((v) => (
-                      <SelectItem key={v.value} value={v.value}>
+                      <SelectItem key={v.value} value={v.value} className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">
                         {v.label}
                       </SelectItem>
                     ))}
@@ -970,13 +1055,106 @@ const LawsEditorPage = () => {
             </div>
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>
+            <Button type="button" variant="outline" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={() => setAddOpen(false)}>
               إلغاء
             </Button>
-            <Button type="button" onClick={submitNewSection}>
+            <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={submitNewSection}>
               إنشاء
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={sectionEditOpen}
+        onOpenChange={(open) => {
+          setSectionEditOpen(open);
+          if (!open) setSectionEdit(null);
+        }}
+      >
+        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] sm:max-w-2xl">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-slate-900">تعديل القسم</DialogTitle>
+            <DialogDescription className="text-slate-600">عدّل بيانات القسم من نافذة واحدة بشكل مرتب.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-end gap-2 border-b border-violet-200 pb-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
+              onClick={() => setSectionEditOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={saveSectionEdit}>
+              حفظ التعديلات
+            </Button>
+          </div>
+          {sectionEdit ? (
+            <div className="space-y-3 text-right">
+              <div>
+                <Label className="text-slate-700">العنوان</Label>
+                <Input
+                  className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                  value={sectionEdit.label}
+                  onChange={(e) => setSectionEdit((prev) => (prev ? { ...prev, label: e.target.value } : prev))}
+                />
+              </div>
+              <div>
+                <Label className="text-slate-700">الاختصار</Label>
+                <Input
+                  className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                  value={sectionEdit.short}
+                  onChange={(e) => setSectionEdit((prev) => (prev ? { ...prev, short: e.target.value } : prev))}
+                />
+              </div>
+              <div>
+                <Label className="text-slate-700">المقدمة</Label>
+                <Textarea
+                  className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 placeholder:text-slate-400"
+                  value={sectionEdit.subtitle}
+                  onChange={(e) => setSectionEdit((prev) => (prev ? { ...prev, subtitle: e.target.value } : prev))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-slate-700">أيقونة</Label>
+                  <Select value={sectionEdit.icon} onValueChange={(v) => setSectionEdit((prev) => (prev ? { ...prev, icon: v } : prev))}>
+                    <SelectTrigger className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 data-[placeholder]:text-slate-700 [&>span]:text-slate-900">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
+                      {LAW_ICON_OPTIONS.map((name) => (
+                        <SelectItem key={name} value={name} className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-slate-700">نمط البطاقات</Label>
+                  <Select
+                    value={sectionEdit.variant}
+                    onValueChange={(v) =>
+                      setSectionEdit((prev) => (prev ? { ...prev, variant: v as RuleVariant } : prev))
+                    }
+                  >
+                    <SelectTrigger className="mt-1 border-violet-200 bg-violet-50/40 text-slate-900 data-[placeholder]:text-slate-700 [&>span]:text-slate-900">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
+                      {variants.map((v) => (
+                        <SelectItem key={v.value} value={v.value} className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">
+                          {v.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 

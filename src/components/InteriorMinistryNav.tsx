@@ -1,11 +1,11 @@
 import { NavLink } from "react-router-dom";
-import { Anchor, BadgeCheck, Eye, LayoutGrid, Shield } from "lucide-react";
+import { Anchor, BadgeCheck, Eye, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const links = [
-  { to: "/interior", label: "الوزارة", short: "وزارة", icon: LayoutGrid, end: true },
   { to: "/interior/police", label: "الشرطة", short: "شرطة", icon: Shield },
-  { to: "/interior/sheriff", label: "الشرف", short: "شرف", icon: BadgeCheck },
+  { to: "/interior/sheriff", label: "الشيرف", short: "شرف", icon: BadgeCheck },
   { to: "/interior/cia", label: "CIA", short: "CIA", icon: Eye },
   { to: "/interior/marines", label: "المارينز", short: "مارينز", icon: Anchor },
 ] as const;
@@ -14,6 +14,15 @@ const links = [
  * شريط تنقل ثابت بين أقسام وزارة الداخلية — بنفس أسلوب شريط تبويبات صفحة القوانين.
  */
 export function InteriorMinistryNav() {
+  const visibility = useSiteVisibility();
+  const visibleLinks = links.filter((link) => {
+    if (link.to === "/interior/police") return visibility.institutions.interior_police;
+    if (link.to === "/interior/sheriff") return visibility.institutions.interior_sheriff;
+    if (link.to === "/interior/cia") return visibility.institutions.interior_cia;
+    if (link.to === "/interior/marines") return visibility.institutions.interior_marines;
+    return true;
+  });
+
   return (
     <div className="sticky top-14 z-40 flex justify-center px-3 py-2 sm:top-16 md:px-6 md:py-2.5 xl:px-10">
       <nav
@@ -24,7 +33,7 @@ export function InteriorMinistryNav() {
           "sm:gap-2 sm:p-2 md:max-w-none",
         )}
       >
-        {links.map(({ to, label, short, icon: Icon, end }) => (
+        {visibleLinks.map(({ to, label, short, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

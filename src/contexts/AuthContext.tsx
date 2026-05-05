@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { SUPER_ADMIN_PASSWORD, SUPER_ADMIN_USERNAME } from "@/config/staffAuth";
 import {
   INSTITUTION_BRANCH_IDS,
@@ -10,7 +10,7 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { appendActivityLog } from "@/lib/activityLog";
-import { findManagedUserByCredentials } from "@/staff/staffDirectory";
+import { findManagedUserByCredentials, loadManagedUsers } from "@/staff/staffDirectory";
 
 export type CoreStaffRole =
   | "super_admin"
@@ -18,7 +18,15 @@ export type CoreStaffRole =
   | "streamer_manager"
   | "gang_manager"
   | "vip_cars_manager"
-  | "application_reviewer";
+  | "application_reviewer"
+  | "about_manager"
+  | "ticket_support_manager"
+  | "ticket_admin_inquiry_manager"
+  | "ticket_player_complaint_manager"
+  | "ticket_compensation_manager"
+  | "ticket_store_manager"
+  | "ticket_general_manager"
+  | "footer_manager";
 
 export type StaffRole = CoreStaffRole | InstitutionRosterStaffRole;
 
@@ -28,6 +36,14 @@ const CORE_STAFF_NO_SUPER: readonly CoreStaffRole[] = [
   "gang_manager",
   "vip_cars_manager",
   "application_reviewer",
+  "about_manager",
+  "ticket_support_manager",
+  "ticket_admin_inquiry_manager",
+  "ticket_player_complaint_manager",
+  "ticket_compensation_manager",
+  "ticket_store_manager",
+  "ticket_general_manager",
+  "footer_manager",
 ];
 
 function isCoreStaffRoleNoSuper(v: string): v is Exclude<CoreStaffRole, "super_admin"> {
@@ -81,6 +97,14 @@ export function getPostLoginDashboardPath(roles: StaffRole[]): string {
     ["streamer_manager", "/dashboard/streamers"],
     ["gang_manager", "/dashboard/gangs"],
     ["vip_cars_manager", "/dashboard/vip-cars"],
+    ["about_manager", "/dashboard/about"],
+    ["ticket_support_manager", "/dashboard/tickets"],
+    ["ticket_admin_inquiry_manager", "/dashboard/tickets"],
+    ["ticket_player_complaint_manager", "/dashboard/tickets"],
+    ["ticket_compensation_manager", "/dashboard/tickets"],
+    ["ticket_store_manager", "/dashboard/tickets"],
+    ["ticket_general_manager", "/dashboard/tickets"],
+    ["footer_manager", "/dashboard/footer"],
   ];
   for (const [r, path] of order) {
     if (roles.includes(r)) return path;
@@ -103,6 +127,14 @@ export function primaryStaffRole(roles: StaffRole[] | undefined): StaffRole | nu
     "streamer_manager",
     "gang_manager",
     "vip_cars_manager",
+    "about_manager",
+    "ticket_support_manager",
+    "ticket_admin_inquiry_manager",
+    "ticket_player_complaint_manager",
+    "ticket_compensation_manager",
+    "ticket_store_manager",
+    "ticket_general_manager",
+    "footer_manager",
   ];
   for (const r of coreOrder) {
     if (roles.includes(r)) return r;
@@ -141,6 +173,7 @@ type AuthContextValue = {
 };
 
 const STORAGE_KEY = "ic_staff_session";
+const MANAGED_EVENT_NAME = "ic-managed-staff";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -250,6 +283,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const syncManagedSession = () => {
+      setUser((prev) => {
+        if (!prev?.managedId) return prev;
+        const latest = loadManagedUsers().find((u) => u.id === prev.managedId);
+        if (!latest || latest.isActive === false) {
+          try {
+            sessionStorage.removeItem(STORAGE_KEY);
+          } catch {
+            /* ignore */
+          }
+          return null;
+        }
+        const next: StaffUser = {
+          username: latest.username,
+          roles: [...latest.roles] as StaffRole[],
+          managedId: latest.id,
+        };
+        const changed =
+          next.username !== prev.username ||
+          next.roles.length !== prev.roles.length ||
+          next.roles.some((r, i) => r !== prev.roles[i]);
+        if (!changed) return prev;
+        try {
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    };
+    window.addEventListener(MANAGED_EVENT_NAME, syncManagedSession as EventListener);
+    window.addEventListener("storage", syncManagedSession);
+    return () => {
+      window.removeEventListener(MANAGED_EVENT_NAME, syncManagedSession as EventListener);
+      window.removeEventListener("storage", syncManagedSession);
+    };
+  }, []);
+
   const value = useMemo<AuthContextValue>(() => {
     const has = (r: StaffRole) => hasRole(user, r);
     const rosterBranch = user ? primaryInstitutionRosterBranchId(user.roles) : undefined;
@@ -280,6 +352,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         has("streamer_manager") ||
         has("gang_manager") ||
         has("vip_cars_manager") ||
+        has("about_manager") ||
+        has("ticket_support_manager") ||
+        has("ticket_admin_inquiry_manager") ||
+        has("ticket_player_complaint_manager") ||
+        has("ticket_compensation_manager") ||
+        has("ticket_store_manager") ||
+        has("ticket_general_manager") ||
+        has("footer_manager") ||
         (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false) ||
         has("application_reviewer"),
     };

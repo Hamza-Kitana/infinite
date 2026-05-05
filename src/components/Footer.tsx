@@ -1,21 +1,36 @@
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import { DiscordIcon } from "@/components/DiscordIcon";
-import { DISCORD_INVITE_URL } from "@/config/communityLinks";
+import { useFooterContent } from "@/lib/footerContent";
 
-const quickLinks = [
-  { label: "الرئيسية", to: "/" },
-  { label: "القوانين", to: "/laws" },
-  { label: "صنّاع المحتوى", to: "/streamers" },
-  { label: "من نحن", to: "/contact" },
-  { label: "تقديم طلب", to: "/apply/citizen" },
-];
+function isExternalUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
 
-const Footer = () => {
+type FooterProps = {
+  forceLight?: boolean;
+};
+
+const Footer = ({ forceLight = false }: FooterProps) => {
+  const content = useFooterContent();
+  const brandTitleClass = forceLight ? "text-slate-900" : "text-foreground";
+  const mutedTextClass = forceLight ? "text-slate-700" : "text-muted-foreground";
+  const headingClass = forceLight ? "text-violet-700" : "text-primary";
+  const linkClass = forceLight ? "text-slate-700 transition-colors hover:text-violet-700" : "text-muted-foreground transition-colors hover:text-primary";
+  const copyrightClass = forceLight ? "text-slate-900" : "text-foreground/95";
+  const dividerClass = forceLight ? "text-slate-400" : "text-muted-foreground/45";
+  const developerLinkClass = forceLight
+    ? "font-latin-display font-medium text-violet-700 underline-offset-2 transition-colors hover:text-violet-800 hover:underline"
+    : "font-latin-display font-medium text-primary underline-offset-2 transition-colors hover:text-primary/85 hover:underline";
+
   return (
     <footer
       dir="rtl"
-      className="relative mt-20 border-t border-primary/25 bg-gradient-to-b from-background via-background to-muted/20"
+      className={
+        forceLight
+          ? "relative border-t border-violet-200 bg-gradient-to-b from-[#f8f3fc] via-[#faf7fd] to-[#fcfaff] pt-20 text-slate-900"
+          : "relative border-t border-primary/25 bg-gradient-to-b from-background via-background to-muted/20 pt-20"
+      }
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-primary/50 to-transparent" />
 
@@ -32,71 +47,82 @@ const Footer = () => {
                 />
               </Link>
               <div className="leading-tight">
-                <div className="font-latin-display text-base font-bold tracking-widest text-foreground">INFINITE</div>
+                <div className={`font-latin-display text-base font-bold tracking-widest ${brandTitleClass}`}>INFINITE</div>
                 <div className="-mt-1 font-latin-display text-[10px] tracking-[0.3em] text-primary">C I T Y</div>
               </div>
             </div>
-            <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            <p className={`mt-4 max-w-sm text-sm leading-relaxed ${mutedTextClass}`}>
               سيرفر رول بلاي عربي — قوانين واضحة، فريق إدارة متواجد، ومجتمع يهتم بالتجربة.
             </p>
           </div>
 
           <div className="md:col-span-4">
-            <h3 className="font-display text-sm font-bold tracking-wide text-primary">تصفح سريع</h3>
+            <h3 className={`font-display text-sm font-bold tracking-wide ${headingClass}`}>{content.quickLinksTitle}</h3>
             <ul className="mt-4 flex flex-col gap-2.5">
-              {quickLinks.map((item) => (
-                <li key={item.to}>
-                  <Link to={item.to} className="text-sm text-muted-foreground transition-colors hover:text-primary">
-                    {item.label}
-                  </Link>
+              {content.quickLinks.map((item) => (
+                <li key={item.id}>
+                  {isExternalUrl(item.to) ? (
+                    <a
+                      href={item.to}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-sm ${linkClass}`}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link to={item.to} className={`text-sm ${linkClass}`}>
+                      {item.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
 
           <div className="md:col-span-3">
-            <h3 className="font-display text-sm font-bold tracking-wide text-primary">تواصل</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              انضم لسيرفر الديسكورد للمقابلات، الدعم، وآخر الأخبار.
+            <h3 className={`font-display text-sm font-bold tracking-wide ${headingClass}`}>{content.contactTitle}</h3>
+            <p className={`mt-3 text-sm leading-relaxed ${mutedTextClass}`}>
+              {content.contactBody}
             </p>
             <a
-              href={DISCORD_INVITE_URL}
+              href={content.discordUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#5865F2]/40 bg-[#5865F2]/10 px-4 py-2.5 text-sm font-medium text-[#c9cdfb] transition-colors hover:border-[#5865F2]/60 hover:bg-[#5865F2]/20"
+              className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-[#5865F2]/40 bg-[#5865F2]/10 px-4 py-2.5 text-sm font-medium transition-colors hover:border-[#5865F2]/60 hover:bg-[#5865F2]/20 ${forceLight ? "text-[#3347e4]" : "text-[#c9cdfb]"}`}
             >
               <DiscordIcon className="h-5 w-5 shrink-0 text-[#5865F2]" />
-              <span className="font-display">ديسكورد</span>
+              <span className="font-display">{content.discordLabel}</span>
               <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
             </a>
           </div>
         </div>
 
-        <div className="mx-auto mt-12 max-w-6xl border-t border-primary/15 px-2 pb-6 pt-8">
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center text-[11px] leading-relaxed text-muted-foreground sm:gap-x-3 sm:text-xs">
-            <span className="font-display font-semibold text-foreground/95">
+        <div className={`mx-auto mt-12 max-w-6xl px-2 pb-6 pt-8 ${forceLight ? "border-t border-violet-200" : "border-t border-primary/15"}`}>
+          <div className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center text-[11px] leading-relaxed sm:gap-x-3 sm:text-xs ${mutedTextClass}`}>
+            <span className={`font-display font-semibold ${copyrightClass}`}>
               © {new Date().getFullYear()} Infinite City
             </span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+            <span className={`select-none ${dividerClass}`} aria-hidden>
               ·
             </span>
-            <span className="font-display">جميع الحقوق محفوظة</span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+            <span className="font-display">{content.rightsText}</span>
+            <span className={`select-none ${dividerClass}`} aria-hidden>
               ·
             </span>
-            <span className="font-display tracking-[0.12em]">صُنع بعناية لمجتمع إنفينيتي سيتي</span>
-            <span className="select-none text-muted-foreground/45" aria-hidden>
+            <span className="font-display tracking-[0.12em]">{content.madeWithText}</span>
+            <span className={`select-none ${dividerClass}`} aria-hidden>
               ·
             </span>
             <span>
-              المبرمج:{" "}
+              {content.developerLabel}:{" "}
               <a
-                href="https://hamza-kitana.vercel.app/"
+                href={content.developerUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-latin-display font-medium text-primary underline-offset-2 transition-colors hover:text-primary/85 hover:underline"
+                className={developerLinkClass}
               >
-                Hamza Kitana
+                {content.developerName}
               </a>
             </span>
           </div>

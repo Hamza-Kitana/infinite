@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Menu, X, Lock, ChevronDown, Volume2, VolumeX, LayoutDashboard } from "lucide-react";
+import { Menu, X, Lock, ChevronDown, Volume2, VolumeX, LayoutDashboard, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoContext";
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
+import { usePublicUser } from "@/contexts/PublicUserContext";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const institutionLinks = [
   { label: "وزارة الصحة", to: "/health" },
@@ -26,13 +28,40 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { login, canUseDashboard } = useAuth();
+  const publicUser = usePublicUser();
   const [staffUser, setStaffUser] = useState("");
   const [staffPass, setStaffPass] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
+  const [publicMenuOpen, setPublicMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [publicUsername, setPublicUsername] = useState("");
+  const [publicPassword, setPublicPassword] = useState("");
+  const [publicRealName, setPublicRealName] = useState("");
+  const [publicFullName, setPublicFullName] = useState("");
+  const [publicEmail, setPublicEmail] = useState("");
+  const [publicDiscordId, setPublicDiscordId] = useState("");
+  const [publicAge, setPublicAge] = useState("");
+  const [publicPasswordConfirm, setPublicPasswordConfirm] = useState("");
   const heroBgVideo = useOptionalHeroBackgroundVideo();
+  const visibility = useSiteVisibility();
+  const canShowInterior =
+    visibility.institutions.interior_police ||
+    visibility.institutions.interior_sheriff ||
+    visibility.institutions.interior_cia ||
+    visibility.institutions.interior_marines;
+  const visibleInstitutionLinks = institutionLinks.filter((item) => {
+    if (item.to === "/health") return visibility.institutions.health;
+    if (item.to === "/interior") return canShowInterior;
+    if (item.to === "/oversight") return visibility.institutions.oversight;
+    if (item.to === "/justice") return visibility.institutions.justice_lawyers;
+    if (item.to === "/developer") return visibility.institutions.developer;
+    return true;
+  });
+  const hideApplyNowForPublicProfile = !!publicUser.user && (location.pathname === "/profile" || location.pathname === "/tickets");
+  const useLightBrandText = location.pathname === "/profile" || location.pathname === "/tickets";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -44,6 +73,7 @@ const Navbar = () => {
   useEffect(() => {
     setInstitutionsOpen(false);
     setOpen(false);
+    setPublicMenuOpen(false);
   }, [location.pathname]);
 
   return (
@@ -68,7 +98,11 @@ const Navbar = () => {
               />
             </Link>
             <div className="min-w-0 leading-tight">
-              <div className="truncate font-latin-display text-sm font-bold tracking-widest text-foreground sm:text-base">
+              <div
+                className={`truncate font-latin-display text-sm font-bold tracking-widest sm:text-base ${
+                  useLightBrandText ? "text-slate-900" : "text-white"
+                }`}
+              >
                 INFINITE
               </div>
               <div className="-mt-1 font-latin-display text-[9px] tracking-[0.28em] text-primary sm:text-[10px] sm:tracking-[0.3em]">
@@ -88,46 +122,54 @@ const Navbar = () => {
             >
               الرئيسية
             </Link>
-            <Link
-              to="/laws"
-              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/laws"
-                  ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
-              }`}
-            >
-              القوانين
-            </Link>
-            <Link
-              to="/streamers"
-              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/streamers"
-                  ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
-              }`}
-            >
-              صنّاع المحتوى
-            </Link>
-            <Link
-              to="/gangs"
-              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/gangs"
-                  ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
-              }`}
-            >
-              العصابات
-            </Link>
-            <Link
-              to="/vip-cars"
-              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/vip-cars"
-                  ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
-              }`}
-            >
-              سيارات VIP
-            </Link>
+            {visibility.pages.laws ? (
+              <Link
+                to="/laws"
+                className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                  location.pathname === "/laws"
+                    ? "text-primary after:w-full"
+                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                }`}
+              >
+                القوانين
+              </Link>
+            ) : null}
+            {visibility.pages.streamers ? (
+              <Link
+                to="/streamers"
+                className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                  location.pathname === "/streamers"
+                    ? "text-primary after:w-full"
+                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                }`}
+              >
+                صنّاع المحتوى
+              </Link>
+            ) : null}
+            {visibility.pages.gangs ? (
+              <Link
+                to="/gangs"
+                className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                  location.pathname === "/gangs"
+                    ? "text-primary after:w-full"
+                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                }`}
+              >
+                العصابات
+              </Link>
+            ) : null}
+            {visibility.pages.vipCars ? (
+              <Link
+                to="/vip-cars"
+                className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                  location.pathname === "/vip-cars"
+                    ? "text-primary after:w-full"
+                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                }`}
+              >
+                سيارات VIP
+              </Link>
+            ) : null}
             <div className="relative">
               <button
                 type="button"
@@ -142,7 +184,7 @@ const Navbar = () => {
 
               {institutionsOpen && (
                 <div className="absolute top-full z-[130] mt-3 right-0 w-64 rounded-xl border border-primary/30 bg-background/95 backdrop-blur-xl p-2 shadow-xl">
-                  {institutionLinks.map((item) => (
+                  {visibleInstitutionLinks.map((item) => (
                     <Link
                       key={item.to}
                       to={item.to}
@@ -171,12 +213,55 @@ const Navbar = () => {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Button
-              asChild
-              className="hidden md:inline-flex bg-gradient-neon text-primary-foreground font-display tracking-widest hover:shadow-glow-primary transition-all duration-500"
-            >
-              <Link to="/apply/citizen">قدّم الآن</Link>
-            </Button>
+            {publicUser.user ? (
+              <div className="relative hidden sm:block">
+                <button
+                  type="button"
+                  onClick={() => setPublicMenuOpen((v) => !v)}
+                  className="inline-flex items-center rounded-xl border border-violet-300 bg-white px-3 py-2 text-sm text-violet-700 transition-colors hover:bg-violet-50"
+                >
+                  <UserCircle2 className="h-4 w-4 ml-2" />
+                  {publicUser.user.displayName}
+                  <ChevronDown className={`me-2 h-4 w-4 transition-transform ${publicMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {publicMenuOpen ? (
+                  <div className="absolute left-0 z-[130] mt-2 w-48 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xl">
+                    <Link
+                      to="/tickets"
+                      className="block px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => setPublicMenuOpen(false)}
+                    >
+                      التكت
+                    </Link>
+                    <Link
+                      to="/profile"
+                      className="block border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => setPublicMenuOpen(false)}
+                    >
+                      البروفايل
+                    </Link>
+                    <button
+                      type="button"
+                      className="block w-full border-t border-violet-100 px-3 py-2 text-right text-sm text-rose-700 transition-colors hover:bg-rose-50"
+                      onClick={() => {
+                        publicUser.logout();
+                        setPublicMenuOpen(false);
+                      }}
+                    >
+                      تسجيل الخروج
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {!hideApplyNowForPublicProfile ? (
+              <Button
+                asChild
+                className="hidden md:inline-flex bg-gradient-neon text-primary-foreground font-display tracking-widest hover:shadow-glow-primary transition-all duration-500"
+              >
+                <Link to="/apply/citizen">قدّم الآن</Link>
+              </Button>
+            ) : null}
             {canUseDashboard ? (
               <Button
                 asChild
@@ -188,7 +273,7 @@ const Navbar = () => {
                   لوحة التحكم
                 </Link>
               </Button>
-            ) : (
+            ) : publicUser.user ? null : (
               <Button
                 onClick={() => setLoginOpen(true)}
                 variant="outline"
@@ -254,36 +339,44 @@ const Navbar = () => {
               >
                 الرئيسية
               </Link>
-              <Link
-                to="/laws"
-                onClick={() => setOpen(false)}
-                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
-              >
-                القوانين
-              </Link>
-              <Link
-                to="/streamers"
-                onClick={() => setOpen(false)}
-                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
-              >
-                صنّاع المحتوى
-              </Link>
-              <Link
-                to="/gangs"
-                onClick={() => setOpen(false)}
-                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
-              >
-                العصابات
-              </Link>
-              <Link
-                to="/vip-cars"
-                onClick={() => setOpen(false)}
-                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
-              >
-                سيارات VIP
-              </Link>
+              {visibility.pages.laws ? (
+                <Link
+                  to="/laws"
+                  onClick={() => setOpen(false)}
+                  className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+                >
+                  القوانين
+                </Link>
+              ) : null}
+              {visibility.pages.streamers ? (
+                <Link
+                  to="/streamers"
+                  onClick={() => setOpen(false)}
+                  className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+                >
+                  صنّاع المحتوى
+                </Link>
+              ) : null}
+              {visibility.pages.gangs ? (
+                <Link
+                  to="/gangs"
+                  onClick={() => setOpen(false)}
+                  className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+                >
+                  العصابات
+                </Link>
+              ) : null}
+              {visibility.pages.vipCars ? (
+                <Link
+                  to="/vip-cars"
+                  onClick={() => setOpen(false)}
+                  className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+                >
+                  سيارات VIP
+                </Link>
+              ) : null}
               <div className="pt-2 pb-1 text-xs tracking-[0.2em] text-primary font-display">المؤسسات</div>
-              {institutionLinks.map((l) => (
+              {visibleInstitutionLinks.map((l) => (
                 <Link
                   key={l.to}
                   to={l.to}
@@ -300,11 +393,33 @@ const Navbar = () => {
               >
                 من نحن
               </Link>
-              <Button asChild className="w-full touch-manipulation bg-gradient-neon text-primary-foreground">
-                <Link to="/apply/citizen" onClick={() => setOpen(false)}>
-                  قدّم الآن
-                </Link>
-              </Button>
+              {!hideApplyNowForPublicProfile ? (
+                <Button asChild className="w-full touch-manipulation bg-gradient-neon text-primary-foreground">
+                  <Link to="/apply/citizen" onClick={() => setOpen(false)}>
+                    قدّم الآن
+                  </Link>
+                </Button>
+              ) : null}
+              {publicUser.user ? (
+                <>
+                  <Button asChild className="w-full touch-manipulation bg-violet-600 text-white hover:bg-violet-700">
+                    <Link to="/profile" onClick={() => setOpen(false)}>
+                      <UserCircle2 className="h-4 w-4 ml-2" /> حسابي
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full touch-manipulation border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                    onClick={() => {
+                      publicUser.logout();
+                      setOpen(false);
+                    }}
+                  >
+                    تسجيل خروج المستخدم
+                  </Button>
+                </>
+              ) : null}
               {canUseDashboard ? (
                 <Button asChild className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow">
                   <Link to="/dashboard" onClick={() => setOpen(false)}>
@@ -331,53 +446,102 @@ const Navbar = () => {
       <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
         <DialogContent
           dir="rtl"
-          className="gap-0 overflow-hidden rounded-2xl border border-primary/25 bg-card/95 p-0 shadow-[0_0_0_1px_hsl(var(--primary)/0.06),0_24px_64px_-12px_hsl(240_50%_2%/0.75),0_0_80px_-24px_hsl(var(--primary)/0.35)] backdrop-blur-xl sm:max-w-[420px]"
+          className={`max-h-[90dvh] gap-0 overflow-y-auto rounded-3xl border border-violet-300/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,241,252,0.97)_100%)] p-0 text-slate-900 shadow-[0_30px_80px_-24px_rgba(54,22,79,0.45)] backdrop-blur-xl ${
+            isRegisterMode ? "sm:max-w-[700px]" : "sm:max-w-[560px]"
+          }`}
         >
-          <div className="relative bg-[radial-gradient(ellipse_120%_100%_at_50%_-20%,hsl(var(--primary)/0.22),transparent_55%)] px-6 pb-1 pt-14 text-center sm:px-8 sm:pt-16">
-            <div className="mx-auto flex h-[5.25rem] w-[5.25rem] items-center justify-center rounded-2xl border border-primary/35 bg-gradient-to-b from-background/90 to-background/40 shadow-[inset_0_1px_0_hsl(var(--primary)/0.2),0_12px_40px_-8px_hsl(var(--primary)/0.45)] ring-1 ring-primary/15">
-              <img
-                src="/INF_LOGO.png"
-                alt="Infinite City"
-                className="h-[3.25rem] w-[3.25rem] object-contain drop-shadow-[0_0_28px_hsl(var(--primary)/0.55)]"
-                loading="eager"
-              />
-            </div>
+          <div className="relative bg-[radial-gradient(ellipse_120%_100%_at_50%_-20%,rgba(54,22,79,0.18),transparent_58%)] px-6 pb-2 pt-12 text-center sm:px-8 sm:pt-14">
+            <img
+              src="/INF_LOGO.png"
+              alt="Infinite City"
+              className="mx-auto h-[4.25rem] w-[4.25rem] object-contain drop-shadow-[0_0_24px_rgba(54,22,79,0.35)]"
+              loading="eager"
+            />
             <p className="mt-3 font-latin-display text-[10px] font-semibold tracking-[0.38em] text-primary/90 sm:text-[11px] sm:tracking-[0.42em]">
               INFINITE CITY
             </p>
             <DialogHeader className="mt-5 space-y-2 text-center sm:text-center">
-              <DialogTitle className="font-display text-xl font-bold text-foreground sm:text-2xl">
-                دخول الموظفين
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
+                {isRegisterMode ? "إنشاء حساب مستخدم" : "تسجيل الدخول"}
               </DialogTitle>
-              <DialogDescription className="mx-auto max-w-[19rem] text-pretty text-sm leading-relaxed text-muted-foreground">
-                بوابة آمنة للأعضاء المعتمدين — الإدارة، الأجهزة الأمنية، والصحة.
+              <DialogDescription className="mx-auto max-w-[19rem] text-pretty text-sm leading-relaxed text-slate-600">
+                {isRegisterMode
+                  ? "حساب عادي لفتح التكتات والتواصل مع الإدارة."
+                  : "استخدم نفس النموذج: حساب الموظف يفتح لوحة التحكم، والحساب العادي يفتح البروفايل."}
               </DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="h-px bg-gradient-to-l from-transparent via-border to-transparent" aria-hidden />
+          <div className="h-px bg-gradient-to-l from-transparent via-violet-200 to-transparent" aria-hidden />
 
           <form
             noValidate
-            className="space-y-4 px-6 py-6 sm:px-8"
+            className="space-y-4 px-6 py-6 sm:px-9 sm:py-7"
             onSubmit={(e: FormEvent) => {
               e.preventDefault();
+              if (isRegisterMode) {
+                if (publicPassword !== publicPasswordConfirm) {
+                  toast.error("تأكيد كلمة السر غير مطابق");
+                  return;
+                }
+                const ageNum = Number(publicAge);
+                const result = publicUser.register({
+                  realName: publicRealName,
+                  fullName: publicFullName,
+                  username: publicUsername,
+                  email: publicEmail,
+                  discordId: publicDiscordId,
+                  age: ageNum,
+                  password: publicPassword,
+                });
+                if (!result.ok) {
+                  toast.error(result.reason);
+                  return;
+                }
+                toast.success("تم إنشاء الحساب وتسجيل الدخول");
+                setLoginOpen(false);
+                setPublicUsername("");
+                setPublicPassword("");
+                setPublicPasswordConfirm("");
+                setPublicRealName("");
+                setPublicFullName("");
+                setPublicEmail("");
+                setPublicDiscordId("");
+                setPublicAge("");
+                setIsRegisterMode(false);
+                navigate("/profile");
+                return;
+              }
+
               try {
                 const session = login(staffUser, staffPass);
                 if (session) {
-                  toast.success("تم الدخول بنجاح");
+                  toast.success("تم الدخول كموظف");
                   setLoginOpen(false);
                   setStaffUser("");
                   setStaffPass("");
+                  setPublicUsername("");
+                  setPublicPassword("");
+                  setPublicPasswordConfirm("");
                   navigate(getPostLoginDashboardPath(session.roles));
-                } else {
-                  toast.error("اسم المستخدم أو كلمة المرور غير صحيحة");
+                  return;
                 }
+                const publicLogin = publicUser.login({ username: publicUsername || staffUser, password: publicPassword || staffPass });
+                if (publicLogin.ok) {
+                  toast.success("تم الدخول بحسابك الشخصي");
+                  setLoginOpen(false);
+                  setStaffUser("");
+                  setStaffPass("");
+                  setPublicUsername("");
+                  setPublicPassword("");
+                  setPublicPasswordConfirm("");
+                  navigate("/profile");
+                  return;
+                }
+                toast.error("اسم المستخدم أو كلمة المرور غير صحيحة");
               } catch (err) {
                 if (err instanceof Error && err.message === "IC_SESSION_STORAGE") {
-                  toast.error(
-                    "تعذر حفظ الجلسة في المتصفح. جرّب تعطيل حظر ملفات تعريف الارتباط لهذا الموقع، أو الخروج من وضع التصفح الخاص إن وُجد.",
-                  );
+                  toast.error("تعذر حفظ جلسة الموظف في المتصفح.");
                 } else {
                   toast.error("حدث خطأ أثناء الدخول");
                   console.error(err);
@@ -385,40 +549,154 @@ const Navbar = () => {
               }
             }}
           >
+            <div className="mb-2 grid grid-cols-2 overflow-hidden rounded-xl border border-violet-200/90 bg-white/85 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setIsRegisterMode(false)}
+                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                  !isRegisterMode ? "bg-[#36164f] text-white shadow-sm" : "text-violet-800 hover:bg-violet-50"
+                }`}
+              >
+                تسجيل الدخول
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsRegisterMode(true)}
+                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                  isRegisterMode ? "bg-[#36164f] text-white shadow-sm" : "text-violet-800 hover:bg-violet-50"
+                }`}
+              >
+                إنشاء حساب
+              </button>
+            </div>
+
+            {isRegisterMode ? (
+              <div className="grid gap-3.5">
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="public-real-name" className="text-xs font-medium text-slate-700">
+                    الاسم الحقيقي
+                  </Label>
+                  <Input
+                    id="public-real-name"
+                    value={publicRealName}
+                    onChange={(ev) => setPublicRealName(ev.target.value)}
+                    placeholder="مثال: محمد خالد"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                  />
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="public-full-name" className="text-xs font-medium text-slate-700">
+                    الاسم داخل المدينة
+                  </Label>
+                  <Input
+                    id="public-full-name"
+                    value={publicFullName}
+                    onChange={(ev) => setPublicFullName(ev.target.value)}
+                    placeholder="مثال: أبو سالم"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                  />
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="public-email" className="text-xs font-medium text-slate-700">
+                    الإيميل
+                  </Label>
+                  <Input
+                    id="public-email"
+                    type="email"
+                    value={publicEmail}
+                    onChange={(ev) => setPublicEmail(ev.target.value)}
+                    placeholder="name@email.com"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="public-discord-id" className="text-xs font-medium text-slate-700">
+                    Discord ID
+                  </Label>
+                  <Input
+                    id="public-discord-id"
+                    value={publicDiscordId}
+                    onChange={(ev) => setPublicDiscordId(ev.target.value)}
+                    placeholder="username#0000 أو ID"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="public-age" className="text-xs font-medium text-slate-700">
+                    العمر
+                  </Label>
+                  <Input
+                    id="public-age"
+                    type="number"
+                    min={13}
+                    value={publicAge}
+                    onChange={(ev) => setPublicAge(ev.target.value)}
+                    placeholder="18"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-1.5 text-right">
-              <Label htmlFor="user" className="text-xs font-medium text-muted-foreground">
+              <Label htmlFor="user" className="text-xs font-medium text-slate-700">
                 اسم المستخدم
               </Label>
               <Input
                 id="user"
                 autoComplete="username"
-                value={staffUser}
-                onChange={(ev) => setStaffUser(ev.target.value)}
+                value={isRegisterMode ? publicUsername : staffUser}
+                onChange={(ev) => {
+                  setStaffUser(ev.target.value);
+                  setPublicUsername(ev.target.value);
+                }}
                 placeholder="أدخل اسم المستخدم"
-                className="h-11 rounded-xl border-border/80 bg-background/60 text-right shadow-sm transition-colors placeholder:text-muted-foreground/50 focus-visible:border-primary/50 focus-visible:ring-primary/25"
+                className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
               />
             </div>
             <div className="space-y-1.5 text-right">
-              <Label htmlFor="pass" className="text-xs font-medium text-muted-foreground">
+              <Label htmlFor="pass" className="text-xs font-medium text-slate-700">
                 كلمة المرور
               </Label>
               <Input
                 id="pass"
                 type="password"
                 autoComplete="current-password"
-                value={staffPass}
-                onChange={(ev) => setStaffPass(ev.target.value)}
+                value={isRegisterMode ? publicPassword : staffPass}
+                onChange={(ev) => {
+                  setStaffPass(ev.target.value);
+                  setPublicPassword(ev.target.value);
+                }}
                 placeholder="••••••••"
-                className="h-11 rounded-xl border-border/80 bg-background/60 text-right shadow-sm transition-colors placeholder:text-muted-foreground/50 focus-visible:border-primary/50 focus-visible:ring-primary/25"
+                className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
               />
             </div>
+            {isRegisterMode ? (
+              <div className="space-y-1.5 text-right">
+                <Label htmlFor="pass-confirm" className="text-xs font-medium text-slate-700">
+                  تأكيد كلمة السر
+                </Label>
+                <Input
+                  id="pass-confirm"
+                  type="password"
+                  value={publicPasswordConfirm}
+                  onChange={(ev) => setPublicPasswordConfirm(ev.target.value)}
+                  placeholder="••••••••"
+                  className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                />
+              </div>
+            ) : null}
             <Button
               type="submit"
-              className="mt-1 h-11 w-full rounded-xl bg-gradient-neon font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-md transition-all hover:brightness-110 hover:shadow-[var(--glow-primary)] active:scale-[0.99]"
+              className="mt-2 h-11 w-full rounded-xl bg-gradient-neon font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-md transition-all hover:brightness-110 hover:shadow-[var(--glow-primary)] active:scale-[0.99]"
             >
               <Lock className="ms-2 h-4 w-4 opacity-90" />
-              دخول آمن
+              {isRegisterMode ? "إنشاء الحساب" : "تسجيل الدخول"}
             </Button>
+            <p className="text-center text-xs text-slate-500">
+              {isRegisterMode ? "بعد إنشاء الحساب سيتم تحويلك مباشرة إلى بروفايلك." : "الدخول بحساب موظف يفتح لوحة التحكم، وبحساب عادي يفتح البروفايل."}
+            </p>
           </form>
         </DialogContent>
       </Dialog>

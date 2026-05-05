@@ -9,6 +9,7 @@ import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContex
 import type { InstitutionBranchId } from "@/data/institutionBranches";
 import { Eye, Shield, Siren, Users } from "lucide-react";
 import type { ReactNode } from "react";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 type DeptKey = "police" | "sheriff" | "cia" | "marines";
 
@@ -65,14 +66,14 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
     badgeEn: "SHERIFF — COUNTY",
     title: (
       <>
-        <span className="text-gradient-neon">الشرف</span>
+        <span className="text-gradient-neon">الشيرف</span>
       </>
     ),
-    alt: "الشرف — Infinite City",
-    leaderBadge: "قائد الشرف",
-    deputyBadge: "نائب الشرف",
-    leadershipIntro: "قيادة الشرف ونائبها، ثم أعضاء وحدة المقاطعة في الشبكة أدناه.",
-    membersTitle: "أعضاء الشرف",
+    alt: "الشيرف — Infinite City",
+    leaderBadge: "قائد الشيرف",
+    deputyBadge: "نائب الشيرف",
+    leadershipIntro: "قيادة الشيرف ونائبها، ثم أعضاء وحدة المقاطعة في الشبكة أدناه.",
+    membersTitle: "أعضاء الشيرف",
     membersSubtitle: "دوريات ريفية وطرق — حرك المؤشر داخل الشبكة للتفاصيل.",
     cards: [
       {
@@ -91,7 +92,7 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
         body: "إجراءات التوقيف والنقل تحت الحراسة وفق اللائحة.",
       },
     ],
-    lawsPlaceholderLabel: "الشرف",
+    lawsPlaceholderLabel: "الشيرف",
   },
   cia: {
     branchId: "interior_cia",
@@ -164,12 +165,19 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
 const InteriorDepartmentPage = () => {
   const { dept } = useParams();
   const deptKey = dept && dept in DEPT_CONFIG ? (dept as DeptKey) : null;
-  const roster = useInstitutionRoster(
-    deptKey ? DEPT_CONFIG[deptKey].branchId : "interior_police",
-  );
+  const visibility = useSiteVisibility();
+  const firstVisibleDept =
+    (Object.keys(DEPT_CONFIG) as DeptKey[]).find((k) => visibility.institutions[DEPT_CONFIG[k].branchId]) ??
+    "police";
+  const effectiveDeptKey = deptKey && visibility.institutions[DEPT_CONFIG[deptKey].branchId] ? deptKey : firstVisibleDept;
+  const roster = useInstitutionRoster(DEPT_CONFIG[effectiveDeptKey].branchId);
+
+  if (deptKey && !visibility.institutions[DEPT_CONFIG[deptKey].branchId]) {
+    return <Navigate to={`/interior/${firstVisibleDept}`} replace />;
+  }
 
   if (!deptKey) {
-    return <Navigate to="/interior" replace />;
+    return <Navigate to={`/interior/${firstVisibleDept}`} replace />;
   }
 
   const cfg = DEPT_CONFIG[deptKey];

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, ImagePlus, Plus, RotateCcw, Shield, Trash2 } from "lucide-react";
+import { GripVertical, ImagePlus, Plus, Shield, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +58,7 @@ import { appendActivityLog } from "@/lib/activityLog";
 import type { GangCard, GangStatus } from "@/types/gangsSchema";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { setPageVisible, useSiteVisibility } from "@/lib/siteVisibility";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -71,9 +72,10 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 function suggestId(name: string, existingIds: string[]): string {
-  const fromLatin = name
-    .normalize("NFKD")
-    .replace(/[^\x00-\x7F]/g, "")
+  const asciiOnly = Array.from(name.normalize("NFKD"))
+    .filter((ch) => ch.charCodeAt(0) <= 0x7f)
+    .join("");
+  const fromLatin = asciiOnly
     .replace(/[^\w]+/g, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase()
@@ -91,10 +93,12 @@ function SortableGangRow({
   gang,
   active,
   onSelect,
+  onEdit,
 }: {
   gang: GangCard;
   active: boolean;
   onSelect: () => void;
+  onEdit: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: gang.id,
@@ -106,8 +110,8 @@ function SortableGangRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-stretch gap-2 rounded-xl border bg-card/60 p-2 text-right transition-shadow",
-        active ? "border-primary/50 ring-1 ring-primary/30" : "border-primary/15",
+        "flex items-stretch gap-2 rounded-xl border bg-violet-50/75 p-2 text-right transition-shadow",
+        active ? "border-violet-400 ring-1 ring-violet-300" : "border-violet-200",
         isDragging && "z-20 opacity-90 shadow-lg",
       )}
     >
@@ -132,6 +136,11 @@ function SortableGangRow({
             {gang.id}
           </p>
         </div>
+        {gang.hidden ? (
+          <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700">
+            مخفية
+          </span>
+        ) : null}
         <span
           className={cn(
             "shrink-0 rounded-md px-1.5 py-0.5 font-display text-[10px]",
@@ -141,6 +150,15 @@ function SortableGangRow({
           {gang.status === "taken" ? "مأخوذة" : "متاحة"}
         </span>
       </button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-9 shrink-0 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+        onClick={onEdit}
+      >
+        تعديل
+      </Button>
     </div>
   );
 }
@@ -158,12 +176,17 @@ const emptyForm: GangCard = {
   brandColor: "#9333EA",
   profilePoints: ["", "", ""],
   leaderName: "",
+  hidden: false,
 };
 
 const GangsEditorPage = () => {
   const { user } = useAuth();
-  const { gangs, reorder, add, update, remove, resetToDefaults } = useGangsContent();
+  const { gangs, reorder, add, update, remove } = useGangsContent();
+  const visibility = useSiteVisibility();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "taken" | "available">("all");
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GangCard>(emptyForm);
   const [isNew, setIsNew] = useState(false);
@@ -182,16 +205,53 @@ const GangsEditorPage = () => {
     }
   }, [gangs, selectedId]);
 
+  useEffect(() => {
+    const sourceIds = gangs.map((g) => g.id);
+    setOrderedIds((prev) => {
+      if (prev.length === 0) return sourceIds;
+      const kept = prev.filter((id) => sourceIds.includes(id));
+      const added = sourceIds.filter((id) => !kept.includes(id));
+      return [...kept, ...added];
+    });
+  }, [gangs]);
+
+  const displayedGangs = useMemo(() => {
+    const byId = new Map(gangs.map((g) => [g.id, g]));
+    return orderedIds.map((id) => byId.get(id)).filter((g): g is GangCard => Boolean(g));
+  }, [gangs, orderedIds]);
+
+  const filteredGangs = displayedGangs.filter((g) => {
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = !q || `${g.name} ${g.id} ${g.location}`.toLowerCase().includes(q);
+    const matchesStatus =
+      statusFilter === "all" ? true : statusFilter === "taken" ? g.status === "taken" : g.status === "available";
+    return matchesSearch && matchesStatus;
+  });
+
+  const hasPendingOrderChanges =
+    orderedIds.length === gangs.length && orderedIds.some((id, i) => id !== gangs[i]?.id);
+
   const selected = gangs.find((g) => g.id === selectedId) ?? null;
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const oldIndex = gangs.findIndex((g) => g.id === active.id);
-    const newIndex = gangs.findIndex((g) => g.id === over.id);
+    const oldIndex = filteredGangs.findIndex((g) => g.id === active.id);
+    const newIndex = filteredGangs.findIndex((g) => g.id === over.id);
     if (oldIndex < 0 || newIndex < 0) return;
-    reorder(oldIndex, newIndex);
-    toast.success("تم تحديث الترتيب");
+    const targetId = filteredGangs[newIndex]?.id;
+    if (!targetId) return;
+
+    setOrderedIds((prev) => {
+      const movingId = String(active.id);
+      const from = prev.indexOf(movingId);
+      const to = prev.indexOf(targetId);
+      if (from < 0 || to < 0) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const openNew = () => {
@@ -251,6 +311,7 @@ const GangsEditorPage = () => {
       profilePoints: points,
       leaderName:
         editing.status === "taken" ? (editing.leaderName?.trim() || "مجهول") : undefined,
+      hidden: !!editing.hidden,
     };
 
     if (isNew) {
@@ -275,153 +336,166 @@ const GangsEditorPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 pb-12">
+    <div className="mx-auto max-w-6xl space-y-8 pb-12">
       <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2">
-            <Shield className="h-7 w-7 text-primary" />
+          <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold text-slate-900">
+            <Shield className="h-7 w-7 text-violet-700" />
             مدير العصابات
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-slate-600">
             نفس الحقول المعروضة في صفحة العصابات. التعديل يظهر في{" "}
-            <a href="/gangs" target="_blank" rel="noreferrer" className="text-primary underline-offset-4 hover:underline">
+            <a href="/gangs" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
               /gangs
             </a>{" "}
             مباشرةً.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={openNew}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            onClick={() => setPageVisible("gangs", !visibility.pages.gangs)}
+          >
+            {visibility.pages.gangs ? "إخفاء صفحة العصابات" : "إظهار صفحة العصابات"}
+          </Button>
+          {hasPendingOrderChanges ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              onClick={() => {
+                const working = gangs.map((g) => g.id);
+                for (let targetIndex = 0; targetIndex < orderedIds.length; targetIndex += 1) {
+                  const wantedId = orderedIds[targetIndex];
+                  const currentIndex = working.indexOf(wantedId);
+                  if (currentIndex < 0 || currentIndex === targetIndex) continue;
+                  reorder(currentIndex, targetIndex);
+                  const [moved] = working.splice(currentIndex, 1);
+                  working.splice(targetIndex, 0, moved);
+                }
+                toast.success("تم حفظ الترتيب");
+              }}
+            >
+              حفظ الترتيب
+            </Button>
+          ) : null}
+          <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={openNew}>
             <Plus className="ms-1 h-4 w-4" /> عصابة جديدة
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="border-warning/40 text-warning">
-                <RotateCcw className="ms-1 h-4 w-4" /> استعادة الافتراضي
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
-              <AlertDialogHeader className="text-right">
-                <AlertDialogTitle>استعادة القائمة الأصلية؟</AlertDialogTitle>
-                <AlertDialogDescription>سيُستبدل كل المحتوى الحالي بالبيانات الافتراضية للمشروع.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:justify-start">
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    resetToDefaults();
-                    toast.success("تمت الاستعادة");
-                  }}
-                >
-                  تأكيد
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_1fr]">
-        <div className="space-y-3">
-          <p className="font-display text-xs tracking-wide text-muted-foreground">الترتيب (اسحب)</p>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={gangs.map((g) => g.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-2">
-                {gangs.map((gang) => (
+      <div className="space-y-3 rounded-2xl border border-violet-200/80 bg-white/85 p-4 shadow-[0_18px_44px_-28px_rgba(54,22,79,0.45)]">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="text-right">
+          <Label htmlFor="gang-search" className="text-slate-700">بحث بالاسم أو المعرف أو الموقع</Label>
+          <Input
+            id="gang-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="mt-1.5 border-violet-200 bg-violet-50/35 text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+            placeholder="اكتب اسم العصابة أو المعرف..."
+            autoComplete="off"
+            dir="rtl"
+          />
+        </div>
+          <div className="text-right">
+            <Label className="text-slate-700">حالة العصابات</Label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "taken" | "available")}>
+              <SelectTrigger className="mt-1.5 border-violet-200 bg-violet-50/35 text-slate-900 [&>span]:text-slate-900 data-[placeholder]:text-slate-700">
+                <SelectValue className="text-slate-900 data-[placeholder]:text-slate-700" />
+              </SelectTrigger>
+              <SelectContent dir="rtl" className="border-violet-200 bg-white text-slate-900">
+                <SelectItem value="all" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">الكل</SelectItem>
+                <SelectItem value="taken" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">المأخوذة فقط</SelectItem>
+                <SelectItem value="available" className="text-slate-800 focus:bg-violet-50 focus:text-violet-900">غير المأخوذة فقط</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <p className="font-display text-xs tracking-wide text-slate-500">الترتيب (اسحب)</p>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={filteredGangs.map((g) => g.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {filteredGangs.length > 0 ? (
+                filteredGangs.map((gang) => (
                   <SortableGangRow
                     key={gang.id}
                     gang={gang}
                     active={selectedId === gang.id}
                     onSelect={() => setSelectedId(gang.id)}
+                    onEdit={() => openEdit(gang)}
                   />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-
-        <div className="min-w-0 space-y-4 rounded-2xl border border-primary/20 bg-card/40 p-4 sm:p-6">
-          {!selected ? (
-            <p className="text-center text-muted-foreground">لا توجد عصابات.</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary/15 pb-4">
-                <div className="text-right min-w-0">
-                  <h2 className="font-display text-xl font-bold">{selected.name}</h2>
-                  <p className="font-mono text-xs text-muted-foreground" dir="ltr">
-                    id: {selected.id}
-                  </p>
+                ))
+              ) : (
+                <div className="rounded-xl border border-violet-200 bg-white/80 px-4 py-8 text-center text-sm text-slate-500">
+                  لا توجد نتائج مطابقة للبحث.
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => openEdit(selected)}>
-                    تعديل كامل
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button type="button" variant="destructive" size="sm">
-                        <Trash2 className="ms-1 h-4 w-4" /> حذف
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent dir="rtl">
-                      <AlertDialogHeader className="text-right">
-                        <AlertDialogTitle>حذف {selected.name}؟</AlertDialogTitle>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter className="gap-2 sm:justify-start">
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => {
-                            appendActivityLog(user?.username ?? "—", "عصابات: حذف", selected.name);
-                            remove(selected.id);
-                            setSelectedId(null);
-                            toast.success("تم الحذف");
-                          }}
-                        >
-                          حذف
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
-                <img
-                  src={selected.logoImage}
-                  alt=""
-                  className="h-28 w-full rounded-xl object-cover border border-primary/25"
-                />
-                <div className="space-y-1 text-right text-sm">
-                  <p className="text-muted-foreground">{selected.specialty}</p>
-                  <p>{selected.location}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-primary/25 bg-card p-0 shadow-[0_24px_64px_-16px_hsl(240_40%_2%/0.88)] sm:w-full lg:max-w-5xl"
+          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-violet-300 bg-[#f7f1fc] p-0 shadow-[0_24px_64px_-24px_rgba(54,22,79,0.55)] sm:w-full lg:max-w-5xl"
         >
-          <div className="shrink-0 border-b border-border/60 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,hsl(var(--primary)/0.14),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
+          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
             <DialogHeader className="space-y-1.5 text-right sm:text-right">
-              <DialogTitle className="font-display text-xl font-bold sm:text-2xl">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
                 {isNew ? "عصابة جديدة" : "تعديل العصابة"}
               </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
+              <DialogDescription className="text-sm leading-relaxed text-slate-600">
                 حدّد الهوية والوسائط والحالة، ثم احفظ — يظهر التحديث في صفحة العصابات.
               </DialogDescription>
             </DialogHeader>
+            {!isNew ? (
+              <div className="mt-3 flex justify-end">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
+                      <Trash2 className="ms-1 h-4 w-4" />
+                      حذف العصابة
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader className="text-right">
+                      <AlertDialogTitle>حذف {editing.name || "العصابة"}؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        سيتم حذف العنصر نهائياً من القائمة.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2 sm:justify-start">
+                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          appendActivityLog(user?.username ?? "—", "عصابات: حذف", editing.name || editing.id);
+                          remove(editing.id);
+                          setSelectedId((prev) => (prev === editing.id ? null : prev));
+                          setDialogOpen(false);
+                          toast.success("تم حذف العصابة");
+                        }}
+                      >
+                        تأكيد الحذف
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ) : null}
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8">
             <EditorDialogSection title="التعريف والمعرّف">
               {isNew ? (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">المعرّف (اختياري)</Label>
+                <Label className="text-xs font-medium text-slate-600">المعرّف (اختياري)</Label>
                   <Input
-                    className={cn(editorDialogMonoClass, "mt-1.5")}
+                    className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     dir="ltr"
                     placeholder="مثال: my-crew"
                     value={editing.id}
@@ -432,13 +506,13 @@ const GangsEditorPage = () => {
                       }))
                     }
                   />
-                  <p className="text-[11px] text-muted-foreground">إن تركته فارغاً يُولَّد تلقائياً من الاسم.</p>
+                  <p className="text-[11px] text-slate-500">إن تركته فارغاً يُولَّد تلقائياً من الاسم.</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">المعرّف</Label>
+                  <Label className="text-xs font-medium text-slate-600">المعرّف</Label>
                   <Input
-                    className={cn(editorDialogMonoClass, "mt-1.5 opacity-80")}
+                    className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900 opacity-80")}
                     dir="ltr"
                     value={editing.id}
                     readOnly
@@ -446,34 +520,34 @@ const GangsEditorPage = () => {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الاسم العربي</Label>
+                <Label className="text-xs font-medium text-slate-600">الاسم العربي</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.name}
                   onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الاسم الإنجليزي (اختياري)</Label>
+                <Label className="text-xs font-medium text-slate-600">الاسم الإنجليزي (اختياري)</Label>
                 <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
+                  className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   dir="ltr"
                   value={editing.nameEn ?? ""}
                   onChange={(e) => setEditing((p) => ({ ...p, nameEn: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">التخصص (السطر فوق الاسم)</Label>
+                <Label className="text-xs font-medium text-slate-600">التخصص (السطر فوق الاسم)</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.specialty}
                   onChange={(e) => setEditing((p) => ({ ...p, specialty: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الموقع</Label>
+                <Label className="text-xs font-medium text-slate-600">الموقع</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5")}
+                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   value={editing.location}
                   onChange={(e) => setEditing((p) => ({ ...p, location: e.target.value }))}
                 />
@@ -482,17 +556,17 @@ const GangsEditorPage = () => {
 
             <EditorDialogSection title="المحتوى والوسائط">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">الوصف</Label>
+                <Label className="text-xs font-medium text-slate-600">الوصف</Label>
                 <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[100px]")}
+                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[100px] border-violet-200 bg-white text-slate-900")}
                   value={editing.description}
                   onChange={(e) => setEditing((p) => ({ ...p, description: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">رابط أو معرف يوتيوب</Label>
+                <Label className="text-xs font-medium text-slate-600">رابط أو معرف يوتيوب</Label>
                 <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
+                  className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                   dir="ltr"
                   value={editing.youtubeVideo}
                   onChange={(e) => setEditing((p) => ({ ...p, youtubeVideo: e.target.value }))}
@@ -502,7 +576,7 @@ const GangsEditorPage = () => {
 
             <EditorDialogSection title="الحالة والهوية">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">حالة العصابة</Label>
+                <Label className="text-xs font-medium text-slate-600">حالة العصابة</Label>
                 <Select
                   value={editing.status}
                   onValueChange={(v) =>
@@ -513,7 +587,7 @@ const GangsEditorPage = () => {
                     }))
                   }
                 >
-                  <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5")}>
+                  <SelectTrigger className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent dir="rtl">
@@ -524,25 +598,25 @@ const GangsEditorPage = () => {
               </div>
               {editing.status === "taken" ? (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">اسم صاحب العصابة</Label>
+                <Label className="text-xs font-medium text-slate-600">اسم صاحب العصابة</Label>
                   <Input
-                    className={cn(editorDialogInputClass, "mt-1.5")}
+                    className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
                     value={editing.leaderName ?? ""}
                     onChange={(e) => setEditing((p) => ({ ...p, leaderName: e.target.value }))}
                   />
                 </div>
               ) : null}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">لون الهوية (HEX)</Label>
+                <Label className="text-xs font-medium text-slate-600">لون الهوية (HEX)</Label>
                 <div className="mt-1.5 flex gap-2">
                   <Input
                     type="color"
-                    className="h-10 w-14 shrink-0 cursor-pointer rounded-lg border border-border/70 p-1"
+                    className="h-10 w-14 shrink-0 cursor-pointer rounded-lg border border-violet-200 bg-white p-1"
                     value={/^#[0-9A-Fa-f]{6}$/.test(editing.brandColor) ? editing.brandColor : "#9333EA"}
                     onChange={(e) => setEditing((p) => ({ ...p, brandColor: e.target.value }))}
                   />
                   <Input
-                    className={cn(editorDialogMonoClass, "min-w-0 flex-1")}
+                    className={cn(editorDialogMonoClass, "min-w-0 flex-1 border-violet-200 bg-white text-slate-900")}
                     dir="ltr"
                     value={editing.brandColor}
                     onChange={(e) => setEditing((p) => ({ ...p, brandColor: e.target.value }))}
@@ -550,9 +624,9 @@ const GangsEditorPage = () => {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">نقاط الهوية (سطر لكل نقطة)</Label>
+                <Label className="text-xs font-medium text-slate-600">نقاط الهوية (سطر لكل نقطة)</Label>
                 <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[120px] font-mono text-sm")}
+                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[120px] border-violet-200 bg-white font-mono text-sm text-slate-900")}
                   value={pointsText}
                   onChange={(e) => setPointsText(e.target.value)}
                   placeholder={"سطر 1\nسطر 2\nسطر 3"}
@@ -562,13 +636,10 @@ const GangsEditorPage = () => {
 
             <EditorDialogSection title="الشعار">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">مسار أو رابط</Label>
-                <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5")}
-                  dir="ltr"
-                  value={editing.logoImage.startsWith("data:") ? "" : editing.logoImage}
-                  onChange={(e) => setEditing((p) => ({ ...p, logoImage: e.target.value }))}
-                />
+                <Label className="text-xs font-medium text-slate-600">رفع الشعار</Label>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  يتم اعتماد الشعار من رفع الملف فقط (بدون روابط).
+                </p>
                 <input
                   ref={fileRef}
                   type="file"
@@ -581,31 +652,44 @@ const GangsEditorPage = () => {
                 />
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
-                  className="mt-2 rounded-lg"
+                  className="mt-2 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
                   onClick={() => fileRef.current?.click()}
                 >
                   <ImagePlus className="ms-2 h-4 w-4" />
                   رفع شعار من الجهاز
                 </Button>
               </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-primary/25 bg-background/40 p-3">
+              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-violet-300 bg-white/70 p-3">
                 <img
                   src={editing.logoImage || "/placeholder.svg"}
                   alt=""
-                  className="max-h-36 max-w-full rounded-md border border-border/60 object-contain"
+                  className="max-h-36 max-w-full rounded-md border border-violet-200 object-contain"
                 />
               </div>
             </EditorDialogSection>
           </div>
 
-          <div className="shrink-0 border-t border-border/60 bg-background/85 px-6 py-4 backdrop-blur-sm sm:px-8">
+          <div className="shrink-0 border-t border-violet-200 bg-white/80 px-6 py-4 backdrop-blur-sm sm:px-8">
             <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-start sm:gap-3">
-              <Button type="button" variant="outline" className="rounded-lg sm:min-w-[7rem]" onClick={() => setDialogOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setEditing((p) => ({ ...p, hidden: !p.hidden }))}
+              >
+                {editing.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                onClick={() => setDialogOpen(false)}
+              >
                 إلغاء
               </Button>
-              <Button type="button" className="rounded-lg sm:min-w-[7rem]" onClick={saveDialog}>
+              <Button type="button" className="rounded-lg bg-[#36164f] text-white hover:bg-[#2f1344] sm:min-w-[7rem]" onClick={saveDialog}>
                 حفظ التغييرات
               </Button>
             </DialogFooter>

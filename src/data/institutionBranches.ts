@@ -2,7 +2,6 @@
 
 export const INSTITUTION_BRANCH_IDS = [
   "health",
-  "interior_hub",
   "interior_police",
   "interior_sheriff",
   "interior_cia",
@@ -23,9 +22,8 @@ export const INSTITUTION_BRANCH_META: Record<
   { labelAr: string; previewPath: string }
 > = {
   health: { labelAr: "وزارة الصحة", previewPath: "/health" },
-  interior_hub: { labelAr: "وزارة الداخلية — النظرة العامة", previewPath: "/interior" },
   interior_police: { labelAr: "وزارة الداخلية — الشرطة", previewPath: "/interior/police" },
-  interior_sheriff: { labelAr: "وزارة الداخلية — الشرف", previewPath: "/interior/sheriff" },
+  interior_sheriff: { labelAr: "وزارة الداخلية — الشيرف", previewPath: "/interior/sheriff" },
   interior_cia: { labelAr: "وزارة الداخلية — CIA", previewPath: "/interior/cia" },
   interior_marines: { labelAr: "وزارة الداخلية — المارينز", previewPath: "/interior/marines" },
   oversight: { labelAr: "مؤسسة الرقابة", previewPath: "/oversight" },

@@ -6,11 +6,13 @@ import {
   Car,
   ClipboardList,
   ExternalLink,
+  Footprints,
   History,
+  Info,
   LayoutDashboard,
   LogOut,
+  MessageSquareMore,
   Scale,
-  Shield,
   Swords,
   Users,
   Video,
@@ -37,6 +39,22 @@ const STATIC_NAV_CORE: NavItem[] = [
   { to: "/dashboard/streamers", label: "ستريمر منجر", icon: Video, roles: ["super_admin", "streamer_manager"] },
   { to: "/dashboard/gangs", label: "مدير العصابات", icon: Swords, roles: ["super_admin", "gang_manager"] },
   { to: "/dashboard/vip-cars", label: "مدير سيارات VIP", icon: Car, roles: ["super_admin", "vip_cars_manager"] },
+  { to: "/dashboard/about", label: "مدير من نحن", icon: Info, roles: ["super_admin", "about_manager"] },
+  { to: "/dashboard/footer", label: "مدير الفوتر", icon: Footprints, roles: ["super_admin", "footer_manager"] },
+  {
+    to: "/dashboard/tickets",
+    label: "التكت",
+    icon: MessageSquareMore,
+    roles: [
+      "super_admin",
+      "ticket_support_manager",
+      "ticket_admin_inquiry_manager",
+      "ticket_player_complaint_manager",
+      "ticket_compensation_manager",
+      "ticket_store_manager",
+      "ticket_general_manager",
+    ],
+  },
 ];
 
 const STATIC_NAV_TAIL: NavItem[] = [
@@ -62,6 +80,17 @@ function adminRoleShell(role: StaffRole): { title: string; badge: string } {
       return { title: "مدير سيارات VIP", badge: "VIP Cars Manager" };
     case "application_reviewer":
       return { title: "مراجع التقديمات", badge: "Application Reviewer" };
+    case "about_manager":
+      return { title: "مدير من نحن", badge: "About Manager" };
+    case "ticket_support_manager":
+    case "ticket_admin_inquiry_manager":
+    case "ticket_player_complaint_manager":
+    case "ticket_compensation_manager":
+    case "ticket_store_manager":
+    case "ticket_general_manager":
+      return { title: "مدير التكت", badge: "Ticket Manager" };
+    case "footer_manager":
+      return { title: "مدير الفوتر", badge: "Footer Manager" };
     default:
       if (isInstitutionRosterStaffRole(role)) {
         const id = branchIdFromInstitutionRosterStaffRole(role);
@@ -142,6 +171,12 @@ const AdminLayout = () => {
                 ? "مدير العصابات"
                 : location.pathname.startsWith("/dashboard/vip-cars")
                   ? "مدير سيارات VIP"
+                  : location.pathname.startsWith("/dashboard/about")
+                    ? "مدير من نحن"
+                    : location.pathname.startsWith("/dashboard/footer")
+                      ? "مدير الفوتر"
+                    : location.pathname.startsWith("/dashboard/tickets")
+                      ? "التكت"
                   : location.pathname === "/dashboard/institution"
                     ? "طواقم المؤسسات"
                     : location.pathname.startsWith("/dashboard/institution/")
@@ -166,6 +201,21 @@ const AdminLayout = () => {
             ? "صلاحية عصابات"
             : isVipCarsManager
               ? "صلاحية سيارات VIP"
+                  : userRoles.includes("about_manager")
+                    ? "صلاحية من نحن"
+                    : userRoles.some((r) =>
+                        [
+                          "ticket_support_manager",
+                          "ticket_admin_inquiry_manager",
+                          "ticket_player_complaint_manager",
+                          "ticket_compensation_manager",
+                          "ticket_store_manager",
+                          "ticket_general_manager",
+                        ].includes(r),
+                      )
+                      ? "صلاحية التكت"
+                      : userRoles.includes("footer_manager")
+                        ? "صلاحية الفوتر"
               : isInstitutionRosterManager
                 ? "صلاحية طاقم مؤسسة"
                 : isApplicationReviewer
@@ -175,27 +225,27 @@ const AdminLayout = () => {
   return (
     <div
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-white text-foreground antialiased dark:from-slate-950 dark:via-slate-900 dark:to-slate-950"
+      className="min-h-screen bg-gradient-to-b from-[#eee5f6] via-[#e7dcf2] to-[#e1d4ee] text-slate-900 antialiased"
     >
       <div className="flex min-h-screen flex-col lg:flex-row">
-        <aside className="relative z-40 flex w-full shrink-0 flex-col border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-xl pt-[env(safe-area-inset-top,0px)] dark:border-slate-800 dark:bg-slate-900/95 lg:fixed lg:inset-y-0 lg:right-0 lg:w-[17.5rem] lg:border-b-0 lg:border-l lg:border-slate-200/80 dark:lg:border-slate-800">
-          <div className="border-b border-slate-100 px-5 py-6 dark:border-slate-800">
+        <aside className="relative z-40 flex w-full shrink-0 flex-col border-b border-[#4a2a63] bg-[#36164f] pt-[env(safe-area-inset-top,0px)] shadow-[0_10px_35px_-20px_rgba(54,22,79,0.9)] lg:fixed lg:inset-y-0 lg:right-0 lg:w-[17.5rem] lg:border-b-0 lg:border-l">
+          <div className="border-b border-violet-300/30 px-5 py-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-sky-200/80 bg-gradient-to-b from-white to-slate-50 shadow-sm ring-1 ring-sky-100/80 dark:border-sky-800/50 dark:from-slate-800 dark:to-slate-900/90 dark:ring-sky-950/40">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center">
                 <img
                   src="/INF_LOGO.png"
                   alt="Infinite City"
-                  className="h-10 w-10 object-contain drop-shadow-[0_0_18px_hsl(199_89%_48%/0.35)]"
+                  className="h-10 w-10 object-contain drop-shadow-[0_0_14px_hsl(272_82%_58%/0.28)]"
                   loading="eager"
                 />
               </div>
               <div className="min-w-0 flex-1 text-right">
-                <p className="font-display text-[10px] tracking-[0.32em] text-sky-600/90 dark:text-sky-400/90">INFINITE CITY</p>
-                <p className="mt-1 font-display text-lg font-bold leading-tight text-slate-800 dark:text-slate-50">{title}</p>
-                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="font-display text-[10px] tracking-[0.32em] text-violet-100">INFINITE CITY</p>
+                <p className="mt-1 font-display text-lg font-bold leading-tight text-white">{title}</p>
+                <p className="mt-1.5 text-xs text-violet-100/90">
                   {user?.username}
                   <span className="mx-1.5 text-slate-300">·</span>
-                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="rounded-md bg-white/20 px-1.5 py-0.5 font-mono text-[10px] text-white">
                     {badge}
                   </span>
                 </p>
@@ -203,7 +253,7 @@ const AdminLayout = () => {
             </div>
           </div>
           <nav className="flex flex-1 flex-col gap-0.5 p-3">
-            <span className="px-3 py-2 font-display text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            <span className="px-3 py-2 font-display text-[11px] font-medium uppercase tracking-wide text-violet-100/80">
               القائمة
             </span>
             {items.map((item) => (
@@ -215,8 +265,8 @@ const AdminLayout = () => {
                   cn(
                     "flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-display text-sm transition-all duration-200",
                     isActive
-                      ? "bg-sky-100 font-semibold text-sky-900 shadow-sm dark:bg-sky-950/60 dark:text-sky-100"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100",
+                      ? "bg-white font-semibold text-violet-800 shadow-sm shadow-violet-900/20"
+                      : "text-violet-100 hover:bg-white/15 hover:text-white",
                   )
                 }
               >
@@ -225,51 +275,51 @@ const AdminLayout = () => {
               </NavLink>
             ))}
 
-            <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <div className="mt-3 space-y-2 border-t border-violet-300/30 pt-3">
               {isLawsEditor ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <Scale className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <Scale className="me-1 inline h-3 w-3 text-violet-100" />
                   القوانين تتحدث للزوّار بعد الحفظ.
                 </p>
               ) : null}
               {isStreamerManager ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <Video className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <Video className="me-1 inline h-3 w-3 text-violet-100" />
                   صفحة البث والصور محلياً في المتصفح.
                 </p>
               ) : null}
               {isGangManager ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <Swords className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <Swords className="me-1 inline h-3 w-3 text-violet-100" />
                   العصابات والشعارات محلياً.
                 </p>
               ) : null}
               {isVipCarsManager ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <Car className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <Car className="me-1 inline h-3 w-3 text-violet-100" />
                   كتالوج VIP والصور محلياً.
                 </p>
               ) : null}
               {isInstitutionRosterManager ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <Building2 className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <Building2 className="me-1 inline h-3 w-3 text-violet-100" />
                   {userRoles.filter((r) => isInstitutionRosterStaffRole(r)).length > 1
                     ? "لكل فرع صفحة منفصلة من القائمة أو من صفحة الطواقم."
                     : "تعديل طاقم الفرع المرتبط بدورك فقط."}
                 </p>
               ) : null}
               {isApplicationReviewer ? (
-                <p className="px-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  <ClipboardList className="me-1 inline h-3 w-3 text-sky-500" />
+                <p className="px-3 text-[11px] leading-relaxed text-violet-100/90">
+                  <ClipboardList className="me-1 inline h-3 w-3 text-violet-100" />
                   طلبات التقديم: قبول أو رفض.
                 </p>
               ) : null}
             </div>
           </nav>
-          <div className="border-t border-slate-100 p-3 space-y-0.5 dark:border-slate-800">
+          <div className="space-y-0.5 border-t border-violet-300/30 p-3">
             <Link
               to="/"
-              className="flex items-center gap-2 rounded-xl px-3 py-2 font-display text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-sky-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-sky-200"
+              className="flex items-center gap-2 rounded-xl px-3 py-2 font-display text-sm text-violet-100 transition-colors hover:bg-white/15 hover:text-white"
             >
               <ExternalLink className="h-4 w-4 shrink-0" />
               الموقع العام
@@ -278,33 +328,17 @@ const AdminLayout = () => {
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:mr-[17.5rem]">
-          <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200/80 bg-white/90 px-4 py-3.5 backdrop-blur-md sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-[#8f74a9] bg-[#b394cd]/95 px-4 py-3.5 backdrop-blur-md sm:px-6">
             <div className="min-w-0 text-right">
-              <p className="truncate font-display text-sm font-semibold text-slate-800 dark:text-slate-100">{pageTitle}</p>
-              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                {user?.username} ·{" "}
-                {isSuperAdmin ? (
-                  <Shield className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : isStreamerManager ? (
-                  <Video className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : isGangManager ? (
-                  <Swords className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : isVipCarsManager ? (
-                  <Car className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : isInstitutionRosterManager ? (
-                  <Building2 className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : isApplicationReviewer ? (
-                  <ClipboardList className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                ) : (
-                  <Scale className="inline h-3 w-3 text-sky-600 dark:text-sky-400" aria-hidden />
-                )}{" "}
-                {subHint}
+              <p className="truncate font-display text-sm font-semibold text-slate-900">{pageTitle}</p>
+              <p className="truncate text-xs text-slate-600">
+                {isSuperAdmin ? "مرحباً بك يا سوبر أدمن" : `${user?.username} · ${subHint}`}
               </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="shrink-0 border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="shrink-0 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 active:bg-violet-100"
               onClick={() => {
                 logout();
                 navigate("/", { replace: true });

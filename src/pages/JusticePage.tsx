@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useReducedMotion } from "framer-motion";
 import { BookOpen, Gavel, Scale } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -8,9 +8,11 @@ import { InstitutionLawsPlaceholder } from "@/components/InstitutionLawsPlacehol
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const JusticePage = () => {
   const lawyerRoster = useInstitutionRoster("justice_lawyers");
+  const visibility = useSiteVisibility();
   const location = useLocation();
   const reduceMotion = useReducedMotion();
 
@@ -20,6 +22,8 @@ const JusticePage = () => {
     if (!el) return;
     el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
   }, [location.hash, location.pathname, reduceMotion]);
+
+  if (!visibility.institutions.justice_lawyers) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">

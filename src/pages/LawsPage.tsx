@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -13,6 +13,7 @@ import { useLawsContent } from "@/contexts/LawsContentContext";
 import { sectionItemCount } from "@/lib/lawsUtils";
 import { cn } from "@/lib/utils";
 import type { LawTabSection } from "@/types/lawsSchema";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 type RuleVariant = "primary" | "secondary" | "accent" | "magenta";
 
@@ -249,8 +250,11 @@ const LawsPage = () => {
   const reduceMotion = useReducedMotion();
   const [query, setQuery] = useState("");
   const { sections } = useLawsContent();
+  const visibility = useSiteVisibility();
+  const visibleSections = useMemo(() => sections.filter((s) => !s.hidden), [sections]);
 
-  const defaultTab = sections[0]?.id ?? "general";
+  const defaultTab = visibleSections[0]?.id ?? "general";
+  if (!visibility.pages.laws) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
@@ -291,7 +295,7 @@ const LawsPage = () => {
           </div>
         </div>
 
-        <Tabs key={sections.map((s) => s.id).join("|")} defaultValue={defaultTab} className="mt-6 w-full md:mt-8">
+        <Tabs key={visibleSections.map((s) => s.id).join("|")} defaultValue={defaultTab} className="mt-6 w-full md:mt-8">
           <div className="sticky top-14 z-40 flex justify-center px-3 py-2 sm:top-16 md:px-6 md:py-2.5 xl:px-10">
             <TabsList
               className={cn(
@@ -300,7 +304,7 @@ const LawsPage = () => {
                 "sm:gap-2 sm:p-2 md:max-w-none",
               )}
             >
-              {sections.map((t) => (
+              {visibleSections.map((t) => (
                 <TabsTrigger
                   key={t.id}
                   value={t.id}
@@ -318,9 +322,13 @@ const LawsPage = () => {
           </div>
 
           <div className="mx-auto max-w-6xl px-4 md:px-8 xl:px-12">
-            {sections.map((section) => (
+            {visibleSections.map((section) => (
               <TabsContent key={section.id} value={section.id} className="mt-8 outline-none" forceMount={false}>
-                {renderSectionContent(section, query, reduceMotion)}
+                {renderSectionContent(
+                  section.kind === "rules" ? { ...section, rules: section.rules.filter((r) => !r.hidden) } : section,
+                  query,
+                  reduceMotion,
+                )}
               </TabsContent>
             ))}
           </div>

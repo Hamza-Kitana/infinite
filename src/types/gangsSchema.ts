@@ -13,6 +13,8 @@ export type GangCard = {
   brandColor: string;
   profilePoints: string[];
   leaderName?: string;
+  /** مخفية من العرض في الموقع العام */
+  hidden?: boolean;
 };
 
 export type GangsPersisted = {

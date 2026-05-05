@@ -4,7 +4,6 @@ import {
   ciaDepartmentRoster,
   developerRoster,
   healthRoster,
-  interiorMinistryOverview,
   lawyerRoster,
   marinesDepartmentRoster,
   oversightRoster,
@@ -26,7 +25,6 @@ export function defaultInstitutionRostersPersisted(): InstitutionRostersPersiste
     v: 1,
     rosters: {
       health: deepClone(healthRoster),
-      interior_hub: deepClone(interiorMinistryOverview),
       interior_police: deepClone(policeDepartmentRoster),
       interior_sheriff: deepClone(sheriffDepartmentRoster),
       interior_cia: deepClone(ciaDepartmentRoster),

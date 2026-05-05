@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Building2, GripVertical, ImagePlus, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Building2, GripVertical, ImagePlus, Plus, Trash2 } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertDialog,
@@ -28,6 +28,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +62,7 @@ import type { ChromaGridItem } from "@/components/ChromaGrid";
 import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { setInstitutionVisible, useSiteVisibility } from "@/lib/siteVisibility";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -67,7 +75,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-type MemberDraft = ChromaGridItem & { _key: string };
+type MemberDraft = ChromaGridItem & { _key: string; hidden?: boolean };
 
 type DraftState = {
   leader: RosterPerson;
@@ -93,23 +101,15 @@ function draftToRoster(d: DraftState): InstitutionRosterData {
   };
 }
 
-/** نص مؤقت للنقاط في الواجهة */
-function highlightsToText(p: RosterPerson): string {
-  return (p.highlights ?? []).join("\n");
-}
-
 function SortableMemberRow({
   member,
-  onPatch,
+  onEdit,
   onRemove,
-  onPickImage,
 }: {
   member: MemberDraft;
-  onPatch: (patch: Partial<ChromaGridItem>) => void;
+  onEdit: () => void;
   onRemove: () => void;
-  onPickImage: (file: File | null) => void;
 }) {
-  const fileRef = useRef<HTMLInputElement>(null);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: member._key,
   });
@@ -120,177 +120,121 @@ function SortableMemberRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-xl border border-primary/20 bg-card/50 p-3 space-y-2 text-right",
+        "space-y-2 rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-right",
         isDragging && "z-20 opacity-90 shadow-lg",
       )}
     >
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/25 text-muted-foreground cursor-grab touch-manipulation active:cursor-grabbing h-10"
+          className="inline-flex h-10 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 active:cursor-grabbing"
           aria-label="سحب"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">العنوان</Label>
-              <Input className="mt-1" value={member.title} onChange={(e) => onPatch({ title: e.target.value })} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <img src={member.image} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-violet-200 object-cover" />
+            <div className="min-w-0 flex-1 text-right">
+              <p className="truncate font-display font-semibold text-slate-900">{member.title}</p>
+              <p className="truncate text-xs text-slate-600">{member.subtitle}</p>
             </div>
-            <div>
-              <Label className="text-xs">الوصف الفرعي</Label>
-              <Input
-                className="mt-1"
-                value={member.subtitle}
-                onChange={(e) => onPatch({ subtitle: e.target.value })}
-              />
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs">رابط الصورة</Label>
-            <Input
-              className="mt-1 font-mono text-xs"
-              dir="ltr"
-              value={member.image.startsWith("data:") ? "" : member.image}
-              onChange={(e) => onPatch({ image: e.target.value })}
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                onPickImage(e.target.files?.[0] ?? null);
-                e.target.value = "";
-              }}
-            />
-            <Button type="button" variant="secondary" size="sm" className="mt-1" onClick={() => fileRef.current?.click()}>
-              <ImagePlus className="ms-1 h-3 w-3" /> رفع
-            </Button>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">لون الإطار</Label>
-              <Input
-                className="mt-1 font-mono text-xs"
-                dir="ltr"
-                value={member.borderColor ?? ""}
-                onChange={(e) => onPatch({ borderColor: e.target.value || undefined })}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">تدرج CSS (linear-gradient…)</Label>
-              <Input
-                className="mt-1 font-mono text-[11px]"
-                dir="ltr"
-                value={member.gradient ?? ""}
-                onChange={(e) => onPatch({ gradient: e.target.value || undefined })}
-              />
-            </div>
+            {member.hidden ? (
+              <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700">
+                مخفي
+              </span>
+            ) : null}
           </div>
         </div>
-        <Button type="button" variant="ghost" size="icon" className="text-destructive shrink-0" onClick={onRemove}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button type="button" variant="outline" size="sm" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={onEdit}>
+            تعديل
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" size="icon" className="shrink-0 border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent dir="rtl">
+              <AlertDialogHeader className="text-right">
+                <AlertDialogTitle>تأكيد حذف العضو</AlertDialogTitle>
+                <AlertDialogDescription>
+                  سيتم حذف هذا العضو من شبكة الطاقم. هل تريد المتابعة؟
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2 sm:justify-start">
+                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={onRemove}>تأكيد الحذف</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   );
 }
 
-function PersonBlock({
-  label,
-  person,
-  setPerson,
-  onImageFile,
-}: {
-  label: string;
-  person: RosterPerson;
-  setPerson: (p: RosterPerson) => void;
-  onImageFile: (file: File | null) => void;
-}) {
-  const imgRef = useRef<HTMLInputElement>(null);
-  const highlightsText = highlightsToText(person);
-
+function PersonSummaryCard({ label, person, onEdit }: { label: string; person: RosterPerson; onEdit: () => void }) {
   return (
-    <div className="rounded-xl border border-primary/15 bg-background/40 p-4 space-y-3 text-right">
-      <p className="font-display text-sm font-semibold text-primary">{label}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label className="text-xs">الاسم</Label>
-          <Input className="mt-1" value={person.name} onChange={(e) => setPerson({ ...person, name: e.target.value })} />
+    <div className="space-y-3 rounded-xl border border-violet-200 bg-white/90 p-4 text-right shadow-[0_14px_30px_-22px_rgba(54,22,79,0.35)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-right">
+          <p className="font-display text-sm font-semibold text-violet-700">{label}</p>
+          {person.hidden ? (
+            <p className="mt-1 text-[11px] font-display text-slate-500">مخفي من الموقع</p>
+          ) : null}
+          <p className="mt-1 text-base font-bold text-slate-900">{person.name}</p>
+          <p className="text-xs text-slate-600">{person.title}</p>
         </div>
-        <div>
-          <Label className="text-xs">المنصب</Label>
-          <Input
-            className="mt-1"
-            value={person.title}
-            onChange={(e) => setPerson({ ...person, title: e.target.value })}
-          />
-        </div>
-      </div>
-      <div>
-        <Label className="text-xs">رابط الصورة</Label>
-        <Input
-          className="mt-1 font-mono text-xs"
-          dir="ltr"
-          value={person.image.startsWith("data:") ? "" : person.image}
-          onChange={(e) => setPerson({ ...person, image: e.target.value })}
-        />
-        <input
-          ref={imgRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            onImageFile(e.target.files?.[0] ?? null);
-            e.target.value = "";
-          }}
-        />
-        <Button type="button" variant="secondary" size="sm" className="mt-1" onClick={() => imgRef.current?.click()}>
-          <ImagePlus className="ms-1 h-3 w-3" /> رفع صورة
+        <Button type="button" variant="outline" size="sm" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={onEdit}>
+          تعديل
         </Button>
       </div>
-      <div>
-        <Label className="text-xs">سطر تعريفي</Label>
-        <Input
-          className="mt-1"
-          value={person.tagline ?? ""}
-          onChange={(e) => setPerson({ ...person, tagline: e.target.value || undefined })}
-        />
-      </div>
-      <div>
-        <Label className="text-xs">نبذة</Label>
-        <Textarea
-          className="mt-1 min-h-[72px]"
-          value={person.bio}
-          onChange={(e) => setPerson({ ...person, bio: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label className="text-xs">نقاط المسؤوليات (سطر لكل نقطة)</Label>
-        <Textarea
-          className="mt-1 min-h-[72px]"
-          value={highlightsText}
-          onChange={(e) => {
-            const lines = e.target.value.split("\n").map((l) => l.trim()).filter(Boolean);
-            setPerson({ ...person, highlights: lines.length ? lines : undefined });
-          }}
-        />
-      </div>
+      <p className="line-clamp-2 text-sm text-slate-600">{person.bio}</p>
     </div>
   );
 }
 
-const defaultGradient = "linear-gradient(160deg, #0891B2, #000)";
+const DEFAULT_GRADIENT_START = "#0891b2";
+const DEFAULT_GRADIENT_END = "#000000";
+const defaultGradient = `linear-gradient(160deg, ${DEFAULT_GRADIENT_START}, ${DEFAULT_GRADIENT_END})`;
+
+function normalizeHexColor(value: string | undefined, fallback: string): string {
+  const trimmed = (value ?? "").trim();
+  const isHex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed);
+  if (!isHex) return fallback;
+  if (trimmed.length === 4) {
+    const r = trimmed[1];
+    const g = trimmed[2];
+    const b = trimmed[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return trimmed.toLowerCase();
+}
+
+function getGradientStops(gradient: string | undefined): { start: string; end: string } {
+  const colors = gradient?.match(/#[0-9a-fA-F]{3,6}/g) ?? [];
+  return {
+    start: normalizeHexColor(colors[0], DEFAULT_GRADIENT_START),
+    end: normalizeHexColor(colors[1], DEFAULT_GRADIENT_END),
+  };
+}
+
+function buildLinearGradient(start: string, end: string): string {
+  const safeStart = normalizeHexColor(start, DEFAULT_GRADIENT_START);
+  const safeEnd = normalizeHexColor(end, DEFAULT_GRADIENT_END);
+  return `linear-gradient(160deg, ${safeStart}, ${safeEnd})`;
+}
 
 const InstitutionRosterEditorPage = () => {
   const { branchId: branchParam } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const { getBranchRoster, setBranchRoster, resetBranchToDefault } = useInstitutionRostersContent();
+  const visibility = useSiteVisibility();
 
   const rosterBranches = useMemo(
     () => institutionRosterBranchIdsFromRoleList(user?.roles ?? []),
@@ -305,6 +249,9 @@ const InstitutionRosterEditorPage = () => {
   const allowedForBranch = branchId != null && (isSuperAdmin || rosterBranches.includes(branchId));
 
   const [draft, setDraft] = useState<DraftState | null>(null);
+  const [personEditTarget, setPersonEditTarget] = useState<"leader" | "deputy" | null>(null);
+  const [memberEditKey, setMemberEditKey] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState("");
 
   useEffect(() => {
     if (!branchId) return;
@@ -380,6 +327,15 @@ const InstitutionRosterEditorPage = () => {
     toast.success("تم تحديث ترتيب الأعضاء");
   };
 
+  const personToEdit = personEditTarget && draft ? draft[personEditTarget] : null;
+  const memberToEdit = memberEditKey && draft ? draft.members.find((m) => m._key === memberEditKey) ?? null : null;
+  const filteredMembers = useMemo(() => {
+    if (!draft) return [];
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return draft.members;
+    return draft.members.filter((m) => `${m.title} ${m.subtitle}`.toLowerCase().includes(q));
+  }, [draft, memberSearch]);
+
   const save = () => {
     if (!draft || !branchId) return;
     if (!isSuperAdmin && !rosterBranches.includes(branchId)) {
@@ -419,55 +375,37 @@ const InstitutionRosterEditorPage = () => {
   if (!draft) return null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 pb-12 text-right">
+    <div className="mx-auto max-w-5xl space-y-8 pb-12 text-right">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2">
-            <Building2 className="h-7 w-7 text-primary" />
+          <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold text-slate-900">
+            <Building2 className="h-7 w-7 text-violet-700" />
             محرر الطاقم — {INSTITUTION_BRANCH_META[branchId].labelAr}
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm text-slate-600">
             تعديل هذا الفرع فقط. التغييرات تظهر في صفحة المعاينة مباشرةً.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
-          <Button type="button" variant="outline" size="sm" asChild>
+          {isSuperAdmin ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              onClick={() => setInstitutionVisible(branchId, !visibility.institutions[branchId])}
+            >
+              {visibility.institutions[branchId] ? "إخفاء المؤسسة من الموقع" : "إظهار المؤسسة بالموقع"}
+            </Button>
+          ) : null}
+          <Button type="button" size="sm" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={save}>
+            حفظ الطاقم
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" asChild>
             <a href={previewPath} target="_blank" rel="noreferrer">
               معاينة الفرع
             </a>
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="border-warning/40 text-warning">
-                <RotateCcw className="ms-1 h-4 w-4" /> استعادة الافتراضي
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
-              <AlertDialogHeader className="text-right">
-                <AlertDialogTitle>استعادة الطاقم الافتراضي لهذا الفرع؟</AlertDialogTitle>
-                <AlertDialogDescription>
-                  سيُستبدل محتوى «{INSTITUTION_BRANCH_META[branchId].labelAr}» بالبيانات الأصلية للمشروع.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter className="gap-2 sm:justify-start">
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    resetBranchToDefault(branchId);
-                    setDraft(rosterToDraft(defaultRosterForBranch(branchId)));
-                    appendActivityLog(
-                      user?.username ?? "—",
-                      "استعادة طاقم افتراضي",
-                      INSTITUTION_BRANCH_META[branchId].labelAr,
-                    );
-                    toast.success("تمت الاستعادة");
-                  }}
-                >
-                  تأكيد
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
@@ -476,7 +414,7 @@ const InstitutionRosterEditorPage = () => {
           <div className="max-w-md w-full space-y-2 sm:ms-auto">
             <Label>تبديل الفرع</Label>
             <Select value={branchId} onValueChange={(v) => navigate(`/dashboard/institution/${v}`)}>
-              <SelectTrigger>
+              <SelectTrigger className="border-violet-200 bg-white text-slate-900">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent dir="rtl">
@@ -488,46 +426,47 @@ const InstitutionRosterEditorPage = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button type="button" variant="outline" size="sm" className="shrink-0" asChild>
+          <Button type="button" variant="outline" size="sm" className="shrink-0 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" asChild>
             <Link to="/dashboard/institution">كل الفروع</Link>
           </Button>
         </div>
       ) : rosterBranches.length > 1 ? (
-        <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+        <p className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-3 text-sm text-slate-700">
           الفرع الحالي: <strong>{INSTITUTION_BRANCH_META[branchId].labelAr}</strong>
           {" — "}
           للأفرع الأخرى استخدم{" "}
-          <Link to="/dashboard/institution" className="font-semibold text-primary underline-offset-4 hover:underline">
+          <Link to="/dashboard/institution" className="font-semibold text-violet-700 underline-offset-4 hover:underline">
             صفحة الطواقم
           </Link>{" "}
           أو القائمة الجانبية.
         </p>
       ) : (
-        <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+        <p className="rounded-lg border border-violet-200 bg-violet-50/70 px-4 py-3 text-sm text-slate-700">
           أنت تدير: <strong>{INSTITUTION_BRANCH_META[branchId].labelAr}</strong>
         </p>
       )}
 
-      <PersonBlock
-        label="القائد"
-        person={draft.leader}
-        setPerson={(leader) => setDraft((d) => (d ? { ...d, leader } : d))}
-        onImageFile={onLeaderImage}
-      />
-      <PersonBlock
-        label="النائب"
-        person={draft.deputy}
-        setPerson={(deputy) => setDraft((d) => (d ? { ...d, deputy } : d))}
-        onImageFile={onDeputyImage}
-      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <PersonSummaryCard
+          label="القائد"
+          person={draft.leader}
+          onEdit={() => setPersonEditTarget("leader")}
+        />
+        <PersonSummaryCard
+          label="النائب"
+          person={draft.deputy}
+          onEdit={() => setPersonEditTarget("deputy")}
+        />
+      </div>
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-display text-sm font-semibold text-primary">أعضاء الشبكة (Chroma)</p>
+          <p className="font-display text-sm font-semibold text-violet-700">أعضاء الشبكة (Chroma)</p>
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="sm"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
             onClick={() =>
               setDraft((d) =>
                 d
@@ -538,10 +477,11 @@ const InstitutionRosterEditorPage = () => {
                         {
                           _key: crypto.randomUUID(),
                           image: "/placeholder.svg",
-                          title: "عضو جديد",
-                          subtitle: "الوصف",
+                          title: "اسم العضو",
+                          subtitle: "المنصب",
                           borderColor: "#22D3EE",
                           gradient: defaultGradient,
+                          hidden: false,
                         },
                       ],
                     }
@@ -552,41 +492,283 @@ const InstitutionRosterEditorPage = () => {
             <Plus className="ms-1 h-4 w-4" /> إضافة عضو
           </Button>
         </div>
+        <div className="max-w-sm">
+          <Input
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+            placeholder="ابحث بالاسم أو المنصب..."
+            className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
+            autoComplete="off"
+          />
+        </div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={draft.members.map((m) => m._key)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={filteredMembers.map((m) => m._key)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
-              {draft.members.map((m) => (
+              {filteredMembers.map((m) => (
                 <SortableMemberRow
                   key={m._key}
                   member={m}
-                  onPatch={(patch) =>
-                    setDraft((d) =>
-                      d
-                        ? {
-                            ...d,
-                            members: d.members.map((x) => (x._key === m._key ? { ...x, ...patch } : x)),
-                          }
-                        : d,
-                    )
-                  }
+                  onEdit={() => setMemberEditKey(m._key)}
                   onRemove={() =>
                     setDraft((d) =>
                       d ? { ...d, members: d.members.filter((x) => x._key !== m._key) } : d,
                     )
                   }
-                  onPickImage={(file) => onMemberImage(m._key, file)}
                 />
               ))}
+              {filteredMembers.length === 0 ? (
+                <p className="rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm text-slate-600">
+                  لا يوجد أعضاء مطابقون للبحث.
+                </p>
+              ) : null}
             </div>
           </SortableContext>
         </DndContext>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button type="button" onClick={save}>
-          حفظ الطاقم
-        </Button>
-      </div>
+      <Dialog open={!!personEditTarget} onOpenChange={(open) => !open && setPersonEditTarget(null)}>
+        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-slate-900">{personEditTarget === "leader" ? "تعديل القائد" : "تعديل النائب"}</DialogTitle>
+          </DialogHeader>
+          {personToEdit ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-slate-700">الاسم</Label>
+                  <Input className="mt-1 border-violet-200 bg-white text-slate-900" value={personToEdit.name} onChange={(e) => setDraft((d) => d ? { ...d, [personEditTarget as "leader" | "deputy"]: { ...d[personEditTarget as "leader" | "deputy"], name: e.target.value } } : d)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-700">المنصب</Label>
+                  <Input className="mt-1 border-violet-200 bg-white text-slate-900" value={personToEdit.title} onChange={(e) => setDraft((d) => d ? { ...d, [personEditTarget as "leader" | "deputy"]: { ...d[personEditTarget as "leader" | "deputy"], title: e.target.value } } : d)} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-700">سطر تعريفي</Label>
+                <Input className="mt-1 border-violet-200 bg-white text-slate-900" value={personToEdit.tagline ?? ""} onChange={(e) => setDraft((d) => d ? { ...d, [personEditTarget as "leader" | "deputy"]: { ...d[personEditTarget as "leader" | "deputy"], tagline: e.target.value || undefined } } : d)} />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-700">نبذة</Label>
+                <Textarea className="mt-1 min-h-[90px] border-violet-200 bg-white text-slate-900" value={personToEdit.bio} onChange={(e) => setDraft((d) => d ? { ...d, [personEditTarget as "leader" | "deputy"]: { ...d[personEditTarget as "leader" | "deputy"], bio: e.target.value } } : d)} />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-700">نقاط المسؤوليات (سطر لكل نقطة)</Label>
+                <Textarea
+                  className="mt-1 min-h-[90px] border-violet-200 bg-white text-slate-900"
+                  value={(personToEdit.highlights ?? []).join("\n")}
+                  onChange={(e) => {
+                    const lines = e.target.value.split("\n").map((l) => l.trim()).filter(Boolean);
+                    setDraft((d) =>
+                      d
+                        ? {
+                            ...d,
+                            [personEditTarget as "leader" | "deputy"]: {
+                              ...d[personEditTarget as "leader" | "deputy"],
+                              highlights: lines.length ? lines : undefined,
+                            },
+                          }
+                        : d,
+                    );
+                  }}
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-slate-700">الصورة</Label>
+                <div className="mt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*";
+                      input.onchange = () => {
+                        const file = input.files?.[0] ?? null;
+                        if (personEditTarget === "leader") onLeaderImage(file);
+                        else onDeputyImage(file);
+                      };
+                      input.click();
+                    }}
+                  >
+                    <ImagePlus className="ms-1 h-3 w-3" /> رفع صورة
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-violet-200 bg-white/70 p-3">
+                <p className="text-xs text-slate-600">
+                  الظهور في الموقع:{" "}
+                  <span className="font-display text-slate-900">{personToEdit.hidden ? "مخفي" : "ظاهر"}</span>
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              onClick={() =>
+                setDraft((d) =>
+                  d && personEditTarget
+                    ? {
+                        ...d,
+                        [personEditTarget]: {
+                          ...d[personEditTarget],
+                          hidden: !d[personEditTarget].hidden,
+                        },
+                      }
+                    : d,
+                )
+              }
+            >
+              {personToEdit?.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
+            </Button>
+            <Button type="button" variant="outline" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={() => setPersonEditTarget(null)}>
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!memberEditKey} onOpenChange={(open) => !open && setMemberEditKey(null)}>
+        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-slate-900">تعديل العضو</DialogTitle>
+          </DialogHeader>
+          {memberToEdit ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-slate-700">الاسم</Label>
+                  <Input className="mt-1 border-violet-200 bg-white text-slate-900" value={memberToEdit.title} onChange={(e) => setDraft((d) => d ? { ...d, members: d.members.map((x) => (x._key === memberToEdit._key ? { ...x, title: e.target.value } : x)) } : d)} />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-700">المنصب</Label>
+                  <Input className="mt-1 border-violet-200 bg-white text-slate-900" value={memberToEdit.subtitle} onChange={(e) => setDraft((d) => d ? { ...d, members: d.members.map((x) => (x._key === memberToEdit._key ? { ...x, subtitle: e.target.value } : x)) } : d)} />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs text-slate-700">لون الإطار</Label>
+                  <Input
+                    type="color"
+                    className="mt-1 h-10 border-violet-200 bg-white p-1 text-slate-900"
+                    value={normalizeHexColor(memberToEdit.borderColor, "#22d3ee")}
+                    onChange={(e) =>
+                      setDraft((d) =>
+                        d
+                          ? {
+                              ...d,
+                              members: d.members.map((x) =>
+                                x._key === memberToEdit._key ? { ...x, borderColor: e.target.value } : x,
+                              ),
+                            }
+                          : d,
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-700">التدرج</Label>
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <Input
+                      type="color"
+                      className="h-10 border-violet-200 bg-white p-1 text-slate-900"
+                      value={getGradientStops(memberToEdit.gradient).start}
+                      onChange={(e) => {
+                        const stops = getGradientStops(memberToEdit.gradient);
+                        const next = buildLinearGradient(e.target.value, stops.end);
+                        setDraft((d) =>
+                          d
+                            ? {
+                                ...d,
+                                members: d.members.map((x) =>
+                                  x._key === memberToEdit._key ? { ...x, gradient: next } : x,
+                                ),
+                              }
+                            : d,
+                        );
+                      }}
+                    />
+                    <Input
+                      type="color"
+                      className="h-10 border-violet-200 bg-white p-1 text-slate-900"
+                      value={getGradientStops(memberToEdit.gradient).end}
+                      onChange={(e) => {
+                        const stops = getGradientStops(memberToEdit.gradient);
+                        const next = buildLinearGradient(stops.start, e.target.value);
+                        setDraft((d) =>
+                          d
+                            ? {
+                                ...d,
+                                members: d.members.map((x) =>
+                                  x._key === memberToEdit._key ? { ...x, gradient: next } : x,
+                                ),
+                              }
+                            : d,
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-700">الصورة</Label>
+                <div className="mt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = "image/*";
+                      input.onchange = () => onMemberImage(memberToEdit._key, input.files?.[0] ?? null);
+                      input.click();
+                    }}
+                  >
+                    <ImagePlus className="ms-1 h-3 w-3" /> رفع صورة
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-violet-200 bg-white/70 p-3">
+                <p className="text-xs text-slate-600">
+                  الظهور في الموقع:{" "}
+                  <span className="font-display text-slate-900">{memberToEdit.hidden ? "مخفي" : "ظاهر"}</span>
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                  onClick={() =>
+                    setDraft((d) =>
+                      d
+                        ? {
+                            ...d,
+                            members: d.members.map((x) =>
+                              x._key === memberToEdit._key ? { ...x, hidden: !x.hidden } : x,
+                            ),
+                          }
+                        : d,
+                    )
+                  }
+                >
+                  {memberToEdit.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button type="button" variant="outline" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={() => setMemberEditKey(null)}>
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

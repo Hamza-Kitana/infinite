@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { parseYoutubeVideoId, youtubeEmbedUrl } from "@/lib/youtube";
 import type { GangCard } from "@/types/gangsSchema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Navigate } from "react-router-dom";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 function scrollToGang(id: string) {
   const el = document.getElementById(`gang-${id}`);
@@ -314,11 +316,14 @@ function GangShowcaseCard({ gang }: { gang: GangCard }) {
 
 const GangsPage = () => {
   const { gangs } = useGangsContent();
+  const visibility = useSiteVisibility();
+  const visibleGangs = gangs.filter((g) => !g.hidden);
+  if (!visibility.pages.gangs) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
-      <GangsSideRail list={gangs} />
+      <GangsSideRail list={visibleGangs} />
       <main className="pb-20">
         <section className="relative h-[46vh] min-h-[300px] max-h-[520px] overflow-hidden">
           <img
@@ -348,7 +353,7 @@ const GangsPage = () => {
         </section>
 
         <section className="mt-10 w-full space-y-8 px-3 sm:px-4 md:mt-12 md:space-y-10 md:px-8 xl:space-y-12 xl:px-12">
-          {gangs.map((gang) => (
+          {visibleGangs.map((gang) => (
             <GangShowcaseCard key={gang.id} gang={gang} />
           ))}
         </section>

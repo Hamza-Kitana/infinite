@@ -3,9 +3,15 @@ import Footer from "@/components/Footer";
 import { Sparkles } from "lucide-react";
 import ReflectiveCard from "@/components/ReflectiveCard";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
+import { Navigate } from "react-router-dom";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const StreamersPage = () => {
   const { items } = useStreamersContent();
+  const visibility = useSiteVisibility();
+  const visibleItems = items.filter((x) => !x.hidden);
+
+  if (!visibility.pages.streamers) return <Navigate to="/" replace />;
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
@@ -41,7 +47,7 @@ const StreamersPage = () => {
             </p>
 
             <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {items.map((streamer) => (
+              {visibleItems.map((streamer) => (
                 <ReflectiveCard
                   key={streamer.id}
                   name={streamer.name}

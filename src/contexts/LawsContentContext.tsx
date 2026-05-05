@@ -70,7 +70,7 @@ type LawsContentValue = {
     patch: Partial<
       Pick<
         LawTabSectionRules,
-        "label" | "short" | "subtitle" | "icon" | "variant"
+        "label" | "short" | "subtitle" | "icon" | "variant" | "hidden"
       >
     >,
   ) => void;
@@ -202,7 +202,7 @@ export function LawsContentProvider({ children }: { children: ReactNode }) {
   const updateSectionMeta = useCallback(
     (
       id: string,
-      patch: Partial<Pick<LawTabSectionRules, "label" | "short" | "subtitle" | "icon" | "variant">>,
+      patch: Partial<Pick<LawTabSectionRules, "label" | "short" | "subtitle" | "icon" | "variant" | "hidden">>,
     ) => {
       setPersisted((prev) => {
         const sections = prev.sections.map((s) => {

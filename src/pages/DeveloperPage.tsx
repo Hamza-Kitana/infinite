@@ -5,8 +5,14 @@ import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
 import { Code2, Cpu, ShieldCheck } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const DeveloperPage = () => {
+  const roster = useInstitutionRoster("developer");
+  const visibility = useSiteVisibility();
+  if (!visibility.institutions.developer) return <Navigate to="/" replace />;
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />

@@ -15,7 +15,15 @@ export type BaseManagedStaffRole =
   | "streamer_manager"
   | "gang_manager"
   | "vip_cars_manager"
-  | "application_reviewer";
+  | "application_reviewer"
+  | "about_manager"
+  | "ticket_support_manager"
+  | "ticket_admin_inquiry_manager"
+  | "ticket_player_complaint_manager"
+  | "ticket_compensation_manager"
+  | "ticket_store_manager"
+  | "ticket_general_manager"
+  | "footer_manager";
 
 export type ManagedStaffRole = BaseManagedStaffRole | InstitutionRosterStaffRole;
 
@@ -25,6 +33,14 @@ const BASE_MANAGED: readonly BaseManagedStaffRole[] = [
   "gang_manager",
   "vip_cars_manager",
   "application_reviewer",
+  "about_manager",
+  "ticket_support_manager",
+  "ticket_admin_inquiry_manager",
+  "ticket_player_complaint_manager",
+  "ticket_compensation_manager",
+  "ticket_store_manager",
+  "ticket_general_manager",
+  "footer_manager",
 ];
 
 function isBaseManagedStaffRole(v: unknown): v is BaseManagedStaffRole {
@@ -42,9 +58,11 @@ export type ManagedUser = {
   username: string;
   password: string;
   roles: ManagedStaffRole[];
+  isActive?: boolean;
 };
 
 const STORAGE_KEY = "ic_managed_staff_v1";
+const EVENT_NAME = "ic-managed-staff";
 
 /** ترحيل: institution_manager + institutionBranchId → institution_roster_<branch> */
 function migrateLegacyRoles(rawRoles: unknown[], institutionBranchId: unknown): ManagedStaffRole[] {
@@ -101,6 +119,7 @@ function safeParse(raw: string | null): ManagedUser[] {
         username: (row as ManagedUser).username,
         password: (row as ManagedUser).password,
         roles,
+        isActive: (row as ManagedUser).isActive !== false,
       };
     });
   } catch {
@@ -117,6 +136,7 @@ export function saveManagedUsers(users: ManagedUser[]) {
   for (let step = 0; step < 10; step++) {
     try {
       localStorage.setItem(STORAGE_KEY, payload);
+      window.dispatchEvent(new CustomEvent(EVENT_NAME));
       return;
     } catch (e) {
       if (!isLocalStorageQuotaError(e)) throw e;
@@ -124,12 +144,14 @@ export function saveManagedUsers(users: ManagedUser[]) {
     }
   }
   localStorage.setItem(STORAGE_KEY, payload);
+  window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 
 export function addManagedUser(input: Omit<ManagedUser, "id">): ManagedUser {
   const users = loadManagedUsers();
   const next: ManagedUser = {
     ...input,
+    isActive: true,
     id: crypto.randomUUID(),
   };
   saveManagedUsers([...users, next]);
@@ -141,14 +163,14 @@ export function removeManagedUser(id: string) {
   saveManagedUsers(users);
 }
 
-export function updateManagedUser(id: string, patch: Partial<Pick<ManagedUser, "username" | "password" | "roles">>) {
+export function updateManagedUser(id: string, patch: Partial<Pick<ManagedUser, "username" | "password" | "roles" | "isActive">>) {
   const users = loadManagedUsers().map((u) => (u.id === id ? { ...u, ...patch } : u));
   saveManagedUsers(users);
 }
 
 export function findManagedUserByCredentials(username: string, password: string): ManagedUser | null {
   const u = username.trim().toLowerCase();
-  return loadManagedUsers().find((m) => m.username.toLowerCase() === u && m.password === password) ?? null;
+  return loadManagedUsers().find((m) => m.username.toLowerCase() === u && m.password === password && m.isActive !== false) ?? null;
 }
 
 /** فروع الطاقم المصرّح بها من قائمة أدوار المستخدم */
