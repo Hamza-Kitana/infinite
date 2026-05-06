@@ -58,6 +58,7 @@ export const INSTITUTION_ROSTER_STAFF_ROLES: InstitutionRosterStaffRole[] = INST
 export function institutionRosterStaffRoleLabelAr(role: InstitutionRosterStaffRole): string {
   const id = branchIdFromInstitutionRosterStaffRole(role);
   if (!id) return role;
+  if (id === "oversight") return "مدير الرقابة";
   return `مدير طاقم — ${INSTITUTION_BRANCH_META[id].labelAr}`;
 }
 

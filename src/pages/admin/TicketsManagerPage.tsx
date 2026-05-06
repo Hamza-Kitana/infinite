@@ -65,6 +65,8 @@ const TicketsManagerPage = () => {
   const [retentionHours, setRetentionHours] = useState<TicketRetentionHours>(() => loadTicketRetentionHours());
   const previousSnapshotRef = useRef<Map<string, number>>(new Map());
   const didBootRef = useRef(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   const visibleTicketTypes = isSuperAdmin
     ? TICKET_TYPES
@@ -111,6 +113,10 @@ const TicketsManagerPage = () => {
     for (const ticket of scope) {
       const prevCount = previousSnapshotRef.current.get(ticket.id) ?? 0;
       const typeSlug = TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug ?? "general";
+      // إذا الشات مفتوح حالياً على هذا التكت، لا نرسل إشعارات عليه
+      if (chatOpen && selectedTicketId === ticket.id) {
+        continue;
+      }
       if (prevCount === 0) {
         const message = `تكت جديد: ${ticket.subject}`;
         setNotifications((prev) => [
@@ -128,17 +134,26 @@ const TicketsManagerPage = () => {
       }
     }
     previousSnapshotRef.current = nextMap;
-  }, [tickets, visibleTicketTypes]);
+  }, [tickets, visibleTicketTypes, chatOpen, selectedTicketId]);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
   const unreadByTypeSlug = useMemo(() => {
     const map = new Map<string, number>();
-    for (const item of notifications) {
-      if (!item.unread) continue;
-      map.set(item.typeSlug, (map.get(item.typeSlug) ?? 0) + 1);
+    // نحسب لكل نوع عدد التكتات التي تحتوي رسائل جديدة من الزبون
+    const allowedRoles = new Set(visibleTicketTypes.map((x) => x.role));
+    for (const ticket of tickets) {
+      if (!allowedRoles.has(ticket.typeRole)) continue;
+      const typeSlug = TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug;
+      if (!typeSlug) continue;
+      const cutoff = ticket.lastStaffReadAt ? new Date(ticket.lastStaffReadAt).getTime() : 0;
+      const hasUnread = ticket.messages.some(
+        (m) => (m.senderType ?? "public") === "public" && new Date(m.at).getTime() > cutoff,
+      );
+      if (!hasUnread) continue;
+      map.set(typeSlug, (map.get(typeSlug) ?? 0) + 1);
     }
     return map;
-  }, [notifications]);
+  }, [tickets, visibleTicketTypes]);
 
   const openFromNotification = (notificationId: string, typeSlug: string, ticketId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, unread: false } : n)));
@@ -146,6 +161,10 @@ const TicketsManagerPage = () => {
     navigate(`/dashboard/tickets/${typeSlug}`);
     setSelectedTicketId(ticketId);
     setChatOpen(true);
+    updateTicket(ticketId, (ticket) => ({
+      ...ticket,
+      lastStaffReadAt: new Date().toISOString(),
+    }));
   };
 
   const clearNotificationsForTicket = (ticketId: string) => {
@@ -203,8 +222,24 @@ const TicketsManagerPage = () => {
   useEffect(() => {
     if (chatOpen && selectedTicketId) {
       clearNotificationsForTicket(selectedTicketId);
+      updateTicket(selectedTicketId, (ticket) => ({
+        ...ticket,
+        lastStaffReadAt: new Date().toISOString(),
+      }));
     }
   }, [chatOpen, selectedTicketId]);
+
+  useEffect(() => {
+    if (!chatOpen || !selectedTicket) return;
+    const scrollToBottom = () => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+      chatEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    };
+    const timer = window.setTimeout(scrollToBottom, 0);
+    return () => window.clearTimeout(timer);
+  }, [chatOpen, selectedTicketId, selectedTicket?.messages.length]);
 
   if (visibleTicketTypes.length === 0) {
     return <div className="rounded-xl border border-violet-200 bg-white/95 p-4 text-right text-sm text-slate-600">لا تملك صلاحية على أي نوع تكت حالياً.</div>;
@@ -330,24 +365,47 @@ const TicketsManagerPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {visibleTickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    className="cursor-pointer border-t border-violet-100 bg-white hover:bg-violet-50/45"
-                    onClick={() => {
-                      setSelectedTicketId(ticket.id);
-                      setChatOpen(true);
-                      clearNotificationsForTicket(ticket.id);
-                    }}
-                  >
-                    <td className="px-3 py-2 font-display text-slate-900">{ticket.subject}</td>
-                    <td className="px-3 py-2 text-slate-700">{ticket.openedBy}</td>
-                    <td className="px-3 py-2">
-                      <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[ticket.status])}>{STATUS_LABELS[ticket.status]}</span>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">{new Date(ticket.updatedAt).toLocaleString("ar")}</td>
-                  </tr>
-                ))}
+                {visibleTickets.map((ticket) => {
+                  const cutoff = ticket.lastStaffReadAt ? new Date(ticket.lastStaffReadAt).getTime() : 0;
+                  const unreadForTicket = ticket.messages.filter(
+                    (m) => (m.senderType ?? "public") === "public" && new Date(m.at).getTime() > cutoff,
+                  ).length;
+
+                  return (
+                    <tr
+                      key={ticket.id}
+                      className="cursor-pointer border-t border-violet-100 bg-white hover:bg-violet-50/45"
+                      onClick={() => {
+                        setSelectedTicketId(ticket.id);
+                        setChatOpen(true);
+                        clearNotificationsForTicket(ticket.id);
+                        updateTicket(ticket.id, (current) => ({
+                          ...current,
+                          lastStaffReadAt: new Date().toISOString(),
+                        }));
+                      }}
+                    >
+                      <td className="px-3 py-2 font-display text-slate-900">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate">{ticket.subject}</span>
+                          {unreadForTicket > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                              جديد
+                              <span className="rounded-full bg-rose-600 px-1 text-[10px] text-white">{unreadForTicket}</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-slate-700">{ticket.openedBy}</td>
+                      <td className="px-3 py-2">
+                        <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[ticket.status])}>
+                          {STATUS_LABELS[ticket.status]}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-slate-500">{new Date(ticket.updatedAt).toLocaleString("ar")}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -376,7 +434,7 @@ const TicketsManagerPage = () => {
                 </div>
               </div>
 
-              <div className="max-h-[45vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3">
+              <div ref={chatScrollRef} className="max-h-[45vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3">
                 {selectedTicket.messages.map((msg) => {
                   const mine = msg.author === (user?.username ?? "");
                   return (
@@ -389,11 +447,35 @@ const TicketsManagerPage = () => {
                             {msg.attachments.map((att) => (
                               <div key={att.id}>
                                 {att.mimeType.startsWith("video/") ? (
-                                  <video controls className="max-h-56 rounded border border-violet-200">
-                                    <source src={att.dataUrl} type={att.mimeType} />
-                                  </video>
+                                  <div className="space-y-1">
+                                    <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                      <video controls className="max-h-56 rounded border border-violet-200">
+                                        <source src={att.dataUrl} type={att.mimeType} />
+                                      </video>
+                                    </a>
+                                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                        فتح
+                                      </a>
+                                      <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                        تنزيل
+                                      </a>
+                                    </div>
+                                  </div>
                                 ) : (
-                                  <img src={att.dataUrl} alt={att.name} className="max-h-56 rounded border border-violet-200" />
+                                  <div className="space-y-1">
+                                    <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                      <img src={att.dataUrl} alt={att.name} className="max-h-56 cursor-zoom-in rounded border border-violet-200" />
+                                    </a>
+                                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                        فتح
+                                      </a>
+                                      <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                        تنزيل
+                                      </a>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             ))}
@@ -404,11 +486,23 @@ const TicketsManagerPage = () => {
                     </div>
                   );
                 })}
+                <div ref={chatEndRef} />
               </div>
 
               <div className="space-y-2">
                 <Label className="text-right text-slate-700">رد الإداري</Label>
-                <Textarea value={messageBody} onChange={(e) => setMessageBody(e.target.value)} className="min-h-[80px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400" placeholder="اكتب ردك للزبون..." />
+                <Textarea
+                  value={messageBody}
+                  onChange={(e) => setMessageBody(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  className="min-h-[80px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
+                  placeholder="اكتب ردك للزبون..."
+                />
               </div>
             </div>
           ) : null}

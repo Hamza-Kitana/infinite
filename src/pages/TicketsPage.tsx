@@ -66,6 +66,8 @@ const TicketsPage = () => {
   const [notifications, setNotifications] = useState<UserTicketNotification[]>([]);
   const previousStaffSnapshotRef = useRef<Map<string, number>>(new Map());
   const didBootRef = useRef(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   if (!user) return <Navigate to="/" replace />;
 
@@ -78,6 +80,20 @@ const TicketsPage = () => {
   );
 
   const selected = myTickets.find((t) => t.id === selectedTicketId) ?? null;
+
+  const unreadTicketsCount = useMemo(() => {
+    const nowOwned = new Set(myTickets.map((t) => t.id));
+    let total = 0;
+    for (const ticket of myTickets) {
+      if (!nowOwned.has(ticket.id)) continue;
+      const cutoff = ticket.lastPublicReadAt ? new Date(ticket.lastPublicReadAt).getTime() : 0;
+      const hasUnread = ticket.messages.some(
+        (m) => (m.senderType ?? "public") === "staff" && new Date(m.at).getTime() > cutoff,
+      );
+      if (hasUnread) total += 1;
+    }
+    return total;
+  }, [myTickets]);
 
   useEffect(() => {
     const nextMap = new Map<string, number>(
@@ -126,19 +142,29 @@ const TicketsPage = () => {
       r.readAsDataURL(file);
     });
 
+  const notifyAttachmentStorageIssue = () => {
+    toast.error("تعذر حفظ التكت مع المرفق. حجم الملف كبير على التخزين المحلي، جرّب ملفًا أصغر.");
+  };
+
   const create = () => {
     if (!typeRole) return;
     const b = body.trim();
     if (!b) return;
     const label = TICKET_TYPES.find((x) => x.role === typeRole)?.label ?? "تكت";
-    const created = createTicket({
-      typeRole,
-      typeLabel: label,
-      openedBy: user.displayName || user.username,
-      openedById: user.id,
-      body: b,
-      attachments: newAttachment ? [newAttachment] : [],
-    });
+    let created;
+    try {
+      created = createTicket({
+        typeRole,
+        typeLabel: label,
+        openedBy: user.displayName || user.username,
+        openedById: user.id,
+        body: b,
+        attachments: newAttachment ? [newAttachment] : [],
+      });
+    } catch {
+      notifyAttachmentStorageIssue();
+      return;
+    }
     setBody("");
     setNewAttachment(null);
     setTypeRole(null);
@@ -169,12 +195,39 @@ const TicketsPage = () => {
             ],
           },
     );
-    saveTickets(next);
+    try {
+      saveTickets(next);
+    } catch {
+      notifyAttachmentStorageIssue();
+      return;
+    }
     const hasAdminReply = selected.messages.some((m) => m.senderType === "staff");
     appendActivityLog(user.displayName || user.username, "رد المستخدم على تكت", `${selected.subject} — ${hasAdminReply ? "تم الرد سابقاً من الإدمن" : "بانتظار رد الإدمن"}`);
     setReply("");
     setReplyAttachment(null);
   };
+
+  useEffect(() => {
+    if (!selectedTicketId || !selected) return;
+    const nowIso = new Date().toISOString();
+    const next = loadTickets().map((t) =>
+      t.id === selectedTicketId
+        ? {
+            ...t,
+            lastPublicReadAt: nowIso,
+          }
+        : t,
+    );
+    saveTickets(next);
+    const scrollToBottom = () => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+      }
+      chatEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    };
+    const timer = window.setTimeout(scrollToBottom, 0);
+    return () => window.clearTimeout(timer);
+  }, [selectedTicketId, selected?.messages.length]);
 
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-[#f6f0fb] via-[#f8f4fc] to-[#fbf9fe] text-slate-900">
@@ -193,6 +246,10 @@ const TicketsPage = () => {
                 {unreadCount > 0 ? (
                   <span className="absolute -left-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] text-white">
                     {unreadCount}
+                  </span>
+                ) : unreadTicketsCount > 0 ? (
+                  <span className="absolute -left-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] text-white">
+                    {unreadTicketsCount}
                   </span>
                 ) : null}
               </button>
@@ -275,7 +332,23 @@ const TicketsPage = () => {
                           clearNotificationsForTicket(t.id);
                         }}
                       >
-                        <td className="px-3 py-2">{t.subject}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate">{t.subject}</span>
+                            {(() => {
+                              const cutoff = t.lastPublicReadAt ? new Date(t.lastPublicReadAt).getTime() : 0;
+                              const unreadForTicket = t.messages.filter(
+                                (m) => (m.senderType ?? "public") === "staff" && new Date(m.at).getTime() > cutoff,
+                              ).length;
+                              return unreadForTicket > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                                  جديد
+                                  <span className="rounded-full bg-rose-600 px-1 text-[10px] text-white">{unreadForTicket}</span>
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
+                        </td>
                         <td className="px-3 py-2">
                           <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[t.status])}>{STATUS_LABELS[t.status]}</span>
                         </td>
@@ -335,7 +408,6 @@ const TicketsPage = () => {
                   <Label className="text-right text-slate-900">إرفاق صورة/فيديو (اختياري)</Label>
                   <Input
                     type="file"
-                    accept="image/*,video/*"
                     className="border-violet-200 bg-white text-slate-900 file:text-slate-900 file:font-medium"
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
@@ -378,7 +450,7 @@ const TicketsPage = () => {
           </DialogHeader>
           {selected ? (
             <div className="space-y-3">
-              <div className="max-h-[50vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3">
+              <div ref={chatScrollRef} className="max-h-[50vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3">
                 {selected.messages.map((msg) => (
                   <div key={msg.id} className={cn("flex items-end gap-2", msg.author === user.displayName || msg.author === user.username ? "justify-end" : "justify-start")}>
                     {msg.author === user.displayName || msg.author === user.username ? (
@@ -391,11 +463,35 @@ const TicketsPage = () => {
                               {msg.attachments.map((att) => (
                                 <div key={att.id}>
                                   {att.mimeType.startsWith("video/") ? (
-                                    <video controls className="max-h-56 rounded border border-violet-200 bg-black/10">
-                                      <source src={att.dataUrl} type={att.mimeType} />
-                                    </video>
+                                    <div className="space-y-1">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                        <video controls className="max-h-56 rounded border border-violet-200 bg-black/10">
+                                          <source src={att.dataUrl} type={att.mimeType} />
+                                        </video>
+                                      </a>
+                                      <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                        <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-white/10 px-2 py-1 text-violet-100 hover:bg-white/15">
+                                          فتح
+                                        </a>
+                                        <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-white/10 px-2 py-1 text-violet-100 hover:bg-white/15">
+                                          تنزيل
+                                        </a>
+                                      </div>
+                                    </div>
                                   ) : (
-                                    <img src={att.dataUrl} alt={att.name} className="max-h-56 rounded border border-violet-200" />
+                                    <div className="space-y-1">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                        <img src={att.dataUrl} alt={att.name} className="max-h-56 cursor-zoom-in rounded border border-violet-200" />
+                                      </a>
+                                      <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                        <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-white/10 px-2 py-1 text-violet-100 hover:bg-white/15">
+                                          فتح
+                                        </a>
+                                        <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-white/10 px-2 py-1 text-violet-100 hover:bg-white/15">
+                                          تنزيل
+                                        </a>
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               ))}
@@ -426,11 +522,35 @@ const TicketsPage = () => {
                               {msg.attachments.map((att) => (
                                 <div key={att.id}>
                                   {att.mimeType.startsWith("video/") ? (
-                                    <video controls className="max-h-56 rounded border border-violet-200">
-                                      <source src={att.dataUrl} type={att.mimeType} />
-                                    </video>
+                                    <div className="space-y-1">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                        <video controls className="max-h-56 rounded border border-violet-200">
+                                          <source src={att.dataUrl} type={att.mimeType} />
+                                        </video>
+                                      </a>
+                                      <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                        <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                          فتح
+                                        </a>
+                                        <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                          تنزيل
+                                        </a>
+                                      </div>
+                                    </div>
                                   ) : (
-                                    <img src={att.dataUrl} alt={att.name} className="max-h-56 rounded border border-violet-200" />
+                                    <div className="space-y-1">
+                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
+                                        <img src={att.dataUrl} alt={att.name} className="max-h-56 cursor-zoom-in rounded border border-violet-200" />
+                                      </a>
+                                      <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                                        <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                          فتح
+                                        </a>
+                                        <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
+                                          تنزيل
+                                        </a>
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               ))}
@@ -442,13 +562,23 @@ const TicketsPage = () => {
                     )}
                   </div>
                 ))}
+                <div ref={chatEndRef} />
               </div>
               <div className="space-y-2">
                 <Label className="text-right text-slate-900">إرسال رسالة جديدة</Label>
-                <Textarea value={reply} onChange={(e) => setReply(e.target.value)} className="min-h-[90px] border-violet-200 bg-white text-slate-900" />
+                <Textarea
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                  className="min-h-[90px] border-violet-200 bg-white text-slate-900"
+                />
                 <Input
                   type="file"
-                  accept="image/*,video/*"
                   className="border-violet-200 bg-white text-slate-900 file:text-slate-900 file:font-medium"
                   onChange={async (e) => {
                     const f = e.target.files?.[0];

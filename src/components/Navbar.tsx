@@ -10,6 +10,7 @@ import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoCo
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useSiteVisibility } from "@/lib/siteVisibility";
+import { useTicketsCenter } from "@/lib/ticketsCenter";
 
 const institutionLinks = [
   { label: "وزارة الصحة", to: "/health" },
@@ -29,6 +30,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { login, canUseDashboard } = useAuth();
   const publicUser = usePublicUser();
+  const tickets = useTicketsCenter();
   const [staffUser, setStaffUser] = useState("");
   const [staffPass, setStaffPass] = useState("");
   const [scrolled, setScrolled] = useState(false);
@@ -62,6 +64,22 @@ const Navbar = () => {
   });
   const hideApplyNowForPublicProfile = !!publicUser.user && (location.pathname === "/profile" || location.pathname === "/tickets");
   const useLightBrandText = location.pathname === "/profile" || location.pathname === "/tickets";
+
+  const publicUnreadTickets = (() => {
+    if (!publicUser.user) return 0;
+    const uid = publicUser.user.id;
+    let total = 0;
+    for (const ticket of tickets) {
+      if (!(ticket.openedById === uid || ticket.openedBy === publicUser.user.username || ticket.openedBy === publicUser.user.displayName))
+        continue;
+      const cutoff = ticket.lastPublicReadAt ? new Date(ticket.lastPublicReadAt).getTime() : 0;
+      const hasUnread = ticket.messages.some(
+        (m) => (m.senderType ?? "public") === "staff" && new Date(m.at).getTime() > cutoff,
+      );
+      if (hasUnread) total += 1;
+    }
+    return total;
+  })();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -220,18 +238,37 @@ const Navbar = () => {
                   onClick={() => setPublicMenuOpen((v) => !v)}
                   className="inline-flex items-center rounded-xl border border-violet-300 bg-white px-3 py-2 text-sm text-violet-700 transition-colors hover:bg-violet-50"
                 >
-                  <UserCircle2 className="h-4 w-4 ml-2" />
-                  {publicUser.user.displayName}
+                  <div className="relative mr-1">
+                    <UserCircle2 className="h-4 w-4" />
+                    {publicUnreadTickets > 0 ? (
+                      <span className="absolute -left-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-semibold text-white">
+                        {publicUnreadTickets}
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="ml-1">{publicUser.user.displayName}</span>
                   <ChevronDown className={`me-2 h-4 w-4 transition-transform ${publicMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {publicMenuOpen ? (
                   <div className="absolute left-0 z-[130] mt-2 w-48 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xl">
                     <Link
                       to="/tickets"
+                      className="flex items-center justify-between px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => setPublicMenuOpen(false)}
+                    >
+                      <span>التكت</span>
+                      {publicUnreadTickets > 0 ? (
+                        <span className="inline-flex min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold text-white">
+                          {publicUnreadTickets}
+                        </span>
+                      ) : null}
+                    </Link>
+                    <Link
+                      to="/jobs"
                       className="block px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
                       onClick={() => setPublicMenuOpen(false)}
                     >
-                      التكت
+                      التقديم لوظيفة
                     </Link>
                     <Link
                       to="/profile"

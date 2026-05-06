@@ -24,6 +24,7 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { Navigate } from "react-router-dom";
 import { useSiteVisibility } from "@/lib/siteVisibility";
+import { usePublicUser } from "@/contexts/PublicUserContext";
 
 const TOTAL_STEPS = 10;
 /** نص جاهز للمستخدمين بدون سجل سابق أو بدون نبذة */
@@ -59,6 +60,27 @@ const targets: Record<string, ApplicationTarget> = {
     dashboardPath: "/interior/police",
     heroEyebrow: "MINISTRY OF INTERIOR — LSPD",
     heroTitleParts: ["تقديم", "الشرطة"],
+  },
+  interior_sheriff: {
+    title: "تقديم الداخلية — الشيرف",
+    subtitle: "تسجيل بيانات المرشح لفرع الشيرف ضمن وزارة الداخلية.",
+    dashboardPath: "/interior/sheriff",
+    heroEyebrow: "MINISTRY OF INTERIOR — SHERIFF",
+    heroTitleParts: ["تقديم", "الشيرف"],
+  },
+  interior_cia: {
+    title: "تقديم الداخلية — CIA",
+    subtitle: "تسجيل بيانات المرشح لفرع الاستخبارات ضمن وزارة الداخلية.",
+    dashboardPath: "/interior/cia",
+    heroEyebrow: "MINISTRY OF INTERIOR — CIA",
+    heroTitleParts: ["تقديم", "CIA"],
+  },
+  interior_marines: {
+    title: "تقديم الداخلية — المارينز",
+    subtitle: "تسجيل بيانات المرشح لفرع المارينز ضمن وزارة الداخلية.",
+    dashboardPath: "/interior/marines",
+    heroEyebrow: "MINISTRY OF INTERIOR — MARINES",
+    heroTitleParts: ["تقديم", "المارينز"],
   },
   ems: {
     title: "تقديم وزارة الصحة",
@@ -130,6 +152,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 const ApplicationFormPage = () => {
   const { role = "" } = useParams();
   const { submitApplication } = useApplicationsContent();
+  const publicUser = usePublicUser();
   const visibility = useSiteVisibility();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -168,6 +191,9 @@ const ApplicationFormPage = () => {
     if (role === "oversight") return visibility.institutions.oversight;
     if (role === "ems") return visibility.institutions.health;
     if (role === "police") return visibility.institutions.interior_police;
+    if (role === "interior_sheriff") return visibility.institutions.interior_sheriff;
+    if (role === "interior_cia") return visibility.institutions.interior_cia;
+    if (role === "interior_marines") return visibility.institutions.interior_marines;
     return true;
   }, [role, visibility]);
 
@@ -381,6 +407,9 @@ const ApplicationFormPage = () => {
       const result = submitApplication({
         roleKey,
         targetTitle: target.title,
+        applicantUserId: publicUser.user?.id,
+        applicantUsername: publicUser.user?.username,
+        applicantDisplayName: publicUser.user?.displayName,
         snapshot: {
           firstName: firstName.trim(),
           lastName: lastName.trim(),

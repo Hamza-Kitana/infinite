@@ -43,6 +43,8 @@ export type TicketThread = {
   createdAt: string;
   updatedAt: string;
   messages: TicketMessage[];
+  lastStaffReadAt?: string;
+  lastPublicReadAt?: string;
 };
 
 type Persisted = { v: 1; tickets: TicketThread[] };
@@ -92,6 +94,8 @@ function normalize(raw: unknown): TicketThread[] {
         createdAt: typeof x.createdAt === "string" ? x.createdAt : new Date().toISOString(),
         updatedAt: typeof x.updatedAt === "string" ? x.updatedAt : new Date().toISOString(),
         messages,
+        lastStaffReadAt: typeof (x as any).lastStaffReadAt === "string" ? (x as any).lastStaffReadAt : undefined,
+        lastPublicReadAt: typeof (x as any).lastPublicReadAt === "string" ? (x as any).lastPublicReadAt : undefined,
       };
     });
 }

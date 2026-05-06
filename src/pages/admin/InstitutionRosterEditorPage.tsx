@@ -48,6 +48,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersContentContext";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import {
   INSTITUTION_BRANCH_IDS,
   INSTITUTION_BRANCH_META,
@@ -63,6 +64,7 @@ import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { setInstitutionVisible, useSiteVisibility } from "@/lib/siteVisibility";
+import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -229,11 +231,24 @@ function buildLinearGradient(start: string, end: string): string {
   return `linear-gradient(160deg, ${safeStart}, ${safeEnd})`;
 }
 
+function roleKeysForBranch(branchId: InstitutionBranchId): string[] {
+  if (branchId === "health") return ["ems"];
+  if (branchId === "interior_police") return ["police"];
+  if (branchId === "interior_sheriff") return ["interior_sheriff"];
+  if (branchId === "interior_cia") return ["interior_cia"];
+  if (branchId === "interior_marines") return ["interior_marines"];
+  if (branchId === "oversight") return ["oversight"];
+  if (branchId === "justice_lawyers") return ["lawyer", "justice"];
+  if (branchId === "developer") return ["developer"];
+  return [];
+}
+
 const InstitutionRosterEditorPage = () => {
   const { branchId: branchParam } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const { getBranchRoster, setBranchRoster, resetBranchToDefault } = useInstitutionRostersContent();
+  const { applications, setDecision } = useApplicationsContent();
   const visibility = useSiteVisibility();
 
   const rosterBranches = useMemo(
@@ -252,6 +267,11 @@ const InstitutionRosterEditorPage = () => {
   const [personEditTarget, setPersonEditTarget] = useState<"leader" | "deputy" | null>(null);
   const [memberEditKey, setMemberEditKey] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
+  const [applicationsOpen, setApplicationsOpen] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
+  const [applicantRank, setApplicantRank] = useState("");
+  const [applicantImage, setApplicantImage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!branchId) return;
@@ -336,6 +356,60 @@ const InstitutionRosterEditorPage = () => {
     return draft.members.filter((m) => `${m.title} ${m.subtitle}`.toLowerCase().includes(q));
   }, [draft, memberSearch]);
 
+  const branchApplications = useMemo(() => {
+    if (!branchId) return [];
+    const keys = new Set(roleKeysForBranch(branchId));
+    return applications
+      .filter((a) => keys.has(a.roleKey))
+      .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
+  }, [applications, branchId]);
+  const pendingApplicationsCount = branchApplications.filter((a) => a.status === "pending").length;
+  const selectedApplication: ApplicationRecord | null = selectedApplicationId
+    ? branchApplications.find((a) => a.id === selectedApplicationId) ?? null
+    : null;
+
+  const runApplicationDecision = (status: "approved" | "rejected") => {
+    if (!selectedApplication || selectedApplication.status !== "pending") return;
+    const actor = user?.username ?? "manager";
+    setDecision(selectedApplication.id, status, actor, decisionNote);
+    if (status === "approved" && branchId) {
+      const fullName = `${selectedApplication.snapshot.firstName} ${selectedApplication.snapshot.lastName}`.trim();
+      const nextMemberTitle = fullName || selectedApplication.applicantDisplayName || selectedApplication.applicantUsername || "عضو جديد";
+      const applicantDiscord = selectedApplication.snapshot.discord?.trim();
+      const baseRank = applicantRank.trim() || "عضو جديد";
+      const applicantSubtitle = applicantDiscord ? `${baseRank} — ${applicantDiscord}` : baseRank;
+
+      const current = getBranchRoster(branchId);
+      const alreadyExists = current.members.some(
+        (m) => m.title.trim().toLowerCase() === nextMemberTitle.trim().toLowerCase(),
+      );
+      if (!alreadyExists) {
+        setBranchRoster(branchId, {
+          ...current,
+          members: [
+            {
+              image: applicantImage || "/placeholder.svg",
+              title: nextMemberTitle,
+              subtitle: applicantSubtitle,
+              borderColor: "#22D3EE",
+              gradient: defaultGradient,
+            },
+            ...current.members,
+          ],
+        });
+      }
+    }
+    appendActivityLog(
+      actor,
+      status === "approved" ? "قرار توظيف: قبول" : "قرار توظيف: رفض",
+      `${selectedApplication.targetTitle} — ${selectedApplication.snapshot.firstName} ${selectedApplication.snapshot.lastName}`,
+    );
+    toast.success(status === "approved" ? "تم قبول الطلب" : "تم رفض الطلب");
+    setDecisionNote("");
+    setApplicantRank("");
+    setApplicantImage(null);
+  };
+
   const save = () => {
     if (!draft || !branchId) return;
     if (!isSuperAdmin && !rosterBranches.includes(branchId)) {
@@ -387,6 +461,20 @@ const InstitutionRosterEditorPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2 justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="relative border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            onClick={() => setApplicationsOpen(true)}
+          >
+            طلبات التوظيف
+            {pendingApplicationsCount > 0 ? (
+              <span className="absolute -left-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] text-white">
+                {pendingApplicationsCount}
+              </span>
+            ) : null}
+          </Button>
           {isSuperAdmin ? (
             <Button
               type="button"
@@ -767,6 +855,153 @@ const InstitutionRosterEditorPage = () => {
               إغلاق
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={applicationsOpen}
+        onOpenChange={(open) => {
+          setApplicationsOpen(open);
+          if (!open) {
+            setSelectedApplicationId(null);
+            setDecisionNote("");
+          }
+        }}
+      >
+        <DialogContent dir="rtl" className="max-w-4xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+          <DialogHeader className="text-right">
+            <DialogTitle className="text-slate-900">طلبات التوظيف — {INSTITUTION_BRANCH_META[branchId].labelAr}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 md:grid-cols-[320px,1fr]">
+            <div className="max-h-[65vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-white p-2">
+              {branchApplications.length === 0 ? (
+                <p className="p-3 text-sm text-slate-500">لا توجد طلبات حالياً.</p>
+              ) : (
+                branchApplications.map((app) => (
+                  <button
+                    key={app.id}
+                    type="button"
+                    onClick={() => setSelectedApplicationId(app.id)}
+                    className={cn(
+                      "w-full rounded-lg border px-3 py-2 text-right",
+                      selectedApplicationId === app.id ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white hover:bg-violet-50/40",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[10px]",
+                          app.status === "pending"
+                            ? "border-amber-300 bg-amber-50 text-amber-700"
+                            : app.status === "approved"
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : "border-rose-300 bg-rose-50 text-rose-700",
+                        )}
+                      >
+                        {app.status === "pending" ? "قيد المراجعة" : app.status === "approved" ? "مقبول" : "مرفوض"}
+                      </span>
+                      <p className="truncate text-xs text-slate-500">{new Date(app.submittedAt).toLocaleString("ar")}</p>
+                    </div>
+                    <p className="mt-1 truncate font-display text-sm text-slate-900">
+                      {app.snapshot.firstName} {app.snapshot.lastName}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="max-h-[65vh] overflow-y-auto rounded-xl border border-violet-200 bg-white p-4">
+              {selectedApplication ? (
+                <div className="space-y-3 text-right">
+                  <h3 className="font-display text-base font-semibold text-slate-900">{selectedApplication.targetTitle}</h3>
+                  <p className="text-sm text-slate-700">
+                    المتقدم: {selectedApplication.snapshot.firstName} {selectedApplication.snapshot.lastName}
+                  </p>
+                  <p className="text-sm text-slate-700">الديسكورد: {selectedApplication.snapshot.discord}</p>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-700">الرتبة / المسمى عند القبول</Label>
+                    <Input
+                      className="border-violet-200 bg-white text-slate-900"
+                      placeholder="مثال: مبتدئ، ملازم، ممرض، مراقب…"
+                      value={applicantRank}
+                      onChange={(e) => setApplicantRank(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-700">صورة العضو (اختياري)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = "image/*";
+                        input.onchange = async () => {
+                          const file = input.files?.[0] ?? null;
+                          if (!file || !file.type.startsWith("image/")) return;
+                          if (file.size > MAX_IMAGE_BYTES) {
+                            toast.error("الصورة كبيرة جداً (حد أقصى 2 ميجابايت).");
+                            return;
+                          }
+                          try {
+                            const url = await readFileAsDataUrl(file);
+                            setApplicantImage(url);
+                            toast.success("تم تحميل الصورة للطلب");
+                          } catch {
+                            toast.error("تعذر قراءة الملف");
+                          }
+                        };
+                        input.click();
+                      }}
+                    >
+                      رفع صورة
+                    </Button>
+                    {applicantImage ? (
+                      <div className="mt-2">
+                        <img src={applicantImage} alt="" className="h-20 w-20 rounded-lg border border-violet-200 object-cover" />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3">
+                    <p className="text-xs text-violet-700">الخبرة</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.snapshot.experience || "—"}</p>
+                  </div>
+                  <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3">
+                    <p className="text-xs text-violet-700">مدن/سيرفرات سابقة</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.snapshot.previousCities || "—"}</p>
+                  </div>
+                  {selectedApplication.status === "pending" ? (
+                    <>
+                      <div>
+                        <Label className="text-xs text-slate-700">ملاحظة القرار (اختياري)</Label>
+                        <Textarea
+                          className="mt-1 min-h-[80px] border-violet-200 bg-white text-slate-900"
+                          value={decisionNote}
+                          onChange={(e) => setDecisionNote(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={() => runApplicationDecision("approved")}>
+                          قبول
+                        </Button>
+                        <Button type="button" variant="outline" className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100" onClick={() => runApplicationDecision("rejected")}>
+                          رفض
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 text-sm text-slate-700">
+                      الحالة: {selectedApplication.status === "approved" ? "مقبول" : "مرفوض"}
+                      {selectedApplication.note ? <p className="mt-1">ملاحظة: {selectedApplication.note}</p> : null}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">اختر طلباً من القائمة لعرض التفاصيل.</p>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

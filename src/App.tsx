@@ -43,6 +43,8 @@ import DeveloperPage from "./pages/DeveloperPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
 import ProfilePage from "./pages/ProfilePage.tsx";
 import TicketsPage from "./pages/TicketsPage.tsx";
+import JobsPage from "./pages/JobsPage.tsx";
+import JobsApplicationFormPage from "./pages/JobsApplicationFormPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { INSTITUTION_ROSTER_STAFF_ROLES } from "@/data/institutionBranches";
 
@@ -91,6 +93,8 @@ const AppRoutes = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/tickets" element={<TicketsPage />} />
+        <Route path="/jobs" element={<JobsPage />} />
+        <Route path="/jobs/apply/:role" element={<JobsApplicationFormPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
         <Route
           path="/dashboard"
@@ -235,7 +239,7 @@ const AppRoutes = () => {
           <Route
             path="applications"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "application_reviewer"]}>
+              <RequireStaffAuth allowRoles={["super_admin", "application_reviewer", ...INSTITUTION_ROSTER_STAFF_ROLES]}>
                 <ApplicationsReviewPage />
               </RequireStaffAuth>
             }

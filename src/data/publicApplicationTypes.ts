@@ -20,6 +20,9 @@ export type ApplicationRecord = {
   /** مفتاح المسار /apply/:role */
   roleKey: string;
   targetTitle: string;
+  applicantUserId?: string;
+  applicantUsername?: string;
+  applicantDisplayName?: string;
   status: ApplicationStatus;
   submittedAt: string;
   decidedAt?: string;

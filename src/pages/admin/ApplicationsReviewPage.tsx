@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAuth } from "@/contexts/AuthContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import type { ApplicationRecord, ApplicationStatus } from "@/data/publicApplicationTypes";
+import { institutionRosterStaffRoleForBranch } from "@/data/institutionBranches";
 import { getArabCountryLabel, isArabCountryCode } from "@/data/arabCountries";
 import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
@@ -33,16 +34,32 @@ function statusLabel(status: ApplicationStatus) {
 }
 
 const ApplicationsReviewPage = () => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, isApplicationReviewer } = useAuth();
   const { applications, setDecision } = useApplicationsContent();
   const [filter, setFilter] = useState<ApplicationStatus | "all">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [search, setSearch] = useState("");
 
+  const canReviewApplication = (app: ApplicationRecord): boolean => {
+    if (isSuperAdmin || isApplicationReviewer) return true;
+    const roles = new Set(user?.roles ?? []);
+    if (app.roleKey === "ems") return roles.has(institutionRosterStaffRoleForBranch("health"));
+    if (app.roleKey === "police") return roles.has(institutionRosterStaffRoleForBranch("interior_police"));
+    if (app.roleKey === "interior_sheriff") return roles.has(institutionRosterStaffRoleForBranch("interior_sheriff"));
+    if (app.roleKey === "interior_cia") return roles.has(institutionRosterStaffRoleForBranch("interior_cia"));
+    if (app.roleKey === "interior_marines") return roles.has(institutionRosterStaffRoleForBranch("interior_marines"));
+    if (app.roleKey === "oversight") return roles.has(institutionRosterStaffRoleForBranch("oversight"));
+    if (app.roleKey === "lawyer" || app.roleKey === "justice") {
+      return roles.has(institutionRosterStaffRoleForBranch("justice_lawyers"));
+    }
+    if (app.roleKey === "developer") return roles.has(institutionRosterStaffRoleForBranch("developer"));
+    return false;
+  };
+
   const sorted = useMemo(
-    () => [...applications].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
-    [applications],
+    () => [...applications].filter(canReviewApplication).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+    [applications, user?.roles, isSuperAdmin, isApplicationReviewer],
   );
 
   const filtered = useMemo(() => {
@@ -82,7 +99,7 @@ const ApplicationsReviewPage = () => {
           طلبات التقديم من الموقع
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          كل من لديه دور «مراجع التقديمات» يرى نفس القائمة. السوبر أدمِن يراها أيضاً دون الحاجة لهذا الدور.
+          السوبر أدمِن ومراجع التقديمات يرون كل الطلبات، ومدير كل جهة يرى فقط طلبات الجهة التابعة له.
         </p>
       </div>
 

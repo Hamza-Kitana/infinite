@@ -81,6 +81,9 @@ type ApplicationsContentValue = {
   submitApplication: (input: {
     roleKey: string;
     targetTitle: string;
+    applicantUserId?: string;
+    applicantUsername?: string;
+    applicantDisplayName?: string;
     snapshot: ApplicationFormSnapshot;
   }) => SubmitApplicationResult;
   /** قرار مراجع (أو سوبر أدمِن) */
@@ -132,6 +135,9 @@ export function ApplicationsContentProvider({ children }: { children: ReactNode 
     (input: {
       roleKey: string;
       targetTitle: string;
+      applicantUserId?: string;
+      applicantUsername?: string;
+      applicantDisplayName?: string;
       snapshot: ApplicationFormSnapshot;
     }): SubmitApplicationResult => {
       try {
@@ -139,6 +145,9 @@ export function ApplicationsContentProvider({ children }: { children: ReactNode 
           id: crypto.randomUUID(),
           roleKey: clampText(input.roleKey, 64),
           targetTitle: clampText(input.targetTitle, 200),
+          applicantUserId: input.applicantUserId ? clampText(input.applicantUserId, 120) : undefined,
+          applicantUsername: input.applicantUsername ? clampText(input.applicantUsername, 120) : undefined,
+          applicantDisplayName: input.applicantDisplayName ? clampText(input.applicantDisplayName, 160) : undefined,
           status: "pending",
           submittedAt: new Date().toISOString(),
           snapshot: clampSnapshot(input.snapshot),

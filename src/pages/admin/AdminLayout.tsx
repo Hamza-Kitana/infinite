@@ -22,12 +22,14 @@ import { primaryStaffRole, useAuth, type StaffRole } from "@/contexts/AuthContex
 import {
   INSTITUTION_BRANCH_IDS,
   INSTITUTION_BRANCH_META,
+  INSTITUTION_ROSTER_STAFF_ROLES,
   branchIdFromInstitutionRosterStaffRole,
   institutionRosterStaffRoleForBranch,
   isInstitutionBranchId,
   isInstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { cn } from "@/lib/utils";
+import { useTicketsCenter, type TicketTypeRole } from "@/lib/ticketsCenter";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: StaffRole[]; end?: boolean };
 
@@ -62,8 +64,17 @@ const STATIC_NAV_TAIL: NavItem[] = [
     to: "/dashboard/applications",
     label: "طلبات التقديم",
     icon: ClipboardList,
-    roles: ["super_admin", "application_reviewer"],
+    roles: ["super_admin", "application_reviewer", ...INSTITUTION_ROSTER_STAFF_ROLES],
   },
+];
+
+const TICKET_TYPE_NAV: { slug: string; label: string; role: TicketTypeRole & StaffRole }[] = [
+  { slug: "support", label: "دعم فني", role: "ticket_support_manager" },
+  { slug: "admin-inquiry", label: "استفسار إداري", role: "ticket_admin_inquiry_manager" },
+  { slug: "player-complaint", label: "شكوى لاعب", role: "ticket_player_complaint_manager" },
+  { slug: "compensation", label: "طلب تعويض", role: "ticket_compensation_manager" },
+  { slug: "store", label: "طلب متجر", role: "ticket_store_manager" },
+  { slug: "general", label: "تكت عام", role: "ticket_general_manager" },
 ];
 
 function adminRoleShell(role: StaffRole): { title: string; badge: string } {
@@ -119,8 +130,36 @@ const AdminLayout = () => {
     isInstitutionRosterManager,
     isApplicationReviewer,
   } = useAuth();
+  const tickets = useTicketsCenter();
 
   const userRoles = user?.roles ?? [];
+  const ticketUnreadByRole = useMemo(() => {
+    const allowedRoles = isSuperAdmin
+      ? new Set(TICKET_TYPE_NAV.map((item) => item.role))
+      : new Set(TICKET_TYPE_NAV.filter((item) => userRoles.includes(item.role)).map((item) => item.role));
+    const counts = new Map<TicketTypeRole, number>();
+    for (const ticket of tickets) {
+      if (!allowedRoles.has(ticket.typeRole)) continue;
+      const cutoff = ticket.lastStaffReadAt ? new Date(ticket.lastStaffReadAt).getTime() : 0;
+      const hasUnread = ticket.messages.some(
+        (m) => (m.senderType ?? "public") === "public" && new Date(m.at).getTime() > cutoff,
+      );
+      if (!hasUnread) continue;
+      counts.set(ticket.typeRole, (counts.get(ticket.typeRole) ?? 0) + 1);
+    }
+    return counts;
+  }, [tickets, userRoles, isSuperAdmin]);
+  const totalTicketUnread = useMemo(
+    () => Array.from(ticketUnreadByRole.values()).reduce((sum, count) => sum + count, 0),
+    [ticketUnreadByRole],
+  );
+  const unreadByTicketPath = useMemo(() => {
+    const map = new Map<string, number>();
+    if (totalTicketUnread > 0) {
+      map.set("/dashboard/tickets", totalTicketUnread);
+    }
+    return map;
+  }, [totalTicketUnread]);
 
   const items = useMemo(() => {
     const instNav: NavItem[] = [];
@@ -271,7 +310,12 @@ const AdminLayout = () => {
                 }
               >
                 <item.icon className="h-4 w-4 shrink-0 opacity-90" />
-                {item.label}
+                <span className="min-w-0 flex-1">{item.label}</span>
+                {(unreadByTicketPath.get(item.to) ?? 0) > 0 ? (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-semibold text-white">
+                    {unreadByTicketPath.get(item.to)}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
 
