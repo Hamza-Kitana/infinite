@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/kick-api/:path*",
+      "destination": "https://kick.com/:path*"
     }
   ]
 }

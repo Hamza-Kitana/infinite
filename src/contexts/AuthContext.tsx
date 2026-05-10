@@ -10,7 +10,11 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { appendActivityLog } from "@/lib/activityLog";
-import { findManagedUserByCredentials, loadManagedUsers } from "@/staff/staffDirectory";
+import {
+  findManagedUserByCredentials,
+  findManagedUserByPublicId,
+  loadManagedUsers,
+} from "@/staff/staffDirectory";
 
 export type CoreStaffRole =
   | "super_admin"
@@ -18,8 +22,12 @@ export type CoreStaffRole =
   | "streamer_manager"
   | "gang_manager"
   | "vip_cars_manager"
+  | "houses_manager"
+  | "packages_manager"
+  | "investments_manager"
   | "application_reviewer"
   | "about_manager"
+  | "store_orders_manager"
   | "ticket_support_manager"
   | "ticket_admin_inquiry_manager"
   | "ticket_player_complaint_manager"
@@ -35,8 +43,12 @@ const CORE_STAFF_NO_SUPER: readonly CoreStaffRole[] = [
   "streamer_manager",
   "gang_manager",
   "vip_cars_manager",
+  "houses_manager",
+  "packages_manager",
+  "investments_manager",
   "application_reviewer",
   "about_manager",
+  "store_orders_manager",
   "ticket_support_manager",
   "ticket_admin_inquiry_manager",
   "ticket_player_complaint_manager",
@@ -97,7 +109,11 @@ export function getPostLoginDashboardPath(roles: StaffRole[]): string {
     ["streamer_manager", "/dashboard/streamers"],
     ["gang_manager", "/dashboard/gangs"],
     ["vip_cars_manager", "/dashboard/vip-cars"],
+    ["houses_manager", "/dashboard/houses"],
+    ["packages_manager", "/dashboard/packages"],
+    ["investments_manager", "/dashboard/investments"],
     ["about_manager", "/dashboard/about"],
+    ["store_orders_manager", "/dashboard/store-orders"],
     ["ticket_support_manager", "/dashboard/tickets"],
     ["ticket_admin_inquiry_manager", "/dashboard/tickets"],
     ["ticket_player_complaint_manager", "/dashboard/tickets"],
@@ -127,7 +143,11 @@ export function primaryStaffRole(roles: StaffRole[] | undefined): StaffRole | nu
     "streamer_manager",
     "gang_manager",
     "vip_cars_manager",
+    "houses_manager",
+    "packages_manager",
+    "investments_manager",
     "about_manager",
+    "store_orders_manager",
     "ticket_support_manager",
     "ticket_admin_inquiry_manager",
     "ticket_player_complaint_manager",
@@ -150,6 +170,11 @@ export function primaryStaffRole(roles: StaffRole[] | undefined): StaffRole | nu
 type AuthContextValue = {
   user: StaffUser | null;
   login: (username: string, password: string) => StaffUser | null;
+  /**
+   * يفتح جلسة موظف انطلاقاً من PublicUser مرتبط (مواطن مرقّى).
+   * لا يطلب كلمة مرور — يعتمد على أن المستخدم سجّل دخولاً عبر دسكورد/الحساب العام.
+   */
+  adoptLinkedStaffSession: (publicUserId: string) => StaffUser | null;
   logout: () => void;
   hasRole: (role: StaffRole) => boolean;
   isSuperAdmin: boolean;
@@ -157,6 +182,9 @@ type AuthContextValue = {
   isStreamerManager: boolean;
   isGangManager: boolean;
   isVipCarsManager: boolean;
+  isHousesManager: boolean;
+  isPackagesManager: boolean;
+  isInvestmentsManager: boolean;
   /** يملك أي دور طاقم مؤسسة (فرع محدد بالدور نفسه) */
   isInstitutionRosterManager: boolean;
   /** أول فرع طاقم يُستدل من الأدوار — للمعاينة وقفل المحرر */
@@ -166,6 +194,9 @@ type AuthContextValue = {
   canManageStreamers: boolean;
   canManageGangs: boolean;
   canManageVipCars: boolean;
+  canManageHouses: boolean;
+  canManagePackages: boolean;
+  canManageInvestments: boolean;
   canEditInstitutionRosters: boolean;
   isApplicationReviewer: boolean;
   canReviewApplications: boolean;
@@ -265,6 +296,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
+  const adoptLinkedStaffSession = useCallback((publicUserId: string): StaffUser | null => {
+    const managed = findManagedUserByPublicId(publicUserId);
+    if (!managed || managed.isActive === false) return null;
+    if (managed.roles.length === 0) return null;
+    const next: StaffUser = {
+      username: managed.username,
+      roles: [...managed.roles] as StaffRole[],
+      managedId: managed.id,
+    };
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      return null;
+    }
+    setUser(next);
+    try {
+      appendActivityLog(next.username, "تسجيل دخول مواطن مرقّى", `أدوار: ${next.roles.join(", ")}`);
+    } catch {
+      /* سجل النشاط لا يمنع الجلسة */
+    }
+    return next;
+  }, []);
+
   const logout = useCallback(() => {
     setUser((prev) => {
       if (prev?.username) {
@@ -328,6 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       user,
       login,
+      adoptLinkedStaffSession,
       logout,
       hasRole: has,
       isSuperAdmin: has("super_admin"),
@@ -335,6 +390,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isStreamerManager: has("streamer_manager"),
       isGangManager: has("gang_manager"),
       isVipCarsManager: has("vip_cars_manager"),
+      isHousesManager: has("houses_manager"),
+      isPackagesManager: has("packages_manager"),
+      isInvestmentsManager: has("investments_manager"),
       isInstitutionRosterManager: user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false,
       institutionBranchId: rosterBranch,
       canManageStaff: has("super_admin"),
@@ -342,16 +400,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageStreamers: has("super_admin") || has("streamer_manager"),
       canManageGangs: has("super_admin") || has("gang_manager"),
       canManageVipCars: has("super_admin") || has("vip_cars_manager"),
+      canManageHouses: has("super_admin") || has("houses_manager"),
+      canManagePackages: has("super_admin") || has("packages_manager"),
+      canManageInvestments: has("super_admin") || has("investments_manager"),
       canEditInstitutionRosters:
         has("super_admin") || (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false),
       isApplicationReviewer: has("application_reviewer"),
-      canReviewApplications: has("super_admin") || has("application_reviewer"),
+      canReviewApplications: has("super_admin") || has("application_reviewer") || has("streamer_manager"),
       canUseDashboard:
         has("super_admin") ||
         has("laws_editor") ||
         has("streamer_manager") ||
         has("gang_manager") ||
         has("vip_cars_manager") ||
+        has("houses_manager") ||
+        has("packages_manager") ||
+        has("investments_manager") ||
         has("about_manager") ||
         has("ticket_support_manager") ||
         has("ticket_admin_inquiry_manager") ||
@@ -359,11 +423,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         has("ticket_compensation_manager") ||
         has("ticket_store_manager") ||
         has("ticket_general_manager") ||
+        has("store_orders_manager") ||
         has("footer_manager") ||
         (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false) ||
         has("application_reviewer"),
     };
-  }, [user, login, logout]);
+  }, [user, login, adoptLinkedStaffSession, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

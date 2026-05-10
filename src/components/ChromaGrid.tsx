@@ -10,6 +10,14 @@ export type ChromaGridItem = {
   gradient?: string;
   url?: string;
   location?: string;
+  /** نبذة العضو (تظهر في تفاصيل البطاقة عند الحاجة) */
+  bio?: string;
+  /** PublicUser.id المرتبط بالعضو — لربط لوحة المستخدم بطاقم المؤسسة */
+  userId?: string;
+  /** Discord ID للحساب المرتبط */
+  discordId?: string;
+  /** نص الرتبة الإدارية المخصصة من القائد/النائب (مثال: ضابط، رقيب، فني...) */
+  rankLabel?: string;
 };
 
 type ChromaGridProps = {

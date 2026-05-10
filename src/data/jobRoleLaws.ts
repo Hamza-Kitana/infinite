@@ -88,3 +88,8 @@ export const JOB_ROLE_LAWS: Record<JobRoleKey, JobRoleLawSet> = {
     ],
   },
 };
+
+/** طلبات التوظيف من /jobs/apply — تُدار من طواقم المؤسسات وليس من «طلبات التقديم» (دخول السيرفر). */
+export function isJobApplicationRoleKey(roleKey: string): boolean {
+  return Object.prototype.hasOwnProperty.call(JOB_ROLE_LAWS, roleKey);
+}

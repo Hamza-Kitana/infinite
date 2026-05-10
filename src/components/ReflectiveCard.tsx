@@ -1,4 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import type { KickChannelLiveInfo } from "@/lib/kickChannel";
+import { ExternalLink } from "lucide-react";
 import "./ReflectiveCard.css";
 
 type ReflectiveCardProps = {
@@ -8,34 +11,157 @@ type ReflectiveCardProps = {
   image: string;
   streamUrl: string;
   featured?: boolean;
+  /** إن وُجد، قناة Kick لعرض الحالة والمعاينة */
+  kickSlug?: string | null;
+  /** حالة Kick من الـ API؛ غير معرّف = لم يكتمل أول طلب بعد */
+  kickLive?: KickChannelLiveInfo;
 };
 
-const ReflectiveCard = ({ name, role, bio, image, streamUrl, featured = false }: ReflectiveCardProps) => {
-  return (
-    <article className={`reflective-card ${featured ? "reflective-card--featured" : "reflective-card--lite"}`}>
+const ReflectiveCard = ({
+  name,
+  role,
+  bio,
+  image,
+  streamUrl,
+  featured = false,
+  kickSlug,
+  kickLive,
+}: ReflectiveCardProps) => {
+  const isKick = Boolean(kickSlug);
+  const loadingKick = isKick && kickLive === undefined;
+  const fetchOk = kickLive?.fetchOk === true;
+  const isLive = fetchOk && kickLive?.live === true;
+  const isOffline = fetchOk && kickLive?.live === false;
+  const fetchFailed = isKick && kickLive !== undefined && kickLive.fetchOk === false;
+
+  const statusRow = (() => {
+    if (!isKick) return null;
+    if (loadingKick) {
+      return (
+        <div className="reflective-card__status-pill reflective-card__status-pill--loading" aria-live="polite">
+          <span className="reflective-card__status-loading-dot" />
+          جاري التحقق من البث…
+        </div>
+      );
+    }
+    if (fetchFailed) {
+      return (
+        <div className="reflective-card__status-pill reflective-card__status-pill--muted" aria-live="polite">
+          <span className="block">تعذّر التحقق من Kick حالياً</span>
+          <span className="mt-0.5 block text-[10px] font-normal opacity-90">
+            يمكنك فتح «رابط البث» أدناه للتحقق يدوياً
+          </span>
+        </div>
+      );
+    }
+    if (isLive) {
+      return (
+        <div className="reflective-card__live-pill" aria-live="polite">
+          <span className="reflective-card__live-dot" />
+          <span className="reflective-card__live-text">مباشر على Kick</span>
+        </div>
+      );
+    }
+    if (isOffline) {
+      return (
+        <div className="reflective-card__offline-pill" aria-live="polite">
+          <span className="reflective-card__offline-dot" />
+          أوفلاين
+        </div>
+      );
+    }
+    return null;
+  })();
+
+  const article = (
+    <article
+      className={`reflective-card ${featured ? "reflective-card--featured" : "reflective-card--lite"} ${isLive ? "reflective-card--live" : ""} ${isOffline ? "reflective-card--offline" : ""}`}
+    >
       <img src={image} alt={name} className="reflective-card__bg" loading="lazy" decoding="async" />
       <div className="reflective-card__overlay" />
 
       <div className="reflective-card__content">
         <div className="reflective-card__body">
-          <div className="reflective-card__avatar-wrap">
+          {statusRow}
+          <div
+            className={`reflective-card__avatar-wrap ${isLive ? "reflective-card__avatar-wrap--live" : ""} ${isOffline ? "reflective-card__avatar-wrap--offline" : ""}`}
+          >
             <img src={image} alt={name} className="reflective-card__avatar" loading="lazy" decoding="async" />
           </div>
           <p className="reflective-card__role">{role}</p>
           <h3 className="reflective-card__name">{name}</h3>
+          {isLive && kickLive?.sessionTitle ? (
+            <p className="reflective-card__live-title" title={kickLive.sessionTitle}>
+              {kickLive.sessionTitle}
+            </p>
+          ) : null}
           <p className="reflective-card__bio">{bio}</p>
+          {isLive ? (
+            <p className="reflective-card__hover-hint">مرّر المؤشر لمعاينة البث</p>
+          ) : null}
         </div>
 
         <footer className="reflective-card__footer">
           <Button asChild className="w-full bg-gradient-neon text-primary-foreground font-display tracking-widest">
             <a href={streamUrl} target="_blank" rel="noreferrer">
-              رابط البث
+              {isLive ? "شاهد البث المباشر" : "رابط البث"}
             </a>
           </Button>
         </footer>
       </div>
     </article>
   );
+
+  if (isLive && kickSlug && fetchOk) {
+    return (
+      <HoverCard openDelay={280} closeDelay={200}>
+        <HoverCardTrigger asChild>
+          <div className="group h-full rounded-[22px] outline-none transition-[transform,box-shadow] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+            {article}
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="top"
+          align="center"
+          sideOffset={10}
+          className="z-[110] w-[min(94vw,440px)] border-violet-200 bg-[#0f0f12] p-0 text-right shadow-xl data-[state=open]:animate-in"
+          dir="rtl"
+        >
+          <div className="border-b border-white/10 px-3 py-2">
+            <p className="text-xs font-medium text-white/90">{name}</p>
+            {kickLive?.sessionTitle ? (
+              <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/70">{kickLive.sessionTitle}</p>
+            ) : (
+              <p className="mt-1 text-[11px] text-emerald-400/90">بث مباشر على Kick</p>
+            )}
+          </div>
+          <div className="relative aspect-video w-full bg-black">
+            <iframe
+              title={`Kick — ${name}`}
+              src={`https://player.kick.com/${kickSlug}`}
+              className="absolute inset-0 h-full w-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-300 underline-offset-4 hover:text-white hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              فتح على Kick
+            </a>
+            <span className="text-[10px] text-white/45">معاينة عند تمرير المؤشر على البطاقة</span>
+          </div>
+        </HoverCardContent>
+      </HoverCard>
+    );
+  }
+
+  return article;
 };
 
 export default ReflectiveCard;

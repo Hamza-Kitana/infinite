@@ -15,8 +15,12 @@ export type BaseManagedStaffRole =
   | "streamer_manager"
   | "gang_manager"
   | "vip_cars_manager"
+  | "houses_manager"
+  | "packages_manager"
+  | "investments_manager"
   | "application_reviewer"
   | "about_manager"
+  | "store_orders_manager"
   | "ticket_support_manager"
   | "ticket_admin_inquiry_manager"
   | "ticket_player_complaint_manager"
@@ -32,8 +36,12 @@ const BASE_MANAGED: readonly BaseManagedStaffRole[] = [
   "streamer_manager",
   "gang_manager",
   "vip_cars_manager",
+  "houses_manager",
+  "packages_manager",
+  "investments_manager",
   "application_reviewer",
   "about_manager",
+  "store_orders_manager",
   "ticket_support_manager",
   "ticket_admin_inquiry_manager",
   "ticket_player_complaint_manager",
@@ -59,6 +67,11 @@ export type ManagedUser = {
   password: string;
   roles: ManagedStaffRole[];
   isActive?: boolean;
+  /**
+   * إن كان هذا المستخدم الموظف ناتجاً عن «ترقية مواطن»،
+   * نحفظ هنا مرجع PublicUser.id لتمييز الترقيات عن الموظفين المنشؤين يدوياً.
+   */
+  linkedPublicUserId?: string;
 };
 
 const STORAGE_KEY = "ic_managed_staff_v1";
@@ -120,6 +133,10 @@ function safeParse(raw: string | null): ManagedUser[] {
         password: (row as ManagedUser).password,
         roles,
         isActive: (row as ManagedUser).isActive !== false,
+        linkedPublicUserId:
+          typeof (row as ManagedUser).linkedPublicUserId === "string"
+            ? (row as ManagedUser).linkedPublicUserId
+            : undefined,
       };
     });
   } catch {
@@ -170,7 +187,20 @@ export function updateManagedUser(id: string, patch: Partial<Pick<ManagedUser, "
 
 export function findManagedUserByCredentials(username: string, password: string): ManagedUser | null {
   const u = username.trim().toLowerCase();
-  return loadManagedUsers().find((m) => m.username.toLowerCase() === u && m.password === password && m.isActive !== false) ?? null;
+  /** المواطن المرقّى لا يحمل كلمة مرور لمنع تسجيل الدخول من نافذة Lock — يدخل عبر الدسكورد ويُتبنّى تلقائياً */
+  if (!password.length) return null;
+  return loadManagedUsers().find(
+    (m) =>
+      m.username.toLowerCase() === u &&
+      m.password.length > 0 &&
+      m.password === password &&
+      m.isActive !== false,
+  ) ?? null;
+}
+
+/** يبحث عن ملف موظف مرتبط بحساب مواطن معيّن — يُستخدم في صفحة الإدارة */
+export function findManagedUserByPublicId(publicUserId: string): ManagedUser | null {
+  return loadManagedUsers().find((m) => m.linkedPublicUserId === publicUserId) ?? null;
 }
 
 /** فروع الطاقم المصرّح بها من قائمة أدوار المستخدم */

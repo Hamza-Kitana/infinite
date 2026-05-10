@@ -19,31 +19,43 @@ type RuleVariant = "primary" | "secondary" | "accent" | "magenta";
 
 const variantStyles: Record<
   RuleVariant,
-  { border: string; badge: string; line: string; glow: string }
+  { border: string; badge: string; line: string; glow: string; orb: string; inset: string }
 > = {
   primary: {
-    border: "border-primary/30 hover:border-primary/55",
-    badge: "bg-primary/20 text-primary ring-1 ring-primary/40 shadow-[0_0_24px_hsl(var(--primary)/0.2)]",
-    line: "from-primary via-secondary/80 to-transparent",
-    glow: "group-hover:shadow-[0_0_32px_hsl(var(--primary)/0.12)]",
+    border: "border-primary/20 hover:border-primary/45",
+    badge:
+      "bg-gradient-to-br from-primary/25 to-primary/10 text-primary ring-1 ring-primary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_28px_hsl(var(--primary)/0.18)]",
+    line: "from-primary via-secondary/70 to-transparent",
+    glow: "hover:shadow-[0_24px_56px_-16px_hsl(var(--primary)/0.22)] hover:-translate-y-1.5",
+    orb: "bg-primary/25",
+    inset: "ring-white/[0.06]",
   },
   secondary: {
-    border: "border-secondary/30 hover:border-secondary/55",
-    badge: "bg-secondary/20 text-secondary ring-1 ring-secondary/40 shadow-[0_0_24px_hsl(var(--secondary)/0.2)]",
-    line: "from-secondary via-primary/60 to-transparent",
-    glow: "group-hover:shadow-[0_0_32px_hsl(var(--secondary)/0.12)]",
+    border: "border-secondary/20 hover:border-secondary/45",
+    badge:
+      "bg-gradient-to-br from-secondary/25 to-secondary/10 text-secondary ring-1 ring-secondary/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_28px_hsl(var(--secondary)/0.18)]",
+    line: "from-secondary via-primary/55 to-transparent",
+    glow: "hover:shadow-[0_24px_56px_-16px_hsl(var(--secondary)/0.2)] hover:-translate-y-1.5",
+    orb: "bg-secondary/22",
+    inset: "ring-white/[0.06]",
   },
   accent: {
-    border: "border-accent/30 hover:border-accent/55",
-    badge: "bg-accent/20 text-accent ring-1 ring-accent/40 shadow-[0_0_24px_hsl(var(--accent)/0.2)]",
-    line: "from-accent via-primary/50 to-transparent",
-    glow: "group-hover:shadow-[0_0_32px_hsl(var(--accent)/0.12)]",
+    border: "border-accent/20 hover:border-accent/45",
+    badge:
+      "bg-gradient-to-br from-accent/25 to-accent/10 text-accent ring-1 ring-accent/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_28px_hsl(var(--accent)/0.18)]",
+    line: "from-accent via-primary/45 to-transparent",
+    glow: "hover:shadow-[0_24px_56px_-16px_hsl(var(--accent)/0.18)] hover:-translate-y-1.5",
+    orb: "bg-accent/20",
+    inset: "ring-white/[0.06]",
   },
   magenta: {
-    border: "border-primary/25 hover:border-secondary/50",
-    badge: "bg-gradient-to-br from-primary/30 to-secondary/25 text-foreground ring-1 ring-primary/30",
-    line: "from-secondary via-primary to-secondary/50",
-    glow: "hover:shadow-[0_0_28px_hsl(var(--secondary)/0.14)]",
+    border: "border-primary/18 hover:border-secondary/42",
+    badge:
+      "bg-gradient-to-br from-primary/35 via-secondary/20 to-primary/15 text-foreground ring-1 ring-primary/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_10px_32px_hsl(var(--secondary)/0.15)]",
+    line: "from-secondary via-primary/90 to-secondary/60",
+    glow: "hover:shadow-[0_24px_52px_-14px_hsl(var(--secondary)/0.2)] hover:-translate-y-1.5",
+    orb: "bg-secondary/18",
+    inset: "ring-white/[0.06]",
   },
 };
 
@@ -82,43 +94,70 @@ function RuleCard({
       layout={!reduceMotion}
       variants={reduceMotion ? undefined : itemVariants}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border bg-card/50 p-5 backdrop-blur-md transition-[transform,box-shadow,border-color] duration-300 md:p-6",
+        "group relative flex h-full flex-col overflow-hidden rounded-3xl border bg-gradient-to-br from-card/95 via-card/75 to-muted/25 p-6 shadow-[0_8px_40px_-18px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-[transform,box-shadow,border-color] duration-500 md:p-7",
+        "ring-1 ring-inset",
+        v.inset,
         v.border,
         v.glow,
-        "hover:-translate-y-1 motion-reduce:transform-none motion-reduce:hover:translate-y-0",
+        "motion-reduce:transform-none motion-reduce:hover:translate-y-0",
       )}
       style={{ contentVisibility: "auto" }}
     >
+      {/* وهج خلفي خفيف يتبع نوع القسم */}
       <div
         className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-l opacity-90 transition-opacity duration-500 group-hover:opacity-100",
+          "pointer-events-none absolute -left-24 top-0 h-52 w-52 rounded-full blur-3xl transition-opacity duration-700 group-hover:opacity-100 md:h-64 md:w-64",
+          v.orb,
+          "opacity-55",
+        )}
+      />
+      <div
+        className={cn(
+          "pointer-events-none absolute -bottom-20 end-0 h-44 w-44 rounded-full blur-3xl transition-opacity duration-700 group-hover:opacity-90",
+          variant === "magenta" ? "bg-primary/15" : "bg-secondary/12",
+          "opacity-40",
+        )}
+      />
+
+      {/* شريط علوي */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-4 top-0 h-[3px] rounded-full bg-gradient-to-l opacity-95 shadow-[0_0_20px_hsl(var(--primary)/0.35)] transition-[opacity,transform] duration-500 group-hover:opacity-100 group-hover:shadow-[0_0_28px_hsl(var(--primary)/0.45)]",
           v.line,
         )}
       />
-      <div
-        className={cn(
-          "pointer-events-none absolute -left-20 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-gradient-to-r blur-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100",
-          variant === "secondary" ? "from-secondary/25" : "from-primary/20",
-        )}
-      />
 
-      <div className="relative flex items-start gap-4">
-        <span
-          className={cn(
-            "flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl font-latin-display text-sm font-bold transition-transform duration-300 group-hover:scale-105",
-            v.badge,
-          )}
-        >
-          {String(rule.id).padStart(2, "0")}
-        </span>
-        <div className="min-w-0 flex-1 space-y-2.5 text-right">
-          <h4 className="font-display text-lg font-bold leading-snug text-foreground md:text-xl">{rule.title}</h4>
-          <p className="text-sm leading-relaxed text-muted-foreground md:text-[15px]">{rule.description}</p>
+      <div className="relative flex flex-1 flex-col gap-5 sm:flex-row sm:items-stretch sm:gap-6">
+        <div className="flex shrink-0 justify-end sm:block">
+          <span
+            className={cn(
+              "inline-flex h-14 min-h-14 min-w-14 items-center justify-center rounded-2xl font-latin-display text-base font-bold tabular-nums tracking-tight transition-transform duration-300 group-hover:scale-[1.03] md:h-[3.75rem] md:min-w-[3.75rem] md:text-lg",
+              v.badge,
+            )}
+          >
+            {String(rule.id).padStart(2, "0")}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-3 text-right">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-full bg-muted/45 px-3 py-1 font-display text-[11px] font-medium text-muted-foreground ring-1 ring-border/35">
+              مادة
+            </span>
+          </div>
+          <h4 className="font-display text-xl font-bold leading-snug tracking-tight text-foreground md:text-[1.35rem]">
+            {rule.title}
+          </h4>
+          <p className="text-[0.9375rem] leading-[1.75] text-muted-foreground md:text-base">{rule.description}</p>
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 h-5 w-5 border-b border-l border-primary/20 opacity-40 transition-opacity group-hover:opacity-70" />
-      <div className="pointer-events-none absolute bottom-3 right-3 h-5 w-5 border-b border-r border-primary/20 opacity-40 transition-opacity group-hover:opacity-70" />
+      {/* خط سفلي يظهر عند المرور */}
+      <div className="pointer-events-none relative mt-6 h-px w-full bg-gradient-to-l from-transparent via-primary/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+      {/* زوايا زخرفية ناعمة */}
+      <div className="pointer-events-none absolute bottom-2 start-2 h-6 w-6 rounded-es-lg border-b border-s border-primary/25 opacity-50 transition-opacity duration-500 group-hover:border-primary/40 group-hover:opacity-80" />
+      <div className="pointer-events-none absolute bottom-2 end-2 h-6 w-6 rounded-ee-lg border-b border-e border-primary/25 opacity-50 transition-opacity duration-500 group-hover:border-primary/40 group-hover:opacity-80" />
     </motion.article>
   );
 }
@@ -144,15 +183,21 @@ function RulesGrid({
 
   if (filtered.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 py-16 text-center">
-        <p className="font-display text-muted-foreground">لا توجد نتائج مطابقة للبحث.</p>
+      <div className="rounded-3xl border border-dashed border-primary/25 bg-gradient-to-br from-muted/30 via-card/40 to-primary/[0.06] px-6 py-20 text-center shadow-inner backdrop-blur-sm">
+        <Search className="mx-auto mb-4 h-10 w-10 text-primary/40" aria-hidden />
+        <p className="font-display text-base font-semibold text-foreground">لا توجد نتائج مطابقة</p>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">جرّب كلمة أخرى أو امسح البحث للعودة إلى كل المواد.</p>
       </div>
     );
   }
 
   if (reduceMotion) {
     return (
-      <div key={query + variant} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        key={query + variant}
+        dir="rtl"
+        className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 xl:grid-cols-3 lg:gap-6"
+      >
         {filtered.map((rule) => (
           <RuleCard key={`${rule.id}-${rule.title}`} rule={rule} variant={variant} reduceMotion={reduceMotion} />
         ))}
@@ -163,7 +208,8 @@ function RulesGrid({
   return (
     <motion.div
       key={query + variant + rules.map((r) => r.id).join("-")}
-      className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+      dir="rtl"
+      className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 xl:grid-cols-3 lg:gap-6"
       variants={listVariants}
       initial="hidden"
       animate="show"
@@ -186,9 +232,13 @@ function SectionIntro({
 }) {
   const inner = (
     <>
-      <h2 className="font-display text-2xl font-bold md:text-3xl">{title}</h2>
-      <p className="mt-2 max-w-2xl text-muted-foreground">{subtitle}</p>
-      <div className="mt-4 h-px max-w-xs bg-gradient-to-l from-primary via-secondary/50 to-transparent" />
+      <h2 className="font-display text-2xl font-bold tracking-tight md:text-3xl">{title}</h2>
+      <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground md:text-base">{subtitle}</p>
+      <div className="mt-5 flex items-center justify-end gap-2">
+        <div className="h-px flex-1 max-w-[4.5rem] bg-gradient-to-l from-transparent to-primary/40" />
+        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/80 shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
+        <div className="h-px flex-1 max-w-xs bg-gradient-to-l from-primary/50 via-secondary/40 to-transparent" />
+      </div>
     </>
   );
 

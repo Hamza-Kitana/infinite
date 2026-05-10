@@ -126,12 +126,21 @@ export function saveTicketRetentionHours(hours: TicketRetentionHours) {
   window.dispatchEvent(new CustomEvent(RETENTION_EVENT_NAME));
 }
 
+/** طلبات المتجر لا تُحذف تلقائياً بمرور الوقت — فقط يدوياً من الإدارة */
+function isRetentionExempt(ticket: TicketThread): boolean {
+  return ticket.typeRole === "ticket_store_manager";
+}
+
 function pruneExpiredTickets(tickets: TicketThread[], hours: TicketRetentionHours) {
   const now = Date.now();
   const maxAgeMs = hours * 60 * 60 * 1000;
   const keep: TicketThread[] = [];
   const removed: TicketThread[] = [];
   for (const ticket of tickets) {
+    if (isRetentionExempt(ticket)) {
+      keep.push(ticket);
+      continue;
+    }
     const createdAtMs = new Date(ticket.createdAt).getTime();
     if (!Number.isFinite(createdAtMs) || now - createdAtMs <= maxAgeMs) {
       keep.push(ticket);

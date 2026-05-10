@@ -24,6 +24,24 @@ export default defineConfig(() => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      // طلبات Kick من نفس المنشأ في التطوير (تفادي CORS + بعض طلبات 403 بدون User-Agent)
+      "/kick-api": {
+        target: "https://kick.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/kick-api/, ""),
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader(
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            );
+            proxyReq.setHeader("Accept", "application/json");
+          });
+        },
+      },
+    },
   },
   plugins: [react()],
   resolve: {

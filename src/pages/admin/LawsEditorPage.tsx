@@ -106,7 +106,7 @@ function ConfirmDeleteButton({
           </Button>
         )}
       </AlertDialogTrigger>
-      <AlertDialogContent dir="rtl">
+      <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
         <AlertDialogHeader className="text-right">
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -148,7 +148,7 @@ function SortableSectionRow({
     >
       <button
         type="button"
-        className="inline-flex w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 active:cursor-grabbing"
+        className="inline-flex w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-500 active:cursor-grabbing"
         aria-label="سحب لترتيب القسم"
         {...attributes}
         {...listeners}
@@ -210,7 +210,7 @@ function SortableRuleRow({
     >
       <button
         type="button"
-        className="mt-0.5 inline-flex h-9 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-md border border-dashed border-violet-300 text-slate-500"
+        className="mt-0.5 inline-flex h-9 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-md border border-dashed border-slate-300 text-slate-500"
         aria-label="سحب لترتيب القانون"
         {...attributes}
         {...listeners}
@@ -252,7 +252,7 @@ function SortableRuleRow({
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent dir="rtl">
+          <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
             <AlertDialogHeader className="text-right">
               <AlertDialogTitle>تأكيد حذف القانون</AlertDialogTitle>
               <AlertDialogDescription>
@@ -907,7 +907,7 @@ const LawsEditorPage = () => {
                       <Trash2 className="ms-1 h-4 w-4" /> حذف القسم
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent dir="rtl">
+                  <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
                     <AlertDialogHeader className="text-right">
                       <AlertDialogTitle>حذف هذا القسم؟</AlertDialogTitle>
                       <AlertDialogDescription>سيزال القسم وجميع قوانينه من الموقع.</AlertDialogDescription>
@@ -979,7 +979,7 @@ const LawsEditorPage = () => {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] sm:max-w-2xl">
+        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">قسم جديد</DialogTitle>
             <DialogDescription className="text-slate-600">اختر نوع القسم ثم العناوين.</DialogDescription>
@@ -1072,7 +1072,7 @@ const LawsEditorPage = () => {
           if (!open) setSectionEdit(null);
         }}
       >
-        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] sm:max-w-2xl">
+        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-2xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:rounded-2xl sm:max-w-2xl">
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">تعديل القسم</DialogTitle>
             <DialogDescription className="text-slate-600">عدّل بيانات القسم من نافذة واحدة بشكل مرتب.</DialogDescription>
@@ -1159,7 +1159,10 @@ const LawsEditorPage = () => {
       </Dialog>
 
       <Dialog open={!!ruleDialog} onOpenChange={(o) => !o && setRuleDialog(null)}>
-        <DialogContent dir="rtl" className="w-[calc(100%-1.25rem)] max-w-3xl sm:max-w-3xl">
+        <DialogContent
+          dir="rtl"
+          className="w-[calc(100%-1.25rem)] max-w-3xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:max-w-3xl sm:rounded-2xl"
+        >
           <DialogHeader className="text-right">
             <DialogTitle>{ruleDialog?.mode === "add" ? "قانون جديد" : "تعديل القانون"}</DialogTitle>
           </DialogHeader>

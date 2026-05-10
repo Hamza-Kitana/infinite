@@ -4,7 +4,7 @@ import { INSTITUTION_BRANCH_IDS, type InstitutionBranchId } from "@/data/institu
 const STORAGE_KEY = "ic_site_visibility_v1";
 const EVENT_NAME = "ic-site-visibility";
 
-export type SitePageKey = "laws" | "streamers" | "gangs" | "vipCars";
+export type SitePageKey = "laws" | "streamers" | "gangs" | "vipCars" | "houses" | "packages" | "investments";
 
 type SiteVisibilityPersisted = {
   v: 1;
@@ -20,6 +20,9 @@ function defaultState(): SiteVisibilityPersisted {
       streamers: true,
       gangs: true,
       vipCars: true,
+      houses: true,
+      packages: true,
+      investments: true,
     },
     institutions: Object.fromEntries(
       INSTITUTION_BRANCH_IDS.map((id) => [id, true]),

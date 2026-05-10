@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Building2, GripVertical, ImagePlus, Plus, Trash2 } from "lucide-react";
+import { Building2, GripVertical, ImagePlus, Lock, Plus, Trash2, Unlock } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertDialog,
@@ -47,7 +47,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersContentContext";
+import {
+  useInstitutionRostersContent,
+  type RosterMembershipRole,
+} from "@/contexts/InstitutionRostersContentContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import {
   INSTITUTION_BRANCH_IDS,
@@ -64,6 +67,11 @@ import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { setInstitutionVisible, useSiteVisibility } from "@/lib/siteVisibility";
+import {
+  setBranchApplicationsClosed,
+  setBranchApplicationsNote,
+  useApplicationsClosure,
+} from "@/lib/applicationsClosure";
 import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
@@ -129,7 +137,7 @@ function SortableMemberRow({
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="inline-flex h-10 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 active:cursor-grabbing"
+          className="inline-flex h-10 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-500 active:cursor-grabbing"
           aria-label="سحب"
           {...attributes}
           {...listeners}
@@ -160,7 +168,7 @@ function SortableMemberRow({
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl">
+            <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
               <AlertDialogHeader className="text-right">
                 <AlertDialogTitle>تأكيد حذف العضو</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -247,9 +255,18 @@ const InstitutionRosterEditorPage = () => {
   const { branchId: branchParam } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
-  const { getBranchRoster, setBranchRoster, resetBranchToDefault } = useInstitutionRostersContent();
+  const {
+    getBranchRoster,
+    setBranchRoster,
+    resetBranchToDefault,
+    assignFromApplication,
+    promoteMember,
+  } = useInstitutionRostersContent();
   const { applications, setDecision } = useApplicationsContent();
   const visibility = useSiteVisibility();
+  const closure = useApplicationsClosure();
+  const [closureDialogOpen, setClosureDialogOpen] = useState(false);
+  const [closureNoteDraft, setClosureNoteDraft] = useState("");
 
   const rosterBranches = useMemo(
     () => institutionRosterBranchIdsFromRoleList(user?.roles ?? []),
@@ -272,6 +289,12 @@ const InstitutionRosterEditorPage = () => {
   const [decisionNote, setDecisionNote] = useState("");
   const [applicantRank, setApplicantRank] = useState("");
   const [applicantImage, setApplicantImage] = useState<string | null>(null);
+  /** الاسم النهائي عند التعيين (افتراضياً = cityName من الطلب) */
+  const [applicantFinalName, setApplicantFinalName] = useState("");
+  /** الدور المختار للتعيين */
+  const [applicantAssignRole, setApplicantAssignRole] = useState<RosterMembershipRole>("member");
+  /** رسالة الصراع عند محاولة تعيين قائد/نائب مع وجود قائم */
+  const [assignConflict, setAssignConflict] = useState<null | "leader" | "deputy">(null);
 
   useEffect(() => {
     if (!branchId) return;
@@ -368,46 +391,126 @@ const InstitutionRosterEditorPage = () => {
     ? branchApplications.find((a) => a.id === selectedApplicationId) ?? null
     : null;
 
+  /** تعبئة الحقول الافتراضية للقبول عند اختيار طلب */
+  useEffect(() => {
+    if (!selectedApplication) {
+      setApplicantFinalName("");
+      setApplicantImage(null);
+      setApplicantRank("");
+      setApplicantAssignRole("member");
+      setAssignConflict(null);
+      return;
+    }
+    const s = selectedApplication.snapshot;
+    const cityName =
+      s.cityName?.trim() ||
+      `${s.firstName} ${s.lastName}`.trim() ||
+      selectedApplication.applicantDisplayName ||
+      "";
+    setApplicantFinalName(cityName);
+    setApplicantImage(s.avatarDataUrl ?? null);
+    setApplicantRank("");
+    setApplicantAssignRole("member");
+    setAssignConflict(null);
+  }, [selectedApplication?.id]);
+
+  /** تخفيض القائد/النائب الحالي إلى عضو لإفراغ المكان */
+  const demoteCurrentLeaderOrDeputy = (slot: "leader" | "deputy") => {
+    if (!branchId) return;
+    const current = getBranchRoster(branchId);
+    const slotPerson = current[slot];
+    const slotEmpty = !slotPerson.userId && (!slotPerson.name || slotPerson.name.trim().length <= 1);
+    if (slotEmpty) {
+      setAssignConflict(null);
+      return;
+    }
+    const result = promoteMember(
+      branchId,
+      { userId: slotPerson.userId },
+      "member",
+      slotPerson.title || (slot === "leader" ? "قائد سابق" : "نائب سابق"),
+    );
+    if (result === "ok") {
+      toast.success(slot === "leader" ? "تم تخفيض القائد الحالي إلى عضو" : "تم تخفيض النائب الحالي إلى عضو");
+      setAssignConflict(null);
+      // مزامنة المسودة بعد التغيير المباشر على المخزن
+      setDraft(rosterToDraft(getBranchRoster(branchId)));
+    } else {
+      toast.error("تعذر تخفيض الشخص الحالي. تحقق من البيانات.");
+    }
+  };
+
   const runApplicationDecision = (status: "approved" | "rejected") => {
     if (!selectedApplication || selectedApplication.status !== "pending") return;
     const actor = user?.username ?? "manager";
-    setDecision(selectedApplication.id, status, actor, decisionNote);
-    if (status === "approved" && branchId) {
-      const fullName = `${selectedApplication.snapshot.firstName} ${selectedApplication.snapshot.lastName}`.trim();
-      const nextMemberTitle = fullName || selectedApplication.applicantDisplayName || selectedApplication.applicantUsername || "عضو جديد";
-      const applicantDiscord = selectedApplication.snapshot.discord?.trim();
-      const baseRank = applicantRank.trim() || "عضو جديد";
-      const applicantSubtitle = applicantDiscord ? `${baseRank} — ${applicantDiscord}` : baseRank;
 
-      const current = getBranchRoster(branchId);
-      const alreadyExists = current.members.some(
-        (m) => m.title.trim().toLowerCase() === nextMemberTitle.trim().toLowerCase(),
-      );
-      if (!alreadyExists) {
-        setBranchRoster(branchId, {
-          ...current,
-          members: [
-            {
-              image: applicantImage || "/placeholder.svg",
-              title: nextMemberTitle,
-              subtitle: applicantSubtitle,
-              borderColor: "#22D3EE",
-              gradient: defaultGradient,
-            },
-            ...current.members,
-          ],
-        });
+    if (status === "approved" && branchId) {
+      const finalName = applicantFinalName.trim();
+      if (finalName.length < 2) {
+        toast.error("اكتب الاسم الذي سيظهر في الطاقم");
+        return;
       }
+      const baseRank = applicantRank.trim() || (
+        applicantAssignRole === "leader"
+          ? "قائد المؤسسة"
+          : applicantAssignRole === "deputy"
+            ? "نائب القائد"
+            : "عضو جديد"
+      );
+      const finalImage = applicantImage || selectedApplication.snapshot.avatarDataUrl || "/placeholder.svg";
+
+      const assignRes = assignFromApplication({
+        branchId,
+        role: applicantAssignRole,
+        name: finalName,
+        rankLabel: baseRank,
+        image: finalImage,
+        bio: selectedApplication.snapshot.bio || selectedApplication.snapshot.experience || "",
+        userId: selectedApplication.applicantUserId,
+        discordId: selectedApplication.snapshot.discordId,
+      });
+
+      if (assignRes === "leader_conflict") {
+        setAssignConflict("leader");
+        toast.error("يوجد قائد حالياً — غيّر رتبة القائد القديم أولاً");
+        return;
+      }
+      if (assignRes === "deputy_conflict") {
+        setAssignConflict("deputy");
+        toast.error("يوجد نائب حالياً — غيّر رتبة النائب القديم أولاً");
+        return;
+      }
+
+      // إذا التعيين نجح، نسجل القرار
+      setDecision(selectedApplication.id, status, actor, decisionNote);
+      // مزامنة المسودة المعروضة في الصفحة
+      setDraft(rosterToDraft(getBranchRoster(branchId)));
+    } else {
+      setDecision(selectedApplication.id, status, actor, decisionNote);
     }
+
     appendActivityLog(
       actor,
-      status === "approved" ? "قرار توظيف: قبول" : "قرار توظيف: رفض",
-      `${selectedApplication.targetTitle} — ${selectedApplication.snapshot.firstName} ${selectedApplication.snapshot.lastName}`,
+      status === "approved"
+        ? `قرار توظيف: قبول (${
+            applicantAssignRole === "leader"
+              ? "قائد"
+              : applicantAssignRole === "deputy"
+                ? "نائب"
+                : "عضو"
+          })`
+        : "قرار توظيف: رفض",
+      `${selectedApplication.targetTitle} — ${
+        selectedApplication.snapshot.cityName || selectedApplication.snapshot.firstName
+      }`,
     );
-    toast.success(status === "approved" ? "تم قبول الطلب" : "تم رفض الطلب");
+    toast.success(status === "approved" ? "تم قبول الطلب وتعيين العضو" : "تم رفض الطلب");
     setDecisionNote("");
     setApplicantRank("");
     setApplicantImage(null);
+    setApplicantFinalName("");
+    setApplicantAssignRole("member");
+    setAssignConflict(null);
   };
 
   const save = () => {
@@ -486,6 +589,39 @@ const InstitutionRosterEditorPage = () => {
               {visibility.institutions[branchId] ? "إخفاء المؤسسة من الموقع" : "إظهار المؤسسة بالموقع"}
             </Button>
           ) : null}
+          {closure.closed[branchId] ? (
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={() => {
+                setBranchApplicationsClosed(branchId, false);
+                appendActivityLog(
+                  user?.username ?? "—",
+                  "فتح التقديم على المؤسسة",
+                  INSTITUTION_BRANCH_META[branchId].labelAr,
+                );
+                toast.success("تم فتح التقديم — يمكن للزوار التقديم الآن");
+              }}
+            >
+              <Unlock className="h-4 w-4" />
+              فتح التقديم
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="gap-1.5 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+              onClick={() => {
+                setClosureNoteDraft(closure.notes[branchId] ?? "");
+                setClosureDialogOpen(true);
+              }}
+            >
+              <Lock className="h-4 w-4" />
+              إغلاق التقديم
+            </Button>
+          )}
           <Button type="button" size="sm" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={save}>
             حفظ الطاقم
           </Button>
@@ -533,6 +669,42 @@ const InstitutionRosterEditorPage = () => {
           أنت تدير: <strong>{INSTITUTION_BRANCH_META[branchId].labelAr}</strong>
         </p>
       )}
+
+      {closure.closed[branchId] ? (
+        <div className="rounded-2xl border border-rose-200/80 bg-gradient-to-l from-rose-50 via-rose-50/60 to-white px-4 py-3 text-right shadow-[0_8px_24px_-16px_rgba(244,63,94,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-rose-800">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+                <Lock className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="font-display text-sm font-semibold">التقديم مغلق حالياً لهذه المؤسسة</p>
+                {closure.notes[branchId] ? (
+                  <p className="mt-0.5 text-xs leading-relaxed text-rose-700/90">
+                    {closure.notes[branchId]}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-xs text-rose-700/80">
+                    لن يستطيع الزوار إرسال طلبات جديدة حتى يُعاد فتح التقديم.
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
+              onClick={() => {
+                setClosureNoteDraft(closure.notes[branchId] ?? "");
+                setClosureDialogOpen(true);
+              }}
+            >
+              تعديل الملاحظة
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <PersonSummaryCard
@@ -615,7 +787,7 @@ const InstitutionRosterEditorPage = () => {
       </div>
 
       <Dialog open={!!personEditTarget} onOpenChange={(open) => !open && setPersonEditTarget(null)}>
-        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:rounded-2xl text-slate-900">
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">{personEditTarget === "leader" ? "تعديل القائد" : "تعديل النائب"}</DialogTitle>
           </DialogHeader>
@@ -721,7 +893,7 @@ const InstitutionRosterEditorPage = () => {
       </Dialog>
 
       <Dialog open={!!memberEditKey} onOpenChange={(open) => !open && setMemberEditKey(null)}>
-        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+        <DialogContent dir="rtl" className="w-[calc(100%-1rem)] max-w-2xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:rounded-2xl text-slate-900">
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">تعديل العضو</DialogTitle>
           </DialogHeader>
@@ -868,7 +1040,7 @@ const InstitutionRosterEditorPage = () => {
           }
         }}
       >
-        <DialogContent dir="rtl" className="max-w-4xl border-violet-300 bg-[#f7f1fc] text-slate-900">
+        <DialogContent dir="rtl" className="max-w-4xl border-slate-200/95 bg-white shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:rounded-2xl text-slate-900">
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">طلبات التوظيف — {INSTITUTION_BRANCH_META[branchId].labelAr}</DialogTitle>
           </DialogHeader>
@@ -911,92 +1083,28 @@ const InstitutionRosterEditorPage = () => {
             </div>
             <div className="max-h-[65vh] overflow-y-auto rounded-xl border border-violet-200 bg-white p-4">
               {selectedApplication ? (
-                <div className="space-y-3 text-right">
-                  <h3 className="font-display text-base font-semibold text-slate-900">{selectedApplication.targetTitle}</h3>
-                  <p className="text-sm text-slate-700">
-                    المتقدم: {selectedApplication.snapshot.firstName} {selectedApplication.snapshot.lastName}
-                  </p>
-                  <p className="text-sm text-slate-700">الديسكورد: {selectedApplication.snapshot.discord}</p>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-700">الرتبة / المسمى عند القبول</Label>
-                    <Input
-                      className="border-violet-200 bg-white text-slate-900"
-                      placeholder="مثال: مبتدئ، ملازم، ممرض، مراقب…"
-                      value={applicantRank}
-                      onChange={(e) => setApplicantRank(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-700">صورة العضو (اختياري)</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
-                      onClick={() => {
-                        const input = document.createElement("input");
-                        input.type = "file";
-                        input.accept = "image/*";
-                        input.onchange = async () => {
-                          const file = input.files?.[0] ?? null;
-                          if (!file || !file.type.startsWith("image/")) return;
-                          if (file.size > MAX_IMAGE_BYTES) {
-                            toast.error("الصورة كبيرة جداً (حد أقصى 2 ميجابايت).");
-                            return;
-                          }
-                          try {
-                            const url = await readFileAsDataUrl(file);
-                            setApplicantImage(url);
-                            toast.success("تم تحميل الصورة للطلب");
-                          } catch {
-                            toast.error("تعذر قراءة الملف");
-                          }
-                        };
-                        input.click();
-                      }}
-                    >
-                      رفع صورة
-                    </Button>
-                    {applicantImage ? (
-                      <div className="mt-2">
-                        <img src={applicantImage} alt="" className="h-20 w-20 rounded-lg border border-violet-200 object-cover" />
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3">
-                    <p className="text-xs text-violet-700">الخبرة</p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.snapshot.experience || "—"}</p>
-                  </div>
-                  <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3">
-                    <p className="text-xs text-violet-700">مدن/سيرفرات سابقة</p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{selectedApplication.snapshot.previousCities || "—"}</p>
-                  </div>
-                  {selectedApplication.status === "pending" ? (
-                    <>
-                      <div>
-                        <Label className="text-xs text-slate-700">ملاحظة القرار (اختياري)</Label>
-                        <Textarea
-                          className="mt-1 min-h-[80px] border-violet-200 bg-white text-slate-900"
-                          value={decisionNote}
-                          onChange={(e) => setDecisionNote(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={() => runApplicationDecision("approved")}>
-                          قبول
-                        </Button>
-                        <Button type="button" variant="outline" className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100" onClick={() => runApplicationDecision("rejected")}>
-                          رفض
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 text-sm text-slate-700">
-                      الحالة: {selectedApplication.status === "approved" ? "مقبول" : "مرفوض"}
-                      {selectedApplication.note ? <p className="mt-1">ملاحظة: {selectedApplication.note}</p> : null}
-                    </div>
-                  )}
-                </div>
+                <ApplicationReviewBody
+                  application={selectedApplication}
+                  applicantFinalName={applicantFinalName}
+                  setApplicantFinalName={setApplicantFinalName}
+                  applicantRank={applicantRank}
+                  setApplicantRank={setApplicantRank}
+                  applicantImage={applicantImage}
+                  setApplicantImage={setApplicantImage}
+                  applicantAssignRole={applicantAssignRole}
+                  setApplicantAssignRole={(r) => {
+                    setApplicantAssignRole(r);
+                    setAssignConflict(null);
+                  }}
+                  assignConflict={assignConflict}
+                  decisionNote={decisionNote}
+                  setDecisionNote={setDecisionNote}
+                  onApprove={() => runApplicationDecision("approved")}
+                  onReject={() => runApplicationDecision("rejected")}
+                  onDemoteCurrent={(slot) => demoteCurrentLeaderOrDeputy(slot)}
+                  currentLeaderName={branchId ? getBranchRoster(branchId).leader.name : ""}
+                  currentDeputyName={branchId ? getBranchRoster(branchId).deputy.name : ""}
+                />
               ) : (
                 <p className="text-sm text-slate-500">اختر طلباً من القائمة لعرض التفاصيل.</p>
               )}
@@ -1004,8 +1112,351 @@ const InstitutionRosterEditorPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={closureDialogOpen}
+        onOpenChange={(open) => {
+          setClosureDialogOpen(open);
+          if (!open) setClosureNoteDraft("");
+        }}
+      >
+        <DialogContent dir="rtl" className="max-w-md border-rose-200 bg-white text-slate-900">
+          <DialogHeader className="text-right">
+            <DialogTitle className="flex items-center justify-end gap-2 font-display text-lg text-rose-700">
+              <Lock className="h-5 w-5" />
+              إغلاق التقديم — {INSTITUTION_BRANCH_META[branchId].labelAr}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-right">
+            <p className="text-sm leading-relaxed text-slate-600">
+              عند الإغلاق، سيتعذّر على الزوار إرسال طلبات جديدة لهذه المؤسسة، وستظهر رسالة "التقديم
+              مغلق حالياً" على صفحة التقديم وصفحة المعاينة.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="closure-note" className="text-sm text-slate-800">
+                ملاحظة اختيارية تُعرض للمتقدمين
+              </Label>
+              <Textarea
+                id="closure-note"
+                value={closureNoteDraft}
+                onChange={(e) => setClosureNoteDraft(e.target.value)}
+                placeholder="مثلاً: سيُعاد فتح التقديم نهاية الشهر، أو لا توجد شواغر حالياً..."
+                className="min-h-[110px] resize-none rounded-xl border-rose-200 bg-rose-50/30 text-sm text-slate-900"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              onClick={() => {
+                setClosureDialogOpen(false);
+                setClosureNoteDraft("");
+              }}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              className="gap-1.5 bg-rose-600 text-white hover:bg-rose-700"
+              onClick={() => {
+                setBranchApplicationsClosed(branchId, true);
+                setBranchApplicationsNote(branchId, closureNoteDraft);
+                appendActivityLog(
+                  user?.username ?? "—",
+                  "إغلاق التقديم على المؤسسة",
+                  `${INSTITUTION_BRANCH_META[branchId].labelAr}${
+                    closureNoteDraft.trim() ? ` — ${closureNoteDraft.trim()}` : ""
+                  }`,
+                );
+                toast.success("تم إغلاق التقديم — لن يتمكن الزوار من إرسال طلبات جديدة");
+                setClosureDialogOpen(false);
+                setClosureNoteDraft("");
+              }}
+            >
+              <Lock className="h-4 w-4" />
+              تأكيد الإغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
 export default InstitutionRosterEditorPage;
+
+/* -------------------------------------------------------------- */
+/*  ApplicationReviewBody — جسم تفاصيل الطلب مع نموذج التعيين      */
+/* -------------------------------------------------------------- */
+
+function ApplicationReviewBody({
+  application,
+  applicantFinalName,
+  setApplicantFinalName,
+  applicantRank,
+  setApplicantRank,
+  applicantImage,
+  setApplicantImage,
+  applicantAssignRole,
+  setApplicantAssignRole,
+  assignConflict,
+  decisionNote,
+  setDecisionNote,
+  onApprove,
+  onReject,
+  onDemoteCurrent,
+  currentLeaderName,
+  currentDeputyName,
+}: {
+  application: ApplicationRecord;
+  applicantFinalName: string;
+  setApplicantFinalName: (v: string) => void;
+  applicantRank: string;
+  setApplicantRank: (v: string) => void;
+  applicantImage: string | null;
+  setApplicantImage: (v: string | null) => void;
+  applicantAssignRole: RosterMembershipRole;
+  setApplicantAssignRole: (r: RosterMembershipRole) => void;
+  assignConflict: null | "leader" | "deputy";
+  decisionNote: string;
+  setDecisionNote: (v: string) => void;
+  onApprove: () => void;
+  onReject: () => void;
+  onDemoteCurrent: (slot: "leader" | "deputy") => void;
+  currentLeaderName: string;
+  currentDeputyName: string;
+}) {
+  const s = application.snapshot;
+  const submittedAvatar = s.avatarDataUrl;
+  const cityName = s.cityName?.trim() || `${s.firstName} ${s.lastName}`.trim();
+  const bioText = (s.bio?.trim() || s.experience?.trim() || "").trim();
+
+  const onPickImage = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0] ?? null;
+      if (!file || !file.type.startsWith("image/")) return;
+      if (file.size > MAX_IMAGE_BYTES) {
+        toast.error("الصورة كبيرة جداً (حد أقصى 2 ميجابايت).");
+        return;
+      }
+      try {
+        const url = await readFileAsDataUrl(file);
+        setApplicantImage(url);
+        toast.success("تم تحديث صورة العضو");
+      } catch {
+        toast.error("تعذر قراءة الملف");
+      }
+    };
+    input.click();
+  };
+
+  const isPending = application.status === "pending";
+
+  return (
+    <div className="space-y-4 text-right">
+      {/* رأس الطلب */}
+      <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-l from-violet-50/60 via-white to-white p-4">
+        <img
+          src={submittedAvatar || "/placeholder.svg"}
+          alt={cityName || "applicant"}
+          className="h-20 w-20 shrink-0 rounded-2xl border border-violet-200 object-cover shadow-sm"
+        />
+        <div className="min-w-0 flex-1 space-y-1">
+          <h3 className="font-display text-base font-bold text-slate-900">
+            {cityName || "—"}
+          </h3>
+          <p className="text-xs text-violet-700">{application.targetTitle}</p>
+          <div className="grid gap-1 pt-1 text-[12px] text-slate-600 sm:grid-cols-2">
+            <p className="truncate" dir="ltr">
+              <span className="text-slate-400">Discord:</span> {s.discord || "—"}
+            </p>
+            {s.discordId ? (
+              <p className="truncate font-mono" dir="ltr">
+                <span className="text-slate-400">ID:</span> {s.discordId}
+              </p>
+            ) : null}
+            <p className="truncate">
+              <span className="text-slate-400">قُدِّم في:</span>{" "}
+              <span dir="ltr">{new Date(application.submittedAt).toLocaleString("ar")}</span>
+            </p>
+            <p className="truncate">
+              <span className="text-slate-400">الحالة:</span>{" "}
+              {application.status === "pending"
+                ? "قيد المراجعة"
+                : application.status === "approved"
+                  ? "مقبول"
+                  : "مرفوض"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* النبذة */}
+      {bioText ? (
+        <div className="rounded-xl border border-violet-200 bg-violet-50/30 p-3">
+          <p className="text-[11px] font-display text-violet-700">نبذة المتقدم</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+            {bioText}
+          </p>
+        </div>
+      ) : null}
+
+      {!isPending ? (
+        <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 text-sm text-slate-700">
+          <p>القرار بواسطة: {application.decidedBy ?? "—"}</p>
+          {application.note ? <p className="mt-1">ملاحظة: {application.note}</p> : null}
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3 rounded-2xl border border-emerald-200 bg-gradient-to-l from-emerald-50/40 to-white p-4">
+            <h4 className="font-display text-sm font-semibold text-emerald-800">
+              تعيين في الطاقم عند القبول
+            </h4>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-700">الاسم في الطاقم</Label>
+                <Input
+                  value={applicantFinalName}
+                  onChange={(e) => setApplicantFinalName(e.target.value)}
+                  placeholder="مثلاً: الضابط آدم"
+                  className="border-violet-200 bg-white text-slate-900"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-slate-700">الرتبة / المسمى</Label>
+                <Input
+                  value={applicantRank}
+                  onChange={(e) => setApplicantRank(e.target.value)}
+                  placeholder="مبتدئ، ملازم، رقيب…"
+                  className="border-violet-200 bg-white text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-slate-700">الدور في المؤسسة</Label>
+              <div className="grid grid-cols-3 gap-2 rounded-xl border border-violet-200 bg-white p-1">
+                {(
+                  [
+                    { v: "member", l: "عضو" },
+                    { v: "deputy", l: "نائب" },
+                    { v: "leader", l: "قائد" },
+                  ] as { v: RosterMembershipRole; l: string }[]
+                ).map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setApplicantAssignRole(opt.v)}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-sm font-display transition",
+                      applicantAssignRole === opt.v
+                        ? opt.v === "leader"
+                          ? "bg-amber-100 text-amber-800 ring-1 ring-amber-400"
+                          : opt.v === "deputy"
+                            ? "bg-indigo-100 text-indigo-800 ring-1 ring-indigo-400"
+                            : "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-400"
+                        : "text-slate-600 hover:bg-violet-50",
+                    )}
+                  >
+                    {opt.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {assignConflict ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm font-semibold text-amber-800">
+                  {assignConflict === "leader"
+                    ? `يوجد قائد حالياً: «${currentLeaderName || "—"}»`
+                    : `يوجد نائب حالياً: «${currentDeputyName || "—"}»`}
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-amber-700">
+                  لإسناد {assignConflict === "leader" ? "القائد الجديد" : "النائب الجديد"}، خفّض الشخص
+                  الحالي أولاً إلى عضو، ثم اضغط «قبول» مرة أخرى.
+                </p>
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-amber-600 text-white hover:bg-amber-700"
+                    onClick={() => onDemoteCurrent(assignConflict)}
+                  >
+                    تخفيض {assignConflict === "leader" ? "القائد" : "النائب"} الحالي إلى عضو
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-slate-700">صورة العضو في الطاقم</Label>
+              <div className="flex items-center gap-3">
+                <img
+                  src={applicantImage || submittedAvatar || "/placeholder.svg"}
+                  alt=""
+                  className="h-16 w-16 rounded-xl border border-violet-200 object-cover"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                    onClick={onPickImage}
+                  >
+                    تغيير الصورة
+                  </Button>
+                  {submittedAvatar && applicantImage !== submittedAvatar ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-violet-200 bg-white text-slate-700 hover:bg-violet-50"
+                      onClick={() => setApplicantImage(submittedAvatar)}
+                    >
+                      استخدم الصورة المرفوعة من المتقدم
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-slate-700">ملاحظة القرار (اختياري)</Label>
+            <Textarea
+              className="mt-1 min-h-[80px] border-violet-200 bg-white text-slate-900"
+              value={decisionNote}
+              onChange={(e) => setDecisionNote(e.target.value)}
+              placeholder="ستُعرض مع الطلب بعد القرار."
+            />
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2 border-t border-violet-100 pt-3">
+            <Button
+              type="button"
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              onClick={onApprove}
+            >
+              قبول وتعيين
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100"
+              onClick={onReject}
+            >
+              رفض الطلب
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ClipboardList, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardList,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldQuestion,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,11 +16,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
-import type { ApplicationRecord, ApplicationStatus } from "@/data/publicApplicationTypes";
+import type {
+  ApplicationRecord,
+  ApplicationStatus,
+  LawsQuizResult,
+} from "@/data/publicApplicationTypes";
 import { institutionRosterStaffRoleForBranch } from "@/data/institutionBranches";
+import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
 import { getArabCountryLabel, isArabCountryCode } from "@/data/arabCountries";
 import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
+import {
+  adminDialogSurface,
+  adminInput,
+  adminListShell,
+  adminPageDesc,
+  adminPageWrap,
+  adminRow,
+  adminTabsList,
+  adminTabsTrigger,
+  adminTitleIcon,
+} from "@/lib/adminUi";
 
 function genderAr(g: "male" | "female") {
   return g === "male" ? "ذكر" : "أنثى";
@@ -54,11 +77,16 @@ const ApplicationsReviewPage = () => {
       return roles.has(institutionRosterStaffRoleForBranch("justice_lawyers"));
     }
     if (app.roleKey === "developer") return roles.has(institutionRosterStaffRoleForBranch("developer"));
+    if (app.roleKey === "streamers") return roles.has("streamer_manager");
     return false;
   };
 
   const sorted = useMemo(
-    () => [...applications].filter(canReviewApplication).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+    () =>
+      [...applications]
+        .filter((a) => !isJobApplicationRoleKey(a.roleKey))
+        .filter(canReviewApplication)
+        .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
     [applications, user?.roles, isSuperAdmin, isApplicationReviewer],
   );
 
@@ -92,14 +120,15 @@ const ApplicationsReviewPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 pb-12 text-right">
+    <div className={cn(adminPageWrap, "max-w-6xl")}>
       <div>
-        <h1 className="font-display text-2xl font-bold flex items-center justify-end gap-2 text-slate-900">
-          <ClipboardList className="h-7 w-7 text-violet-700" />
+        <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold tracking-tight text-slate-900">
+          <ClipboardList className={adminTitleIcon} />
           طلبات التقديم من الموقع
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          السوبر أدمِن ومراجع التقديمات يرون كل الطلبات، ومدير كل جهة يرى فقط طلبات الجهة التابعة له.
+        <p className={adminPageDesc}>
+          طلبات نماذج الدخول للسيرفر (/apply) بما فيها تقديم صنّاع المحتوى — يراجعها «ستريمر منجر» أو المراجع العام.
+          طلبات التوظيف (/jobs) تظهر في صفحة طاقم كل مؤسسة من «طواقم المؤسسات».
         </p>
       </div>
 
@@ -112,11 +141,19 @@ const ApplicationsReviewPage = () => {
         dir="rtl"
         className="w-full"
       >
-        <TabsList className="flex w-full flex-wrap justify-end gap-1 h-auto rounded-xl border border-violet-200 bg-white p-1">
-          <TabsTrigger value="pending">قيد المراجعة</TabsTrigger>
-          <TabsTrigger value="all">الكل</TabsTrigger>
-          <TabsTrigger value="approved">مقبول</TabsTrigger>
-          <TabsTrigger value="rejected">مرفوض</TabsTrigger>
+        <TabsList className={adminTabsList}>
+          <TabsTrigger value="pending" className={adminTabsTrigger}>
+            قيد المراجعة
+          </TabsTrigger>
+          <TabsTrigger value="all" className={adminTabsTrigger}>
+            الكل
+          </TabsTrigger>
+          <TabsTrigger value="approved" className={adminTabsTrigger}>
+            مقبول
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className={adminTabsTrigger}>
+            مرفوض
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -126,11 +163,11 @@ const ApplicationsReviewPage = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ابحث بالاسم أو نوع الطلب أو الديسكورد..."
-              className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
+              className={adminInput}
               autoComplete="off"
             />
           </div>
-          <div className="space-y-2 rounded-xl border border-violet-200 bg-white/95 p-2 max-h-[70vh] overflow-y-auto shadow-[0_14px_34px_-24px_rgba(54,22,79,0.4)]">
+          <div className={adminListShell}>
             {filtered.length === 0 ? (
               <p className="p-4 text-center text-sm text-slate-500">لا توجد طلبات.</p>
             ) : (
@@ -139,7 +176,7 @@ const ApplicationsReviewPage = () => {
                   key={a.id}
                   type="button"
                   onClick={() => setSelectedId(a.id)}
-                  className="w-full rounded-lg border border-violet-100 px-3 py-2 text-right transition-colors hover:bg-violet-50/70"
+                  className={adminRow}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-display", statusBadge(a.status))}>
@@ -160,10 +197,7 @@ const ApplicationsReviewPage = () => {
       </div>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelectedId(null)}>
-        <DialogContent
-          dir="rtl"
-          className="w-[calc(100%-1rem)] max-w-4xl border-violet-300 bg-[#f7f1fc] text-slate-900"
-        >
+        <DialogContent dir="rtl" className={cn("w-[calc(100%-1rem)] max-w-4xl", adminDialogSurface)}>
           <DialogHeader className="text-right">
             <DialogTitle className="text-slate-900">تفاصيل الطلب</DialogTitle>
           </DialogHeader>
@@ -199,8 +233,8 @@ function ApplicationDetail({
   const countryLabel = isArabCountryCode(s.countryCode) ? getArabCountryLabel(s.countryCode) : s.countryCode;
 
   return (
-    <div className="min-w-0 space-y-4 rounded-2xl border border-violet-200 bg-gradient-to-b from-white to-violet-50/35 p-4 shadow-[0_24px_52px_-30px_rgba(54,22,79,0.5)] sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-violet-200/80 pb-3">
+    <div className="min-w-0 space-y-4 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/40 p-4 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 pb-3">
         <div>
           <h2 className="font-display text-lg font-bold text-slate-900">{app.targetTitle}</h2>
           <p className="text-xs text-slate-500 font-mono" dir="ltr">
@@ -224,8 +258,10 @@ function ApplicationDetail({
         <DetailRow label="الإقرار بالقوانين" value={s.lawsAccepted ? "نعم" : "لا"} />
       </dl>
 
+      <QuizResultSection result={s.lawsQuizResult} />
+
       {app.status !== "pending" && (
-        <div className="rounded-lg border border-violet-200 bg-violet-50/35 p-3 text-sm text-slate-700">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 text-sm text-slate-700">
           <p>
             <span className="text-slate-500">القرار بواسطة:</span> {app.decidedBy ?? "—"}
           </p>
@@ -241,11 +277,11 @@ function ApplicationDetail({
       )}
 
       {app.status === "pending" ? (
-        <div className="space-y-3 border-t border-violet-200/80 pt-4">
+        <div className="space-y-3 border-t border-slate-200 pt-4">
           <div>
             <Label className="text-xs font-medium text-slate-700">ملاحظة للقرار (اختياري)</Label>
             <Textarea
-              className="mt-1 min-h-[72px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+              className="mt-1 min-h-[72px] border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-500/30"
               value={decisionNote}
               onChange={(e) => setDecisionNote(e.target.value)}
               placeholder="تظهر مع الطلب بعد القبول أو الرفض…"
@@ -254,7 +290,7 @@ function ApplicationDetail({
           <div className="flex flex-wrap gap-2 justify-end">
             <Button
               type="button"
-              className="bg-[#36164f] text-white hover:bg-[#2f1344]"
+              className="bg-gradient-to-l from-violet-600 to-violet-700 text-white shadow-sm hover:from-violet-700 hover:to-violet-800"
               onClick={onApprove}
             >
               <CheckCircle2 className="ms-2 h-4 w-4" /> قبول
@@ -274,6 +310,119 @@ function ApplicationDetail({
   );
 }
 
+function QuizResultSection({ result }: { result?: LawsQuizResult }) {
+  if (!result) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-500">
+        <span className="inline-flex items-center gap-2">
+          <ShieldQuestion className="h-4 w-4 text-slate-400" aria-hidden />
+          لا توجد بيانات لاختبار قراءة القوانين لهذا الطلب.
+        </span>
+      </div>
+    );
+  }
+
+  const passed = result.passed;
+  const headerClass = passed
+    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+    : "border-amber-300 bg-amber-50 text-amber-800";
+  const icon = passed ? (
+    <ShieldCheck className="h-5 w-5" aria-hidden />
+  ) : (
+    <ShieldAlert className="h-5 w-5" aria-hidden />
+  );
+  const completedAt = (() => {
+    try {
+      return new Date(result.completedAt).toLocaleString("ar");
+    } catch {
+      return result.completedAt;
+    }
+  })();
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <header className={cn("flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm font-display", headerClass)}>
+        <span className="inline-flex items-center gap-2">
+          {icon}
+          <span className="font-semibold">اختبار قراءة القوانين:</span>
+          <span>{passed ? "اجتاز ✓" : "لم يجتز"}</span>
+        </span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <span>
+            النتيجة: <strong>{result.correctCount} / {result.totalQuestions}</strong>
+          </span>
+          <span>
+            عدد المحاولات: <strong>{result.attempts}</strong>
+          </span>
+          <span className="font-mono text-[11px] opacity-80" dir="ltr">
+            {completedAt}
+          </span>
+        </div>
+      </header>
+
+      {!passed ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-700">
+          المتقدم اختار إرسال الطلب رغم وجود إجابات غير صحيحة. القرار النهائي يعود لك ويمكنك القبول أو الرفض كالمعتاد.
+        </p>
+      ) : null}
+
+      {Array.isArray(result.answers) && result.answers.length > 0 ? (
+        <ol className="space-y-2 text-sm">
+          {result.answers.map((a, idx) => {
+            const correct = a.isCorrect;
+            return (
+              <li
+                key={a.questionId || idx}
+                className={cn(
+                  "rounded-xl border p-3",
+                  correct
+                    ? "border-emerald-200 bg-emerald-50/40"
+                    : "border-rose-200 bg-rose-50/40",
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="font-display text-sm font-semibold leading-relaxed text-slate-900">
+                    <span className="me-1 text-slate-500">{idx + 1}.</span>
+                    {a.question}
+                  </p>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] font-display font-semibold",
+                      correct
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-rose-100 text-rose-700",
+                    )}
+                  >
+                    {correct ? "صحيحة" : "خاطئة"}
+                  </span>
+                </div>
+                <dl className="mt-2 grid gap-1 text-xs">
+                  <div className="flex flex-wrap items-baseline gap-1">
+                    <dt className="text-slate-500">إجابته:</dt>
+                    <dd className={cn("text-slate-900", !correct && "text-rose-700")}>
+                      {a.selectedOptionLabel || "—"}
+                    </dd>
+                  </div>
+                  {!correct ? (
+                    <div className="flex flex-wrap items-baseline gap-1">
+                      <dt className="text-slate-500">الإجابة الصحيحة:</dt>
+                      <dd className="text-emerald-700">
+                        {a.correctOptionLabel || "—"}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="text-xs text-slate-500">لم تُسجَّل تفاصيل الإجابات.</p>
+      )}
+    </section>
+  );
+}
+
 function DetailRow({
   label,
   value,
@@ -286,8 +435,8 @@ function DetailRow({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-lg border border-violet-200 bg-violet-50/30 px-3 py-2", className)}>
-      <dt className="font-display text-[10px] text-violet-700">{label}</dt>
+    <div className={cn("rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]", className)}>
+      <dt className="font-display text-[10px] font-medium text-slate-500">{label}</dt>
       <dd className={cn("mt-1 text-slate-900 whitespace-pre-wrap break-words", dir === "ltr" && "font-mono text-left")} dir={dir}>
         {value || "—"}
       </dd>

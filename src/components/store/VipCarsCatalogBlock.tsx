@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +16,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   CircleStop,
   Gauge,
@@ -31,7 +29,6 @@ import {
 import { Progress } from "@/components/ui/progress";
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
 import { useVipCarsContent } from "@/contexts/VipCarsContentContext";
-import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -141,7 +138,6 @@ function VipGalleryCarousel({ urls, carName }: { urls: string[]; carName: string
           {urls.map((src, i) => (
             <CarouselItem key={`${src}-${i}`} className="basis-full pl-0">
               <div className="overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-b from-muted/40 to-muted/70 shadow-inner ring-1 ring-white/5">
-                {/* 4:3 أطول من 16:9 — مساحة أوضح من فوق وتحت داخل النافذة */}
                 <div className="relative aspect-[4/3] w-full">
                   <img
                     src={src}
@@ -227,12 +223,10 @@ function VipCarCompactCard({
           loading="lazy"
           decoding="async"
         />
-        {/* قراءة النص: تدرّج داكن ثم فوقه الإضاءة المتحركة */}
         <div
           className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/[0.92] via-black/45 via-[32%] to-transparent to-[68%]"
           aria-hidden
         />
-        {/* طبقة نيون — فوق التدرّج حتى تبان (screen يضيء على الغامق) */}
         <div className="pointer-events-none absolute inset-0 z-[3]" aria-hidden>
           <div className="absolute -inset-[38%] animate-vip-mesh-drift bg-[radial-gradient(ellipse_70%_52%_at_22%_12%,hsl(var(--primary)/0.95),transparent_55%),radial-gradient(ellipse_62%_48%_at_88%_88%,rgba(34,211,238,0.65),transparent_50%),radial-gradient(ellipse_48%_42%_at_48%_52%,hsl(var(--primary-glow)/0.45),transparent_58%)] motion-reduce:animate-none mix-blend-screen opacity-90" />
         </div>
@@ -277,7 +271,6 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
         dir="rtl"
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:max-h-[calc(92vh-52px)] lg:flex-row lg:overflow-hidden">
-          {/* عمود المعلومات — يظهر أولاً في RTL يمين */}
           <div className="flex w-full min-h-0 shrink-0 flex-col gap-2 overflow-hidden border-b border-primary/15 px-3 py-3 sm:gap-2.5 sm:px-4 sm:py-3.5 lg:w-[min(100%,400px)] lg:max-w-[400px] lg:border-b-0 lg:border-e xl:w-[420px] xl:max-w-[420px]">
             <DialogHeader className="shrink-0 space-y-1.5 text-right">
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -329,7 +322,6 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
             </DialogDescription>
           </div>
 
-          {/* عمود المعرض — أوسع */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-2 pt-1.5 sm:px-4 sm:pb-3 sm:pt-2">
             <p className="mb-1 flex shrink-0 items-center justify-end gap-2 font-display text-xs text-foreground">
               <ImageIcon className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" aria-hidden />
@@ -359,9 +351,9 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
   );
 }
 
-const VipCarsPage = () => {
+/** كتالوج سيارات VIP — يُستخدم في صفحة المتجر أو أي صفحة أخرى */
+export function VipCarsCatalogBlock() {
   const { cars } = useVipCarsContent();
-  const visibility = useSiteVisibility();
   const visibleCars = cars.filter((c) => !c.hidden);
   const [selected, setSelected] = useState<VipCatalogCar | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -376,52 +368,16 @@ const VipCarsPage = () => {
     if (!open) setSelected(null);
   };
 
-  if (!visibility.pages.vipCars) return <Navigate to="/" replace />;
-
   return (
-    <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
-      <Navbar />
-
-      {/* Hero — نفس أبعاد القوانين وصنّاع المحتوى؛ تدرجات أخف لظهور الـGIF + صندوق زجاجي للعنوان */}
-      <section className="relative h-[46vh] min-h-[300px] max-h-[520px] overflow-hidden">
-        <img
-          src="/INF-CONECT-LOGO.gif"
-          alt="سيارات VIP — Infinite City"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = "/placeholder.svg";
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/55 via-background/[0.06] to-background/72" />
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-background/45 to-transparent backdrop-blur-[3px] sm:h-28" />
-        <div className="absolute inset-x-0 -bottom-8 h-36 bg-gradient-to-t from-background/88 via-background/35 to-transparent backdrop-blur-[2px] sm:h-40" />
-        <div className="relative z-[1] flex h-full flex-col items-center justify-end px-4 pb-6 pt-24 text-center sm:justify-center sm:pb-10 sm:pt-20 md:pb-12">
-          <div className="w-full max-w-3xl rounded-2xl border border-primary/35 bg-background/55 px-5 py-4 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.55)] backdrop-blur-md ring-1 ring-white/10 sm:rounded-3xl sm:px-10 sm:py-6">
-            <p className="font-display text-xs tracking-[0.38em] text-primary drop-shadow-sm sm:text-[0.65rem]">
-              VIP CARS
-            </p>
-            <h1 className="mt-2 font-display text-4xl font-bold leading-tight drop-shadow-[0_4px_20px_hsl(var(--background)/0.6)] sm:text-5xl md:text-6xl">
-              <span className="text-gradient-neon">كتالوج</span> <span className="text-foreground">سيارات VIP</span>
-            </h1>
-          </div>
+    <>
+      <section className="mx-auto max-w-[1600px] px-0 sm:px-0">
+        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
+          {visibleCars.map((car) => (
+            <VipCarCompactCard key={car.id} car={car} onOpen={openCar} />
+          ))}
         </div>
       </section>
-
-      <main className="relative z-10 pb-24">
-        <section className="mx-auto mt-8 max-w-[1600px] px-4 sm:mt-10 sm:px-6 lg:px-10">
-          <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
-            {visibleCars.map((car) => (
-              <VipCarCompactCard key={car.id} car={car} onOpen={openCar} />
-            ))}
-          </div>
-        </section>
-      </main>
-
       <VipCarDialog car={selected} open={dialogOpen} onOpenChange={handleDialog} />
-      <Footer />
-    </div>
+    </>
   );
-};
-
-export default VipCarsPage;
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { Save, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,10 +14,10 @@ import {
   saveAboutPageContent,
   type AboutPageContent,
 } from "@/lib/aboutPageContent";
+import { adminInput } from "@/lib/adminUi";
 
-const inputClassName = "border-violet-200 bg-white text-slate-900 placeholder:text-slate-400";
-const textareaClassName =
-  "min-h-[96px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400";
+const inputClassName = adminInput;
+const textareaClassName = cn(adminInput, "min-h-[96px]");
 
 function PillarEditor({
   index,
@@ -32,7 +33,7 @@ function PillarEditor({
   onBodyChange: (next: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+    <div className="rounded-xl border border-slate-200 bg-violet-50/35 p-4">
       <p className="mb-3 font-display text-sm text-violet-700">ميزة {index + 1}</p>
       <div className="space-y-2">
         <Label className="text-slate-700">العنوان</Label>
@@ -74,7 +75,7 @@ const AboutManagerPage = () => {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-violet-200 bg-white/95 p-5 shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="text-right">
             <h1 className="font-display text-2xl font-bold text-slate-900">مدير من نحن</h1>
@@ -100,7 +101,7 @@ const AboutManagerPage = () => {
       </div>
 
       <div className="grid gap-4">
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">الهيدر</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2 text-right">
@@ -118,7 +119,7 @@ const AboutManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">قسم من نحن</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2 text-right">
@@ -136,10 +137,10 @@ const AboutManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">رؤيتنا وكيف نعمل</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+            <div className="rounded-xl border border-slate-200 bg-violet-50/35 p-4">
               <div className="space-y-2 text-right">
                 <Label className="text-slate-700">عنوان الرؤية</Label>
                 <Input value={draft.visionTitle} onChange={(e) => setField("visionTitle", e.target.value)} className={inputClassName} />
@@ -149,7 +150,7 @@ const AboutManagerPage = () => {
                 <Textarea value={draft.visionBody} onChange={(e) => setField("visionBody", e.target.value)} className={textareaClassName} />
               </div>
             </div>
-            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+            <div className="rounded-xl border border-slate-200 bg-violet-50/35 p-4">
               <div className="space-y-2 text-right">
                 <Label className="text-slate-700">عنوان كيف نعمل</Label>
                 <Input value={draft.workTitle} onChange={(e) => setField("workTitle", e.target.value)} className={inputClassName} />
@@ -162,7 +163,7 @@ const AboutManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">قسم المميزات</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2 text-right">
@@ -192,7 +193,7 @@ const AboutManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">قسم الديسكورد</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2 text-right">
@@ -222,7 +223,7 @@ const AboutManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">الصندوق الختامي</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2 text-right">

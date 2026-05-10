@@ -11,16 +11,25 @@ import { LawsContentProvider } from "@/contexts/LawsContentContext";
 import { StreamersContentProvider } from "@/contexts/StreamersContentContext";
 import { GangsContentProvider } from "@/contexts/GangsContentContext";
 import { VipCarsContentProvider } from "@/contexts/VipCarsContentContext";
+import { HousesContentProvider } from "@/contexts/HousesContentContext";
+import { PackagesContentProvider } from "@/contexts/PackagesContentContext";
+import { InvestmentsContentProvider } from "@/contexts/InvestmentsContentContext";
 import { InstitutionRostersContentProvider } from "@/contexts/InstitutionRostersContentContext";
 import { ApplicationsContentProvider } from "@/contexts/ApplicationsContentContext";
+import { RoleGroupsProvider } from "@/contexts/RoleGroupsContext";
 import { RequireStaffAuth } from "@/components/RequireStaffAuth";
+import { PublicStaffLinkSync } from "@/components/PublicStaffLinkSync";
 import AdminLayout from "./pages/admin/AdminLayout.tsx";
 import DashboardGate from "./pages/admin/DashboardGate.tsx";
 import GangsEditorPage from "./pages/admin/GangsEditorPage.tsx";
 import LawsEditorPage from "./pages/admin/LawsEditorPage.tsx";
 import StaffUsersPage from "./pages/admin/StaffUsersPage.tsx";
+import RoleGroupsPage from "./pages/admin/RoleGroupsPage.tsx";
 import StreamersEditorPage from "./pages/admin/StreamersEditorPage.tsx";
 import VipCarsEditorPage from "./pages/admin/VipCarsEditorPage.tsx";
+import HousesEditorPage from "./pages/admin/HousesEditorPage.tsx";
+import PackagesEditorPage from "./pages/admin/PackagesEditorPage.tsx";
+import InvestmentsEditorPage from "./pages/admin/InvestmentsEditorPage.tsx";
 import InstitutionRosterEditorPage from "./pages/admin/InstitutionRosterEditorPage.tsx";
 import InstitutionRosterHubPage from "./pages/admin/InstitutionRosterHubPage.tsx";
 import ApplicationsReviewPage from "./pages/admin/ApplicationsReviewPage.tsx";
@@ -36,15 +45,17 @@ import InteriorDepartmentPage from "./pages/InteriorDepartmentPage.tsx";
 import OversightPage from "./pages/OversightPage.tsx";
 import GangHubPage from "./pages/GangHubPage.tsx";
 import GangsPage from "./pages/GangsPage.tsx";
-import VipCarsPage from "./pages/VipCarsPage.tsx";
+import StorePage from "./pages/StorePage.tsx";
 import JusticePage from "./pages/JusticePage.tsx";
 import LawsPage from "./pages/LawsPage.tsx";
 import DeveloperPage from "./pages/DeveloperPage.tsx";
 import ContactPage from "./pages/ContactPage.tsx";
 import ProfilePage from "./pages/ProfilePage.tsx";
+import DiscordCallbackPage from "./pages/DiscordCallbackPage.tsx";
 import TicketsPage from "./pages/TicketsPage.tsx";
 import JobsPage from "./pages/JobsPage.tsx";
 import JobsApplicationFormPage from "./pages/JobsApplicationFormPage.tsx";
+import LeadershipPanelPage from "./pages/LeadershipPanelPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { INSTITUTION_ROSTER_STAFF_ROLES } from "@/data/institutionBranches";
 
@@ -65,11 +76,15 @@ const AppRoutes = () => {
     setShowBootLoader(true);
   }, [location.pathname]);
 
-  const skipBoot = location.pathname.startsWith("/dashboard");
+  const skipBoot =
+    location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/auth/") ||
+    location.pathname.startsWith("/store");
 
   return (
     <>
       <ScrollToTop />
+      <PublicStaffLinkSync />
       <AnimatePresence>
         {showBootLoader && !skipBoot ? (
           <BootLoader key={location.pathname} onComplete={() => setShowBootLoader(false)} />
@@ -87,14 +102,17 @@ const AppRoutes = () => {
         <Route path="/oversight" element={<OversightPage />} />
         <Route path="/gang-vip" element={<GangHubPage />} />
         <Route path="/gangs" element={<GangsPage />} />
-        <Route path="/vip-cars" element={<VipCarsPage />} />
+        <Route path="/store" element={<StorePage />} />
+        <Route path="/vip-cars" element={<Navigate to="/store" replace />} />
         <Route path="/justice" element={<JusticePage />} />
         <Route path="/laws" element={<LawsPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/auth/discord/callback" element={<DiscordCallbackPage />} />
         <Route path="/tickets" element={<TicketsPage />} />
         <Route path="/jobs" element={<JobsPage />} />
         <Route path="/jobs/apply/:role" element={<JobsApplicationFormPage />} />
+        <Route path="/leadership" element={<LeadershipPanelPage />} />
         <Route path="/developer" element={<DeveloperPage />} />
         <Route
           path="/dashboard"
@@ -106,6 +124,9 @@ const AppRoutes = () => {
                 "streamer_manager",
                 "gang_manager",
                 "vip_cars_manager",
+                "houses_manager",
+                "packages_manager",
+                "investments_manager",
                 "about_manager",
                 "ticket_support_manager",
                 "ticket_admin_inquiry_manager",
@@ -113,6 +134,7 @@ const AppRoutes = () => {
                 "ticket_compensation_manager",
                 "ticket_store_manager",
                 "ticket_general_manager",
+                "store_orders_manager",
                 "footer_manager",
                 ...INSTITUTION_ROSTER_STAFF_ROLES,
                 "application_reviewer",
@@ -124,6 +146,14 @@ const AppRoutes = () => {
         >
           <Route index element={<DashboardGate />} />
           <Route path="users" element={<StaffUsersPage />} />
+          <Route
+            path="role-groups"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin"]}>
+                <RoleGroupsPage />
+              </RequireStaffAuth>
+            }
+          />
           <Route
             path="activity"
             element={
@@ -161,6 +191,30 @@ const AppRoutes = () => {
             element={
               <RequireStaffAuth allowRoles={["super_admin", "vip_cars_manager"]}>
                 <VipCarsEditorPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="houses"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "houses_manager"]}>
+                <HousesEditorPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="packages"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "packages_manager"]}>
+                <PackagesEditorPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="investments"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "investments_manager"]}>
+                <InvestmentsEditorPage />
               </RequireStaffAuth>
             }
           />
@@ -219,6 +273,14 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="store-orders"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "store_orders_manager"]}>
+                <TicketsManagerPage storeOrdersOnly />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
             path="tickets/:ticketType"
             element={
               <RequireStaffAuth
@@ -239,7 +301,9 @@ const AppRoutes = () => {
           <Route
             path="applications"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "application_reviewer", ...INSTITUTION_ROSTER_STAFF_ROLES]}>
+              <RequireStaffAuth
+                allowRoles={["super_admin", "application_reviewer", "streamer_manager", ...INSTITUTION_ROSTER_STAFF_ROLES]}
+              >
                 <ApplicationsReviewPage />
               </RequireStaffAuth>
             }
@@ -266,9 +330,17 @@ const App = () => {
             <StreamersContentProvider>
               <GangsContentProvider>
               <VipCarsContentProvider>
-                <InstitutionRostersContentProvider>
-                  <AppRoutes />
-                </InstitutionRostersContentProvider>
+                <HousesContentProvider>
+                  <PackagesContentProvider>
+                    <InvestmentsContentProvider>
+                      <InstitutionRostersContentProvider>
+                        <RoleGroupsProvider>
+                          <AppRoutes />
+                        </RoleGroupsProvider>
+                      </InstitutionRostersContentProvider>
+                    </InvestmentsContentProvider>
+                  </PackagesContentProvider>
+                </HousesContentProvider>
               </VipCarsContentProvider>
             </GangsContentProvider>
             </StreamersContentProvider>

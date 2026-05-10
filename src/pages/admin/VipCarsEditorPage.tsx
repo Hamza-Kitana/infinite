@@ -122,7 +122,7 @@ function SortableCarRow({
     >
       <button
         type="button"
-        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-violet-300 text-slate-500 cursor-grab touch-manipulation active:cursor-grabbing"
+        className="inline-flex w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-500 cursor-grab touch-manipulation active:cursor-grabbing"
         aria-label="سحب للترتيب"
         {...attributes}
         {...listeners}
@@ -373,8 +373,8 @@ const VipCarsEditorPage = () => {
           </h1>
           <p className="mt-2 max-w-xl text-sm text-slate-600">
             نفس حقول كتالوج السيارات الحالية. التعديل يظهر في{" "}
-            <a href="/vip-cars" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
-              /vip-cars
+            <a href="/store" target="_blank" rel="noreferrer" className="text-violet-700 underline-offset-4 hover:underline">
+              /store
             </a>{" "}
             مباشرةً.
           </p>
@@ -469,7 +469,7 @@ const VipCarsEditorPage = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-violet-300 bg-[#f7f1fc] p-0 shadow-[0_24px_64px_-24px_rgba(54,22,79,0.55)] sm:w-full lg:max-w-5xl"
+          className="flex max-h-[min(92dvh,92svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-slate-200/95 bg-white p-0 shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:w-full lg:max-w-5xl"
         >
           <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
             <DialogHeader className="space-y-1.5 text-right sm:text-right">
@@ -489,7 +489,7 @@ const VipCarsEditorPage = () => {
                       حذف السيارة
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent dir="rtl">
+                  <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
                     <AlertDialogHeader className="text-right">
                       <AlertDialogTitle>حذف {editing.name || "السيارة"}؟</AlertDialogTitle>
                       <AlertDialogDescription>سيتم حذف السيارة نهائياً من القائمة.</AlertDialogDescription>
@@ -704,7 +704,7 @@ const VipCarsEditorPage = () => {
                   <ImagePlus className="ms-2 h-4 w-4" /> رفع غلاف من الجهاز
                 </Button>
               </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-violet-300 bg-white/70 p-3">
+              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-slate-300 bg-white/70 p-3">
                 <img
                   src={editing.thumbnailUrl || "/placeholder.svg"}
                   alt=""

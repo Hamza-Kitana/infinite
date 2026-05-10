@@ -51,7 +51,12 @@ type TicketNotification = {
   unread: boolean;
 };
 
-const TicketsManagerPage = () => {
+export type TicketsManagerPageProps = {
+  /** صفحة «طلبات المتاجر» — نفس تكت «طلب المتجر» فقط بدون باقي أنواع التكت */
+  storeOrdersOnly?: boolean;
+};
+
+const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps) => {
   const { ticketType } = useParams<{ ticketType?: string }>();
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
@@ -68,19 +73,32 @@ const TicketsManagerPage = () => {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const visibleTicketTypes = isSuperAdmin
-    ? TICKET_TYPES
-    : TICKET_TYPES.filter((item) => (user?.roles ?? []).includes(item.role));
+  const visibleTicketTypes = useMemo(() => {
+    if (storeOrdersOnly) {
+      const store = TICKET_TYPES.find((x) => x.slug === "store");
+      if (!store) return [];
+      const roles = user?.roles ?? [];
+      const allowed =
+        isSuperAdmin || roles.includes("ticket_store_manager") || roles.includes("store_orders_manager");
+      return allowed ? [store] : [];
+    }
+    return isSuperAdmin
+      ? TICKET_TYPES
+      : TICKET_TYPES.filter((item) => (user?.roles ?? []).includes(item.role));
+  }, [isSuperAdmin, user?.roles, storeOrdersOnly]);
 
-  const activeType = visibleTicketTypes.find((x) => x.slug === ticketType) ?? visibleTicketTypes[0] ?? null;
+  const activeType = storeOrdersOnly
+    ? visibleTicketTypes[0] ?? null
+    : visibleTicketTypes.find((x) => x.slug === ticketType) ?? visibleTicketTypes[0] ?? null;
   const effectiveTypeRole = activeType?.role ?? null;
   const effectiveTypeLabel = activeType?.label ?? "";
 
   useEffect(() => {
+    if (storeOrdersOnly) return;
     if (!activeType && visibleTicketTypes.length > 0) {
       navigate(`/dashboard/tickets/${visibleTicketTypes[0].slug}`, { replace: true });
     }
-  }, [activeType, visibleTicketTypes, navigate]);
+  }, [storeOrdersOnly, activeType, visibleTicketTypes, navigate]);
 
   const scopedTickets = useMemo(
     () => tickets.filter((t) => t.typeRole === effectiveTypeRole).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)),
@@ -158,7 +176,7 @@ const TicketsManagerPage = () => {
   const openFromNotification = (notificationId: string, typeSlug: string, ticketId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, unread: false } : n)));
     setNotificationsOpen(false);
-    navigate(`/dashboard/tickets/${typeSlug}`);
+    navigate(storeOrdersOnly ? "/dashboard/store-orders" : `/dashboard/tickets/${typeSlug}`);
     setSelectedTicketId(ticketId);
     setChatOpen(true);
     updateTicket(ticketId, (ticket) => ({
@@ -244,16 +262,24 @@ const TicketsManagerPage = () => {
   if (visibleTicketTypes.length === 0) {
     return <div className="rounded-xl border border-violet-200 bg-white/95 p-4 text-right text-sm text-slate-600">لا تملك صلاحية على أي نوع تكت حالياً.</div>;
   }
-  if (!ticketType) return <Navigate to={`/dashboard/tickets/${visibleTicketTypes[0].slug}`} replace />;
+  if (!storeOrdersOnly && !ticketType) {
+    return <Navigate to={`/dashboard/tickets/${visibleTicketTypes[0].slug}`} replace />;
+  }
 
   return (
     <section className="mx-auto max-w-6xl space-y-6">
       <div className={cn("rounded-2xl border border-violet-200 bg-gradient-to-b p-5 text-right shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]", activeType?.accent ?? "from-white to-violet-50")}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-2xl font-bold text-slate-900">{effectiveTypeLabel}</h1>
-            <p className="mt-1 text-sm text-slate-700">جدول تكتات احترافي مع فلترة ونافذة شات للرد على الزبون.</p>
-            {isSuperAdmin ? (
+            <h1 className="font-display text-2xl font-bold text-slate-900">
+              {storeOrdersOnly ? "طلبات المتاجر" : effectiveTypeLabel}
+            </h1>
+            <p className="mt-1 text-sm text-slate-700">
+              {storeOrdersOnly
+                ? "طلبات المتجر المرسلة من صفحة التكت (نوع «طلب متجر») — اعرض الموضوع والزبون ورد من هنا."
+                : "جدول تكتات احترافي مع فلترة ونافذة شات للرد على الزبون."}
+            </p>
+            {isSuperAdmin && !storeOrdersOnly ? (
               <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-violet-300 bg-white text-xs">
                 <button
                   type="button"
@@ -270,6 +296,13 @@ const TicketsManagerPage = () => {
                   مدة التكت: 3 أيام
                 </button>
               </div>
+            ) : null}
+            {isSuperAdmin && !storeOrdersOnly ? (
+              <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-slate-500">
+                مدة الحذف التلقائي (24 ساعة / 3 أيام) لا تُطبَّق على{" "}
+                <strong className="font-semibold text-slate-600">طلبات المتجر</strong>؛ تظل محفوظة بدون انتهاء وقتي، على
+                عكس باقي أنواع التكت.
+              </p>
             ) : null}
           </div>
           <div className="relative">
@@ -317,30 +350,32 @@ const TicketsManagerPage = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleTicketTypes.map((item) => (
-          <Button
-            key={item.role}
-            type="button"
-            asChild
-            variant="outline"
-            className={cn(
-              "h-12 justify-center rounded-xl border-violet-300 bg-white text-sm text-violet-800 hover:bg-violet-50 hover:text-violet-900",
-              effectiveTypeRole === item.role && "border-[#36164f] bg-[#36164f] text-white hover:bg-[#2f1344] hover:text-white",
-            )}
-          >
-            <Link to={`/dashboard/tickets/${item.slug}`} className="relative inline-flex w-full items-center justify-center">
-              <MessageSquareMore className="ms-2 h-4 w-4" />
-              {item.label}
-              {(unreadByTypeSlug.get(item.slug) ?? 0) > 0 ? (
-                <span className="absolute -left-2 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] text-white">
-                  {unreadByTypeSlug.get(item.slug)}
-                </span>
-              ) : null}
-            </Link>
-          </Button>
-        ))}
-      </div>
+      {!storeOrdersOnly ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleTicketTypes.map((item) => (
+            <Button
+              key={item.role}
+              type="button"
+              asChild
+              variant="outline"
+              className={cn(
+                "h-12 justify-center rounded-xl border-violet-300 bg-white text-sm text-violet-800 hover:bg-violet-50 hover:text-violet-900",
+                effectiveTypeRole === item.role && "border-[#36164f] bg-[#36164f] text-white hover:bg-[#2f1344] hover:text-white",
+              )}
+            >
+              <Link to={`/dashboard/tickets/${item.slug}`} className="relative inline-flex w-full items-center justify-center">
+                <MessageSquareMore className="ms-2 h-4 w-4" />
+                {item.label}
+                {(unreadByTypeSlug.get(item.slug) ?? 0) > 0 ? (
+                  <span className="absolute -left-2 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] text-white">
+                    {unreadByTypeSlug.get(item.slug)}
+                  </span>
+                ) : null}
+              </Link>
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-violet-200 bg-white/95 p-4 shadow-[0_16px_36px_-24px_rgba(54,22,79,0.35)]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -415,7 +450,7 @@ const TicketsManagerPage = () => {
       </div>
 
       <Dialog open={chatOpen && !!selectedTicket} onOpenChange={setChatOpen}>
-        <DialogContent dir="rtl" className="border-violet-300 bg-[#f7f1fc] text-right sm:max-w-3xl">
+        <DialogContent dir="rtl" className="border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:max-w-3xl sm:rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-display text-slate-900">{selectedTicket?.subject ?? "تفاصيل التكت"}</DialogTitle>
           </DialogHeader>

@@ -13,8 +13,9 @@ import {
   type FooterContent,
   type FooterQuickLink,
 } from "@/lib/footerContent";
+import { adminInput } from "@/lib/adminUi";
 
-const inputClassName = "border-violet-200 bg-white text-slate-900 placeholder:text-slate-400";
+const inputClassName = adminInput;
 
 const FooterManagerPage = () => {
   const { user } = useAuth();
@@ -64,7 +65,7 @@ const FooterManagerPage = () => {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-violet-200 bg-white/95 p-5 shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="text-right">
             <h1 className="font-display text-2xl font-bold text-slate-900">مدير الفوتر</h1>
@@ -78,7 +79,7 @@ const FooterManagerPage = () => {
       </div>
 
       <div className="grid gap-4">
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">روابط التصفح السريع</h2>
           <div className="space-y-3">
             <div className="flex justify-end">
@@ -89,7 +90,7 @@ const FooterManagerPage = () => {
             </div>
             <div className="space-y-3">
               {draft.quickLinks.map((item) => (
-                <div key={item.id} className="rounded-xl border border-violet-200 bg-violet-50/40 p-3">
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-violet-50/35 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
                     <div className="space-y-2 text-right">
                       <Label className="text-slate-700">اسم الرابط</Label>
@@ -123,7 +124,7 @@ const FooterManagerPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-violet-200 bg-white/95 p-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-right font-display text-lg font-semibold text-slate-900">النصوص العامة</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2 text-right">

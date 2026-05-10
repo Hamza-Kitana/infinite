@@ -1,5 +1,17 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Menu, X, Lock, ChevronDown, Volume2, VolumeX, LayoutDashboard, UserCircle2 } from "lucide-react";
+import {
+  Menu,
+  X,
+  Lock,
+  ChevronDown,
+  Volume2,
+  VolumeX,
+  LayoutDashboard,
+  UserCircle2,
+  Shield,
+  Sparkles,
+  MessageSquareMore,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -9,8 +21,12 @@ import { toast } from "sonner";
 import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoContext";
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
+import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersContentContext";
+import { DiscordIcon } from "@/components/DiscordIcon";
+import { isDiscordOAuthConfigured, startDiscordLogin } from "@/lib/discordOAuth";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 const institutionLinks = [
   { label: "وزارة الصحة", to: "/health" },
@@ -30,23 +46,18 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { login, canUseDashboard } = useAuth();
   const publicUser = usePublicUser();
+  const { findMembershipForUser } = useInstitutionRostersContent();
+  /** عضوية المستخدم الحالي (إن وُجدت) — تحدد إذا كان قائداً/نائباً يحتاج لوحة قيادة */
+  const myMembership = findMembershipForUser(publicUser.user?.id);
   const tickets = useTicketsCenter();
   const [staffUser, setStaffUser] = useState("");
   const [staffPass, setStaffPass] = useState("");
+  const [staffLoginVisible, setStaffLoginVisible] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
   const [publicMenuOpen, setPublicMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [publicUsername, setPublicUsername] = useState("");
-  const [publicPassword, setPublicPassword] = useState("");
-  const [publicRealName, setPublicRealName] = useState("");
-  const [publicFullName, setPublicFullName] = useState("");
-  const [publicEmail, setPublicEmail] = useState("");
-  const [publicDiscordId, setPublicDiscordId] = useState("");
-  const [publicAge, setPublicAge] = useState("");
-  const [publicPasswordConfirm, setPublicPasswordConfirm] = useState("");
   const heroBgVideo = useOptionalHeroBackgroundVideo();
   const visibility = useSiteVisibility();
   const canShowInterior =
@@ -63,7 +74,21 @@ const Navbar = () => {
     return true;
   });
   const hideApplyNowForPublicProfile = !!publicUser.user && (location.pathname === "/profile" || location.pathname === "/tickets");
-  const useLightBrandText = location.pathname === "/profile" || location.pathname === "/tickets";
+  /** صفحات بخلفية فاتحة بنفسجية — يتغيّر معها لون شريط التنقّل عند التمرير */
+  const isLightSurface = (() => {
+    const lightPaths = ["/profile", "/tickets", "/jobs"];
+    return lightPaths.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`));
+  })();
+  /** نوحّد لون علامة INFINITE مع لون السطح حتى تظل واضحة فوق الخلفيات الفاتحة */
+  const useLightBrandText = isLightSurface;
+  /** لون النص للروابط غير النشطة — أغمق على الخلفيات الفاتحة لقابلية القراءة */
+  const navInactiveTextCls = isLightSurface
+    ? "text-slate-800 hover:text-primary"
+    : "text-muted-foreground hover:text-primary";
+  /** زر دائري/مستطيل في الناڤبار (الجرس + قائمة المستخدم) — يتكيّف مع لون الخلفية */
+  const navTriggerButtonCls = isLightSurface
+    ? "border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+    : "border-primary/30 bg-background/40 text-foreground backdrop-blur-md hover:bg-primary/15 hover:border-primary/50";
 
   const publicUnreadTickets = (() => {
     if (!publicUser.user) return 0;
@@ -98,10 +123,12 @@ const Navbar = () => {
     <>
       <header
         dir="rtl"
-        className={`fixed inset-x-0 top-0 z-[100] pt-[env(safe-area-inset-top,0px)] transition-all duration-500 ${
+        className={`fixed inset-x-0 top-0 z-[100] py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] transition-[background-color,border-color,box-shadow,backdrop-filter] duration-500 sm:py-4 sm:pt-[calc(env(safe-area-inset-top,0px)+1rem)] ${
           scrolled
-            ? "border-b border-primary/20 bg-background/70 py-2 backdrop-blur-xl"
-            : "bg-transparent py-3 sm:py-4"
+            ? isLightSurface
+              ? "border-b border-violet-300/45 bg-gradient-to-l from-violet-100/75 via-white/72 to-fuchsia-50/78 shadow-[0_10px_36px_-18px_rgba(124,58,237,0.45)] backdrop-blur-xl supports-[backdrop-filter]:from-violet-100/65 supports-[backdrop-filter]:via-white/60 supports-[backdrop-filter]:to-fuchsia-50/68"
+              : "border-b border-primary/20 bg-background/70 backdrop-blur-xl"
+            : "border-b border-transparent bg-transparent"
         }`}
       >
         {/* z أعلى من شريط الصوت (z-110) حتى دروبداون المؤسسات والروابط تُنقَط فوقه */}
@@ -135,10 +162,20 @@ const Navbar = () => {
               className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
                 location.pathname === "/"
                   ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                  : `${navInactiveTextCls} after:w-0 hover:after:w-full`
               }`}
             >
               الرئيسية
+            </Link>
+            <Link
+              to="/contact"
+              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                location.pathname === "/contact"
+                  ? "text-primary after:w-full"
+                  : `${navInactiveTextCls} after:w-0 hover:after:w-full`
+              }`}
+            >
+              من نحن
             </Link>
             {visibility.pages.laws ? (
               <Link
@@ -146,7 +183,7 @@ const Navbar = () => {
                 className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
                   location.pathname === "/laws"
                     ? "text-primary after:w-full"
-                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                    : `${navInactiveTextCls} after:w-0 hover:after:w-full`
                 }`}
               >
                 القوانين
@@ -158,7 +195,7 @@ const Navbar = () => {
                 className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
                   location.pathname === "/streamers"
                     ? "text-primary after:w-full"
-                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                    : `${navInactiveTextCls} after:w-0 hover:after:w-full`
                 }`}
               >
                 صنّاع المحتوى
@@ -170,7 +207,7 @@ const Navbar = () => {
                 className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
                   location.pathname === "/gangs"
                     ? "text-primary after:w-full"
-                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                    : `${navInactiveTextCls} after:w-0 hover:after:w-full`
                 }`}
               >
                 العصابات
@@ -178,14 +215,14 @@ const Navbar = () => {
             ) : null}
             {visibility.pages.vipCars ? (
               <Link
-                to="/vip-cars"
+                to="/store"
                 className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                  location.pathname === "/vip-cars"
+                  location.pathname === "/store" || location.pathname.startsWith("/store/")
                     ? "text-primary after:w-full"
-                    : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                    : `${navInactiveTextCls} after:w-0 hover:after:w-full`
                 }`}
               >
-                سيارات VIP
+                المتجر
               </Link>
             ) : null}
             <div className="relative">
@@ -194,7 +231,7 @@ const Navbar = () => {
                 onClick={() => {
                   setInstitutionsOpen((prev) => !prev);
                 }}
-                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-body"
+                className={`inline-flex items-center gap-2 text-sm font-body transition-colors ${navInactiveTextCls}`}
               >
                 المؤسسات
                 <ChevronDown className={`h-4 w-4 transition-transform ${institutionsOpen ? "rotate-180" : ""}`} />
@@ -218,42 +255,58 @@ const Navbar = () => {
                 </div>
               )}
             </div>
-            <Link
-              to="/contact"
-              className={`relative font-body font-medium text-sm transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
-                location.pathname === "/contact"
+            <button
+              type="button"
+              onClick={() => {
+                if (publicUser.user) {
+                  navigate("/tickets");
+                } else {
+                  setLoginOpen(true);
+                  toast.message("سجّل الدخول أولاً لفتح مركز التكت");
+                }
+              }}
+              className={`relative inline-flex items-center gap-1.5 font-body text-sm font-medium transition-colors after:absolute after:bottom-[-6px] after:right-0 after:h-px after:bg-primary after:transition-all ${
+                location.pathname === "/tickets"
                   ? "text-primary after:w-full"
-                  : "text-muted-foreground hover:text-primary after:w-0 hover:after:w-full"
+                  : `${navInactiveTextCls} after:w-0 hover:after:w-full`
               }`}
+              aria-label="مركز التكت"
             >
-              من نحن
-            </Link>
+              <MessageSquareMore className="h-4 w-4 opacity-90" aria-hidden />
+              <span>التكت</span>
+              {publicUser.user && publicUnreadTickets > 0 ? (
+                <span className="inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-4 text-white shadow-[0_0_10px_-1px_rgba(244,63,94,0.65)]">
+                  {publicUnreadTickets}
+                </span>
+              ) : null}
+            </button>
           </nav>
 
           <div className="flex items-center gap-3">
+            {publicUser.user ? <NotificationsBell buttonClassName={navTriggerButtonCls} /> : null}
             {publicUser.user ? (
               <div className="relative hidden sm:block">
                 <button
                   type="button"
                   onClick={() => setPublicMenuOpen((v) => !v)}
-                  className="inline-flex items-center rounded-xl border border-violet-300 bg-white px-3 py-2 text-sm text-violet-700 transition-colors hover:bg-violet-50"
+                  className={`inline-flex items-center rounded-xl border px-3 py-2 text-sm transition-colors ${navTriggerButtonCls}`}
                 >
-                  <div className="relative mr-1">
-                    <UserCircle2 className="h-4 w-4" />
-                    {publicUnreadTickets > 0 ? (
-                      <span className="absolute -left-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-semibold text-white">
-                        {publicUnreadTickets}
-                      </span>
-                    ) : null}
-                  </div>
+                  <UserCircle2 className="h-4 w-4 ml-1" />
                   <span className="ml-1">{publicUser.user.displayName}</span>
                   <ChevronDown className={`me-2 h-4 w-4 transition-transform ${publicMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {publicMenuOpen ? (
                   <div className="absolute left-0 z-[130] mt-2 w-48 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xl">
                     <Link
+                      to="/profile"
+                      className="block px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => setPublicMenuOpen(false)}
+                    >
+                      البروفايل
+                    </Link>
+                    <Link
                       to="/tickets"
-                      className="flex items-center justify-between px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      className="flex items-center justify-between border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
                       onClick={() => setPublicMenuOpen(false)}
                     >
                       <span>التكت</span>
@@ -265,18 +318,23 @@ const Navbar = () => {
                     </Link>
                     <Link
                       to="/jobs"
-                      className="block px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      className="block border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
                       onClick={() => setPublicMenuOpen(false)}
                     >
                       التقديم لوظيفة
                     </Link>
-                    <Link
-                      to="/profile"
-                      className="block border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
-                      onClick={() => setPublicMenuOpen(false)}
-                    >
-                      البروفايل
-                    </Link>
+                    {myMembership && (myMembership.role === "leader" || myMembership.role === "deputy") ? (
+                      <Link
+                        to="/leadership"
+                        className="flex items-center justify-between border-t border-amber-100 bg-amber-50/40 px-3 py-2 text-right text-sm text-amber-800 transition-colors hover:bg-amber-100/60"
+                        onClick={() => setPublicMenuOpen(false)}
+                      >
+                        <span>لوحة القيادة</span>
+                        <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-display font-semibold text-amber-800">
+                          {myMembership.role === "leader" ? "قائد" : "نائب"}
+                        </span>
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
                       className="block w-full border-t border-violet-100 px-3 py-2 text-right text-sm text-rose-700 transition-colors hover:bg-rose-50"
@@ -292,12 +350,33 @@ const Navbar = () => {
               </div>
             ) : null}
             {!hideApplyNowForPublicProfile ? (
-              <Button
-                asChild
-                className="hidden md:inline-flex bg-gradient-neon text-primary-foreground font-display tracking-widest hover:shadow-glow-primary transition-all duration-500"
+              <button
+                type="button"
+                onClick={() => {
+                  if (!publicUser.user) {
+                    setLoginOpen(true);
+                    toast.message("سجّل الدخول عبر Discord للمتابعة في التقديم الإلكتروني");
+                    return;
+                  }
+                  if (publicUser.user.authProvider !== "discord") {
+                    toast.message(
+                      "التقديم الإلكتروني متاح للحسابات المسجّلة عبر Discord — اضغط للمتابعة",
+                    );
+                    navigate("/apply/citizen");
+                    return;
+                  }
+                  navigate("/apply/citizen");
+                }}
+                className="group relative hidden h-10 items-center gap-2 overflow-hidden rounded-full bg-gradient-neon px-5 font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-[0_0_24px_-4px_hsl(var(--primary)/0.65)] ring-1 ring-white/15 transition-all duration-500 hover:scale-[1.04] hover:shadow-[0_0_36px_-2px_hsl(var(--primary)/0.85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:inline-flex"
+                aria-label="التقديم الإلكتروني — يتطلب الدخول عبر Discord"
               >
-                <Link to="/apply/citizen">قدّم الآن</Link>
-              </Button>
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 -translate-x-[120%] bg-gradient-to-l from-transparent via-white/35 to-transparent opacity-0 transition-all duration-700 group-hover:translate-x-[120%] group-hover:opacity-100"
+                />
+                <Sparkles className="relative h-4 w-4 shrink-0 transition-transform duration-500 group-hover:rotate-12" aria-hidden />
+                <span className="relative">التقديم الإلكتروني</span>
+              </button>
             ) : null}
             {canUseDashboard ? (
               <Button
@@ -376,6 +455,13 @@ const Navbar = () => {
               >
                 الرئيسية
               </Link>
+              <Link
+                to="/contact"
+                onClick={() => setOpen(false)}
+                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+              >
+                من نحن
+              </Link>
               {visibility.pages.laws ? (
                 <Link
                   to="/laws"
@@ -405,11 +491,11 @@ const Navbar = () => {
               ) : null}
               {visibility.pages.vipCars ? (
                 <Link
-                  to="/vip-cars"
+                  to="/store"
                   onClick={() => setOpen(false)}
                   className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
                 >
-                  سيارات VIP
+                  المتجر
                 </Link>
               ) : null}
               <div className="pt-2 pb-1 text-xs tracking-[0.2em] text-primary font-display">المؤسسات</div>
@@ -423,19 +509,52 @@ const Navbar = () => {
                   {l.label}
                 </Link>
               ))}
-              <Link
-                to="/contact"
-                onClick={() => setOpen(false)}
-                className="touch-manipulation rounded-lg py-3 text-foreground transition-colors active:bg-primary/10 hover:text-primary"
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  if (publicUser.user) {
+                    navigate("/tickets");
+                  } else {
+                    setLoginOpen(true);
+                    toast.message("سجّل الدخول أولاً لفتح مركز التكت");
+                  }
+                }}
+                className="flex w-full touch-manipulation items-center justify-between rounded-lg py-3 text-right text-foreground transition-colors hover:text-primary active:bg-primary/10"
               >
-                من نحن
-              </Link>
+                <span className="inline-flex items-center gap-2">
+                  <MessageSquareMore className="h-4 w-4 opacity-90" aria-hidden />
+                  التكت
+                </span>
+                {publicUser.user && publicUnreadTickets > 0 ? (
+                  <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-semibold leading-4 text-white">
+                    {publicUnreadTickets}
+                  </span>
+                ) : null}
+              </button>
               {!hideApplyNowForPublicProfile ? (
-                <Button asChild className="w-full touch-manipulation bg-gradient-neon text-primary-foreground">
-                  <Link to="/apply/citizen" onClick={() => setOpen(false)}>
-                    قدّم الآن
-                  </Link>
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    if (!publicUser.user) {
+                      setLoginOpen(true);
+                      toast.message("سجّل الدخول عبر Discord للمتابعة في التقديم الإلكتروني");
+                      return;
+                    }
+                    if (publicUser.user.authProvider !== "discord") {
+                      toast.message(
+                        "التقديم الإلكتروني متاح للحسابات المسجّلة عبر Discord — اضغط للمتابعة",
+                      );
+                    }
+                    navigate("/apply/citizen");
+                  }}
+                  className="group inline-flex w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-gradient-neon px-5 py-3 font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)] ring-1 ring-white/15"
+                  aria-label="التقديم الإلكتروني — يتطلب الدخول عبر Discord"
+                >
+                  <Sparkles className="h-4 w-4 shrink-0 transition-transform group-hover:rotate-12" aria-hidden />
+                  التقديم الإلكتروني
+                </button>
               ) : null}
               {publicUser.user ? (
                 <>
@@ -480,12 +599,20 @@ const Navbar = () => {
         )}
       </header>
 
-      <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+      <Dialog
+        open={loginOpen}
+        onOpenChange={(next) => {
+          setLoginOpen(next);
+          if (!next) {
+            setStaffUser("");
+            setStaffPass("");
+            setStaffLoginVisible(false);
+          }
+        }}
+      >
         <DialogContent
           dir="rtl"
-          className={`max-h-[90dvh] gap-0 overflow-y-auto rounded-3xl border border-violet-300/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,241,252,0.97)_100%)] p-0 text-slate-900 shadow-[0_30px_80px_-24px_rgba(54,22,79,0.45)] backdrop-blur-xl ${
-            isRegisterMode ? "sm:max-w-[700px]" : "sm:max-w-[560px]"
-          }`}
+          className="max-h-[90dvh] gap-0 overflow-y-auto rounded-3xl border border-violet-300/40 bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(248,241,252,0.97)_100%)] p-0 text-slate-900 shadow-[0_30px_80px_-24px_rgba(54,22,79,0.45)] backdrop-blur-xl sm:max-w-[560px]"
         >
           <div className="relative bg-[radial-gradient(ellipse_120%_100%_at_50%_-20%,rgba(54,22,79,0.18),transparent_58%)] px-6 pb-2 pt-12 text-center sm:px-8 sm:pt-14">
             <img
@@ -498,243 +625,125 @@ const Navbar = () => {
               INFINITE CITY
             </p>
             <DialogHeader className="mt-5 space-y-2 text-center sm:text-center">
-              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
-                {isRegisterMode ? "إنشاء حساب مستخدم" : "تسجيل الدخول"}
-              </DialogTitle>
-              <DialogDescription className="mx-auto max-w-[19rem] text-pretty text-sm leading-relaxed text-slate-600">
-                {isRegisterMode
-                  ? "حساب عادي لفتح التكتات والتواصل مع الإدارة."
-                  : "استخدم نفس النموذج: حساب الموظف يفتح لوحة التحكم، والحساب العادي يفتح البروفايل."}
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">تسجيل الدخول</DialogTitle>
+              <DialogDescription className="mx-auto max-w-[22rem] text-pretty text-sm leading-relaxed text-slate-600">
+                الطريقة الأساسية للاعبين والزوار هي <strong className="font-semibold text-slate-800">Discord</strong>.
+                دخول لوحة الإدارة بالاسم وكلمة المرور يظهر فقط بعد الضغط على «تسجيل دخول إدمن».
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="h-px bg-gradient-to-l from-transparent via-violet-200 to-transparent" aria-hidden />
 
-          <form
-            noValidate
-            className="space-y-4 px-6 py-6 sm:px-9 sm:py-7"
-            onSubmit={(e: FormEvent) => {
-              e.preventDefault();
-              if (isRegisterMode) {
-                if (publicPassword !== publicPasswordConfirm) {
-                  toast.error("تأكيد كلمة السر غير مطابق");
-                  return;
-                }
-                const ageNum = Number(publicAge);
-                const result = publicUser.register({
-                  realName: publicRealName,
-                  fullName: publicFullName,
-                  username: publicUsername,
-                  email: publicEmail,
-                  discordId: publicDiscordId,
-                  age: ageNum,
-                  password: publicPassword,
-                });
-                if (!result.ok) {
-                  toast.error(result.reason);
-                  return;
-                }
-                toast.success("تم إنشاء الحساب وتسجيل الدخول");
-                setLoginOpen(false);
-                setPublicUsername("");
-                setPublicPassword("");
-                setPublicPasswordConfirm("");
-                setPublicRealName("");
-                setPublicFullName("");
-                setPublicEmail("");
-                setPublicDiscordId("");
-                setPublicAge("");
-                setIsRegisterMode(false);
-                navigate("/profile");
-                return;
-              }
-
-              try {
-                const session = login(staffUser, staffPass);
-                if (session) {
-                  toast.success("تم الدخول كموظف");
-                  setLoginOpen(false);
-                  setStaffUser("");
-                  setStaffPass("");
-                  setPublicUsername("");
-                  setPublicPassword("");
-                  setPublicPasswordConfirm("");
-                  navigate(getPostLoginDashboardPath(session.roles));
-                  return;
-                }
-                const publicLogin = publicUser.login({ username: publicUsername || staffUser, password: publicPassword || staffPass });
-                if (publicLogin.ok) {
-                  toast.success("تم الدخول بحسابك الشخصي");
-                  setLoginOpen(false);
-                  setStaffUser("");
-                  setStaffPass("");
-                  setPublicUsername("");
-                  setPublicPassword("");
-                  setPublicPasswordConfirm("");
-                  navigate("/profile");
-                  return;
-                }
-                toast.error("اسم المستخدم أو كلمة المرور غير صحيحة");
-              } catch (err) {
-                if (err instanceof Error && err.message === "IC_SESSION_STORAGE") {
-                  toast.error("تعذر حفظ جلسة الموظف في المتصفح.");
-                } else {
-                  toast.error("حدث خطأ أثناء الدخول");
-                  console.error(err);
-                }
-              }
-            }}
-          >
-            <div className="mb-2 grid grid-cols-2 overflow-hidden rounded-xl border border-violet-200/90 bg-white/85 p-1 shadow-sm">
-              <button
+          <div className="space-y-4 px-6 py-6 sm:px-9 sm:py-7">
+            <div className="space-y-2">
+              <Button
                 type="button"
-                onClick={() => setIsRegisterMode(false)}
-                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
-                  !isRegisterMode ? "bg-[#36164f] text-white shadow-sm" : "text-violet-800 hover:bg-violet-50"
-                }`}
+                variant="outline"
+                className="flex min-h-[4rem] w-full items-center justify-center gap-3 rounded-2xl border-[#5865F2]/50 bg-[#5865F2] px-5 py-4 text-base text-white shadow-md hover:bg-[#4752C4] hover:text-white sm:min-h-[4.25rem]"
+                onClick={() => {
+                  if (!isDiscordOAuthConfigured()) {
+                    toast.error("أضف VITE_DISCORD_CLIENT_ID في ملف .env ثم أعد تشغيل السيرفر.");
+                    return;
+                  }
+                  void startDiscordLogin().catch(() => {
+                    toast.error("تعذر بدء تسجيل الدخول عبر Discord");
+                  });
+                }}
               >
-                تسجيل الدخول
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsRegisterMode(true)}
-                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
-                  isRegisterMode ? "bg-[#36164f] text-white shadow-sm" : "text-violet-800 hover:bg-violet-50"
-                }`}
-              >
-                إنشاء حساب
-              </button>
+                <DiscordIcon className="h-8 w-8 shrink-0 text-white sm:h-9 sm:w-9" />
+                <span className="font-display text-base font-semibold tracking-wide sm:text-lg">
+                  تسجيل الدخول عبر Discord
+                </span>
+              </Button>
+              {!isDiscordOAuthConfigured() ? (
+                <p className="text-center text-[11px] leading-snug text-amber-800/90">
+                  لتفعيل الزر: أنشئ تطبيقاً في Discord Developer Portal وأضف نفس رابط الإرجاع في OAuth2 → Redirects.
+                </p>
+              ) : (
+                <p className="text-center text-xs text-slate-500">الطريقة الموصى بها للاعبين والزوار.</p>
+              )}
             </div>
 
-            {isRegisterMode ? (
-              <div className="grid gap-3.5">
-                <div className="space-y-1.5 text-right">
-                  <Label htmlFor="public-real-name" className="text-xs font-medium text-slate-700">
-                    الاسم الحقيقي
-                  </Label>
-                  <Input
-                    id="public-real-name"
-                    value={publicRealName}
-                    onChange={(ev) => setPublicRealName(ev.target.value)}
-                    placeholder="مثال: محمد خالد"
-                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                  />
-                </div>
-                <div className="space-y-1.5 text-right">
-                  <Label htmlFor="public-full-name" className="text-xs font-medium text-slate-700">
-                    الاسم داخل المدينة
-                  </Label>
-                  <Input
-                    id="public-full-name"
-                    value={publicFullName}
-                    onChange={(ev) => setPublicFullName(ev.target.value)}
-                    placeholder="مثال: أبو سالم"
-                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                  />
-                </div>
-                <div className="space-y-1.5 text-right">
-                  <Label htmlFor="public-email" className="text-xs font-medium text-slate-700">
-                    الإيميل
-                  </Label>
-                  <Input
-                    id="public-email"
-                    type="email"
-                    value={publicEmail}
-                    onChange={(ev) => setPublicEmail(ev.target.value)}
-                    placeholder="name@email.com"
-                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-1.5 text-right">
-                  <Label htmlFor="public-discord-id" className="text-xs font-medium text-slate-700">
-                    Discord ID
-                  </Label>
-                  <Input
-                    id="public-discord-id"
-                    value={publicDiscordId}
-                    onChange={(ev) => setPublicDiscordId(ev.target.value)}
-                    placeholder="username#0000 أو ID"
-                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-1.5 text-right">
-                  <Label htmlFor="public-age" className="text-xs font-medium text-slate-700">
-                    العمر
-                  </Label>
-                  <Input
-                    id="public-age"
-                    type="number"
-                    min={13}
-                    value={publicAge}
-                    onChange={(ev) => setPublicAge(ev.target.value)}
-                    placeholder="18"
-                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                  />
-                </div>
-              </div>
-            ) : null}
-            <div className="space-y-1.5 text-right">
-              <Label htmlFor="user" className="text-xs font-medium text-slate-700">
-                اسم المستخدم
-              </Label>
-              <Input
-                id="user"
-                autoComplete="username"
-                value={isRegisterMode ? publicUsername : staffUser}
-                onChange={(ev) => {
-                  setStaffUser(ev.target.value);
-                  setPublicUsername(ev.target.value);
-                }}
-                placeholder="أدخل اسم المستخدم"
-                className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
-              />
-            </div>
-            <div className="space-y-1.5 text-right">
-              <Label htmlFor="pass" className="text-xs font-medium text-slate-700">
-                كلمة المرور
-              </Label>
-              <Input
-                id="pass"
-                type="password"
-                autoComplete="current-password"
-                value={isRegisterMode ? publicPassword : staffPass}
-                onChange={(ev) => {
-                  setStaffPass(ev.target.value);
-                  setPublicPassword(ev.target.value);
-                }}
-                placeholder="••••••••"
-                className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
-              />
-            </div>
-            {isRegisterMode ? (
-              <div className="space-y-1.5 text-right">
-                <Label htmlFor="pass-confirm" className="text-xs font-medium text-slate-700">
-                  تأكيد كلمة السر
-                </Label>
-                <Input
-                  id="pass-confirm"
-                  type="password"
-                  value={publicPasswordConfirm}
-                  onChange={(ev) => setPublicPasswordConfirm(ev.target.value)}
-                  placeholder="••••••••"
-                  className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
-                />
-              </div>
-            ) : null}
             <Button
-              type="submit"
-              className="mt-2 h-11 w-full rounded-xl bg-gradient-neon font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-md transition-all hover:brightness-110 hover:shadow-[var(--glow-primary)] active:scale-[0.99]"
+              type="button"
+              variant="outline"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border-violet-300 bg-white text-sm font-semibold text-violet-900 shadow-sm hover:bg-violet-50"
+              onClick={() => setStaffLoginVisible((v) => !v)}
+              aria-expanded={staffLoginVisible}
             >
-              <Lock className="ms-2 h-4 w-4 opacity-90" />
-              {isRegisterMode ? "إنشاء الحساب" : "تسجيل الدخول"}
+              <Shield className="h-4 w-4 shrink-0 opacity-90" />
+              {staffLoginVisible ? "إخفاء تسجيل دخول الإدمن" : "تسجيل دخول إدمن"}
+              <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${staffLoginVisible ? "rotate-180" : ""}`} />
             </Button>
-            <p className="text-center text-xs text-slate-500">
-              {isRegisterMode ? "بعد إنشاء الحساب سيتم تحويلك مباشرة إلى بروفايلك." : "الدخول بحساب موظف يفتح لوحة التحكم، وبحساب عادي يفتح البروفايل."}
-            </p>
-          </form>
+
+            {staffLoginVisible ? (
+              <form
+                noValidate
+                className="space-y-4 border-t border-violet-200/90 pt-4"
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  try {
+                    const session = login(staffUser, staffPass);
+                    if (session) {
+                      toast.success("تم الدخول كموظف");
+                      setLoginOpen(false);
+                      setStaffUser("");
+                      setStaffPass("");
+                      setStaffLoginVisible(false);
+                      navigate(getPostLoginDashboardPath(session.roles));
+                      return;
+                    }
+                    toast.error("بيانات الموظف غير صحيحة");
+                  } catch (err) {
+                    if (err instanceof Error && err.message === "IC_SESSION_STORAGE") {
+                      toast.error("تعذر حفظ جلسة الموظف في المتصفح.");
+                    } else {
+                      toast.error("حدث خطأ أثناء الدخول");
+                      console.error(err);
+                    }
+                  }
+                }}
+              >
+                <p className="text-center text-xs font-medium text-violet-800">لوحة التحكم — موظفون معتمدون فقط</p>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="staff-user" className="text-xs font-medium text-slate-700">
+                    اسم المستخدم
+                  </Label>
+                  <Input
+                    id="staff-user"
+                    autoComplete="username"
+                    value={staffUser}
+                    onChange={(ev) => setStaffUser(ev.target.value)}
+                    placeholder="اسم المستخدم"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                  />
+                </div>
+                <div className="space-y-1.5 text-right">
+                  <Label htmlFor="staff-pass" className="text-xs font-medium text-slate-700">
+                    كلمة المرور
+                  </Label>
+                  <Input
+                    id="staff-pass"
+                    type="password"
+                    autoComplete="current-password"
+                    value={staffPass}
+                    onChange={(ev) => setStaffPass(ev.target.value)}
+                    placeholder="كلمة المرور"
+                    className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="h-11 w-full rounded-xl bg-gradient-neon font-display text-sm font-semibold tracking-wide text-primary-foreground shadow-md transition-all hover:brightness-110 hover:shadow-[var(--glow-primary)] active:scale-[0.99]"
+                >
+                  <Lock className="ms-2 h-4 w-4 opacity-90" />
+                  دخول لوحة التحكم
+                </Button>
+                <p className="text-center text-[11px] text-slate-500">لا يُستخدم هذا القسم لتسجيل اللاعبين.</p>
+              </form>
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
     </>

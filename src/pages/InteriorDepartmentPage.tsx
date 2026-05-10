@@ -2,6 +2,7 @@ import { Navigate, useParams } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { InstitutionLawsPlaceholder } from "@/components/InstitutionLawsPlaceholder";
+import { InstitutionClosedBanner } from "@/components/InstitutionClosedBanner";
 import { InteriorMinistryNav } from "@/components/InteriorMinistryNav";
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
@@ -188,6 +189,7 @@ const InteriorDepartmentPage = () => {
       <InstitutionHero badgeEn={cfg.badgeEn} alt={cfg.alt} title={cfg.title} />
       <InteriorMinistryNav />
       <main className="pb-20">
+        <InstitutionClosedBanner branchId={cfg.branchId} organizationLabel={cfg.lawsPlaceholderLabel} />
         <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
           <InstitutionRoster
             {...roster}

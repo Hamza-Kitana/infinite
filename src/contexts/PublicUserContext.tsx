@@ -10,6 +10,8 @@ type PublicUser = {
   age: number;
   password: string;
   displayName: string;
+  /** حساب أنشئ بتسجيل يدوي؛ Discord OAuth يضيف discord */
+  authProvider?: "local" | "discord";
   avatarUrl?: string;
   isActive?: boolean;
   createdAt: string;
@@ -19,6 +21,7 @@ type PublicSessionUser = {
   id: string;
   username: string;
   displayName: string;
+  authProvider?: "local" | "discord";
 };
 
 export type PublicUserProfile = {
@@ -30,11 +33,22 @@ export type PublicUserProfile = {
   discordId: string;
   age: number;
   avatarUrl?: string;
+  authProvider?: "local" | "discord";
   createdAt: string;
+};
+
+export type DiscordSignInPayload = {
+  discordUserId: string;
+  discordUsername: string;
+  globalName: string | null;
+  email: string | null;
+  avatarUrl?: string;
 };
 
 type PublicUserContextValue = {
   user: PublicSessionUser | null;
+  /** تسجيل دخول عبر Discord OAuth (PKCE) — يربط الحساب بمعرّف Discord */
+  signInWithDiscord: (payload: DiscordSignInPayload) => { ok: true } | { ok: false; reason: string };
   register: (input: {
     realName: string;
     fullName: string;
@@ -78,7 +92,8 @@ function loadUsers(): PublicUser[] {
         typeof p.displayName === "string" &&
         (typeof p.avatarUrl === "undefined" || typeof p.avatarUrl === "string") &&
         (typeof p.isActive === "undefined" || typeof p.isActive === "boolean") &&
-        typeof p.createdAt === "string"
+        typeof p.createdAt === "string" &&
+        (p.authProvider === undefined || p.authProvider === "local" || p.authProvider === "discord")
       );
     });
   } catch {
@@ -97,7 +112,9 @@ function loadSession(): PublicSessionUser | null {
     const parsed = JSON.parse(raw) as Partial<PublicSessionUser>;
     if (!parsed || typeof parsed !== "object") return null;
     if (typeof parsed.id !== "string" || typeof parsed.username !== "string" || typeof parsed.displayName !== "string") return null;
-    return { id: parsed.id, username: parsed.username, displayName: parsed.displayName };
+    const authProvider =
+      parsed.authProvider === "discord" || parsed.authProvider === "local" ? parsed.authProvider : undefined;
+    return { id: parsed.id, username: parsed.username, displayName: parsed.displayName, authProvider };
   } catch {
     return null;
   }
@@ -117,6 +134,79 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PublicUserContextValue>(
     () => ({
       user,
+      signInWithDiscord: ({ discordUserId, discordUsername, globalName, email, avatarUrl }) => {
+        const users = loadUsers();
+        const existing = users.find((x) => x.discordId === discordUserId);
+        const displayFromDiscord = (globalName?.trim() || discordUsername).trim();
+        const emailNorm = (email ?? "").trim().toLowerCase();
+        const resolvedEmail =
+          emailNorm && emailNorm.includes("@") && !emailNorm.startsWith("@") && !emailNorm.endsWith("@")
+            ? emailNorm
+            : `${discordUserId}@discord.oauth.local`;
+
+        if (existing) {
+          if (existing.isActive === false) return { ok: false, reason: "الحساب موقوف من الإدارة" };
+          const updatedUsers = users.map((u) =>
+            u.id === existing.id
+              ? {
+                  ...u,
+                  authProvider: "discord" as const,
+                  avatarUrl: avatarUrl ?? u.avatarUrl,
+                  displayName: displayFromDiscord || u.displayName,
+                  fullName: u.fullName || displayFromDiscord,
+                  email:
+                    emailNorm && emailNorm.includes("@") && !emailNorm.startsWith("@") && !emailNorm.endsWith("@")
+                      ? emailNorm
+                      : u.email,
+                }
+              : u,
+          );
+          saveUsers(updatedUsers);
+          const sessionUser: PublicSessionUser = {
+            id: existing.id,
+            username: existing.username,
+            displayName: displayFromDiscord || existing.displayName,
+            authProvider: "discord",
+          };
+          setUser(sessionUser);
+          saveSession(sessionUser);
+          return { ok: true };
+        }
+
+        const baseHandle = discordUsername.toLowerCase().replace(/[^a-z0-9._]/g, "") || `u${discordUserId.slice(-8)}`;
+        let username = baseHandle;
+        let suffix = 0;
+        while (users.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
+          suffix += 1;
+          username = `${baseHandle}_${suffix}`;
+        }
+
+        const created: PublicUser = {
+          id: crypto.randomUUID(),
+          realName: displayFromDiscord,
+          fullName: displayFromDiscord,
+          username,
+          email: resolvedEmail,
+          discordId: discordUserId,
+          age: 18,
+          password: "",
+          displayName: displayFromDiscord,
+          authProvider: "discord",
+          avatarUrl,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        saveUsers([...users, created]);
+        const sessionUser: PublicSessionUser = {
+          id: created.id,
+          username: created.username,
+          displayName: created.displayName,
+          authProvider: "discord",
+        };
+        setUser(sessionUser);
+        saveSession(sessionUser);
+        return { ok: true };
+      },
       register: ({ realName, fullName, username, email, discordId, age, password }) => {
         const r = realName.trim();
         const f = fullName.trim();
@@ -140,6 +230,9 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         if (users.some((x) => x.email.toLowerCase() === em)) {
           return { ok: false, reason: "الإيميل مستخدم مسبقاً" };
         }
+        if (users.some((x) => x.discordId.trim() === dc)) {
+          return { ok: false, reason: "Discord ID مربوط بحساب آخر — سجّل الدخول عبر Discord" };
+        }
         const created: PublicUser = {
           id: crypto.randomUUID(),
           realName: r,
@@ -150,11 +243,17 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
           age: Math.floor(age),
           password,
           displayName: f,
+          authProvider: "local",
           isActive: true,
           createdAt: new Date().toISOString(),
         };
         saveUsers([...users, created]);
-        const sessionUser: PublicSessionUser = { id: created.id, username: created.username, displayName: created.displayName };
+        const sessionUser: PublicSessionUser = {
+          id: created.id,
+          username: created.username,
+          displayName: created.displayName,
+          authProvider: "local",
+        };
         setUser(sessionUser);
         saveSession(sessionUser);
         return { ok: true };
@@ -163,8 +262,14 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const u = username.trim().toLowerCase();
         const found = loadUsers().find((x) => x.username.toLowerCase() === u && x.password === password);
         if (!found) return { ok: false, reason: "بيانات الدخول غير صحيحة" };
+        if (found.authProvider === "discord") return { ok: false, reason: "هذا الحساب مسجّل عبر Discord — استخدم زر Discord" };
         if (found.isActive === false) return { ok: false, reason: "الحساب موقوف من الإدارة" };
-        const sessionUser: PublicSessionUser = { id: found.id, username: found.username, displayName: found.displayName };
+        const sessionUser: PublicSessionUser = {
+          id: found.id,
+          username: found.username,
+          displayName: found.displayName,
+          authProvider: found.authProvider ?? "local",
+        };
         setUser(sessionUser);
         saveSession(sessionUser);
         return { ok: true };
@@ -186,6 +291,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
           discordId: found.discordId,
           age: found.age,
           avatarUrl: found.avatarUrl,
+          authProvider: found.authProvider ?? "local",
           createdAt: found.createdAt,
         };
       },
@@ -222,7 +328,12 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const updated = [...users];
         updated[idx] = next;
         saveUsers(updated);
-        const nextSession: PublicSessionUser = { id: next.id, username: next.username, displayName: next.displayName };
+        const nextSession: PublicSessionUser = {
+          id: next.id,
+          username: next.username,
+          displayName: next.displayName,
+          authProvider: next.authProvider ?? "local",
+        };
         setUser(nextSession);
         saveSession(nextSession);
         return { ok: true };

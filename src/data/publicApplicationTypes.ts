@@ -1,4 +1,28 @@
-/** طلب تقديم من الزوار — يُخزَّن محلياً ويُراجع من لوحة التحكم */
+/** طلب تقديم من الزوار — يُخزَّن محلياً ويُراجع من لوحة التحكم */
+
+/** إجابة واحدة من اختبار قراءة القوانين */
+export type LawsQuizAnswer = {
+  questionId: string;
+  question: string;
+  selectedOptionId: string;
+  selectedOptionLabel: string;
+  correctOptionId: string;
+  correctOptionLabel: string;
+  isCorrect: boolean;
+};
+
+/** نتيجة كاملة لاختبار قراءة القوانين — تظهر للأدمن مع الطلب */
+export type LawsQuizResult = {
+  /** هل اجتاز كل الأسئلة بشكل صحيح؟ */
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  /** عدد المحاولات حتى الإقرار/الإرسال */
+  attempts: number;
+  /** زمن تأكيد الإجابات (ISO) */
+  completedAt: string;
+  answers: LawsQuizAnswer[];
+};
 
 export type ApplicationFormSnapshot = {
   firstName: string;
@@ -11,6 +35,16 @@ export type ApplicationFormSnapshot = {
   previousCities: string;
   experience: string;
   lawsAccepted: boolean;
+  /** نتيجة اختبار قراءة القوانين — قد تكون passed=false إذا أرسل بعد الرسوب */
+  lawsQuizResult?: LawsQuizResult;
+  /** اسم الشخصية في المدينة (للتقديم على الوظائف الاحترافي) */
+  cityName?: string;
+  /** نبذة شخصية مختصرة يكتبها المتقدم (للتقديم الاحترافي) */
+  bio?: string;
+  /** صورة شخصية يرفعها المتقدم — Data URL */
+  avatarDataUrl?: string;
+  /** Discord ID الخام كما هو من الحساب المتصل (مفيد للأدمن) */
+  discordId?: string;
 };
 
 export type ApplicationStatus = "pending" | "approved" | "rejected";

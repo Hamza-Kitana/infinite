@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { ApplicationFormSnapshot, ApplicationRecord, ApplicationStatus } from "@/data/publicApplicationTypes";
+import type {
+  ApplicationFormSnapshot,
+  ApplicationRecord,
+  ApplicationStatus,
+  LawsQuizAnswer,
+  LawsQuizResult,
+} from "@/data/publicApplicationTypes";
 
 const STORAGE_KEY = "ic_public_applications_v1";
 
@@ -44,6 +50,34 @@ function clampText(s: string, max: number): string {
   return s.slice(0, max);
 }
 
+function clampQuizAnswer(a: LawsQuizAnswer): LawsQuizAnswer {
+  return {
+    questionId: clampText(a.questionId, 120),
+    question: clampText(a.question, 600),
+    selectedOptionId: clampText(a.selectedOptionId, 80),
+    selectedOptionLabel: clampText(a.selectedOptionLabel, 600),
+    correctOptionId: clampText(a.correctOptionId, 80),
+    correctOptionLabel: clampText(a.correctOptionLabel, 600),
+    isCorrect: !!a.isCorrect,
+  };
+}
+
+function clampQuizResult(r: LawsQuizResult | undefined): LawsQuizResult | undefined {
+  if (!r) return undefined;
+  const answers = Array.isArray(r.answers) ? r.answers.slice(0, 50).map(clampQuizAnswer) : [];
+  return {
+    passed: !!r.passed,
+    correctCount: Math.max(0, Math.min(50, Number.isFinite(r.correctCount) ? Math.floor(r.correctCount) : 0)),
+    totalQuestions: Math.max(0, Math.min(50, Number.isFinite(r.totalQuestions) ? Math.floor(r.totalQuestions) : answers.length)),
+    attempts: Math.max(1, Math.min(99, Number.isFinite(r.attempts) ? Math.floor(r.attempts) : 1)),
+    completedAt: clampText(r.completedAt || new Date().toISOString(), 40),
+    answers,
+  };
+}
+
+/** أقصى حجم لصورة Data URL مرفقة في الطلب — ~ 2.5MB Base64 */
+const MAX_AVATAR_DATA_URL_LEN = 2_700_000;
+
 function clampSnapshot(s: ApplicationFormSnapshot): ApplicationFormSnapshot {
   return {
     firstName: clampText(s.firstName, 120),
@@ -56,6 +90,13 @@ function clampSnapshot(s: ApplicationFormSnapshot): ApplicationFormSnapshot {
     previousCities: clampText(s.previousCities, 8000),
     experience: clampText(s.experience, 20000),
     lawsAccepted: s.lawsAccepted,
+    lawsQuizResult: clampQuizResult(s.lawsQuizResult),
+    cityName: s.cityName ? clampText(s.cityName, 120) : undefined,
+    bio: s.bio ? clampText(s.bio, 4000) : undefined,
+    avatarDataUrl: s.avatarDataUrl
+      ? clampText(s.avatarDataUrl, MAX_AVATAR_DATA_URL_LEN)
+      : undefined,
+    discordId: s.discordId ? clampText(s.discordId, 64) : undefined,
   };
 }
 

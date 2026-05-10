@@ -19,6 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { LawsQuizDialog } from "@/components/LawsQuizDialog";
+import { CITIZEN_LAWS_QUIZ } from "@/data/lawsQuiz";
+import type { LawsQuizResult } from "@/data/publicApplicationTypes";
 
 type RuleItem = { id: number; title: string; description: string };
 
@@ -103,12 +106,14 @@ function SafeZonesBlock() {
 type LawsReaderDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAccept: () => void;
+  /** يُستدعى بعد تأكيد الاختبار — تُمرَّر نتيجة الاختبار لتُسجَّل مع الطلب */
+  onAccept: (quizResult: LawsQuizResult) => void;
 };
 
 const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProps) => {
   const [slide, setSlide] = useState(0);
   const [agreed, setAgreed] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(false);
 
   const isAckSlide = slide === ACK_SLIDE_INDEX;
 
@@ -116,6 +121,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
     if (open) {
       setSlide(0);
       setAgreed(false);
+      setQuizOpen(false);
     }
   }, [open]);
 
@@ -123,16 +129,31 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
     if (!next) {
       setAgreed(false);
       setSlide(0);
+      setQuizOpen(false);
     }
     onOpenChange(next);
   };
 
+  /** الإقرار يفتح اختبار الأسئلة بدلاً من الاعتماد المباشر */
   const handleConfirm = () => {
     if (!agreed) return;
-    onAccept();
+    setQuizOpen(true);
+  };
+
+  /** اكتمال الاختبار (نجاح أو إرسال رغم الرسوب) يعتمد الإقرار ويُغلق كل النوافذ */
+  const handleQuizComplete = (result: LawsQuizResult) => {
+    onAccept(result);
     setAgreed(false);
     setSlide(0);
+    setQuizOpen(false);
     onOpenChange(false);
+  };
+
+  /** "أعد قراءة القوانين" يعيد المستخدم لأول شريحة محتوى */
+  const handleQuizReread = () => {
+    setQuizOpen(false);
+    setAgreed(false);
+    setSlide(0);
   };
 
   const renderContentSlide = (def: ContentSlideDef) => {
@@ -143,7 +164,8 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <>
+    <Dialog open={open && !quizOpen} onOpenChange={handleClose}>
       <DialogContent
         dir="rtl"
         className="flex h-[min(92vh,760px)] max-h-[92vh] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl border-primary/35 bg-background p-0 shadow-[0_0_60px_hsl(var(--primary)/0.18)] ring-1 ring-primary/15 sm:max-w-5xl"
@@ -175,8 +197,8 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
             {isAckSlide ? (
               <div className="flex min-h-0 flex-1 flex-col justify-center space-y-6 text-right">
                 <p className="text-lg leading-relaxed text-foreground sm:text-xl">
-                  بعد الاطلاع على جميع الأقسام، يمكنك تأكيد موافقتك أدناه. بعد الإغلاق ستتمكن من الضغط على «التالي» في
-                  النموذج للانتقال إلى مراجعة الطلب وإرساله.
+                  بعد الاطلاع على جميع الأقسام، أكّد قراءتك أدناه ثم أجب عن أسئلة قصيرة للتحقق من فهمك للقوانين قبل
+                  متابعة الطلب.
                 </p>
                 <div className="flex items-start gap-4 rounded-2xl border border-primary/25 bg-card/50 p-5 shadow-inner sm:p-6">
                   <Checkbox
@@ -189,6 +211,10 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
                     أقر بأنني اطلعت على القوانين وأفهم أن الالتزام بها شرط للعب في المدينة.
                   </Label>
                 </div>
+                <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-200 sm:text-base">
+                  بعد ضغط «متابعة وأسئلة الإقرار»، سيُعرض عليك اختبار قصير من {CITIZEN_LAWS_QUIZ.length} أسئلة. لن
+                  يُعتمد إقرارك إلا بالإجابة الصحيحة على الأسئلة جميعها.
+                </p>
               </div>
             ) : (
               renderContentSlide(CONTENT_SLIDES[slide]!)
@@ -247,7 +273,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
                   onClick={handleConfirm}
                   className="h-12 min-w-[12rem] bg-gradient-neon px-5 font-display text-base text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)] disabled:opacity-40"
                 >
-                  تأكيد الاطلاع والمتابعة
+                  متابعة وأسئلة الإقرار
                 </Button>
               </div>
             </div>
@@ -255,6 +281,20 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
         )}
       </DialogContent>
     </Dialog>
+    <LawsQuizDialog
+      open={quizOpen}
+      onOpenChange={(next) => {
+        setQuizOpen(next);
+        if (!next) {
+          setAgreed(false);
+        }
+      }}
+      questions={CITIZEN_LAWS_QUIZ}
+      contextLabel="قوانين المدينة"
+      onComplete={handleQuizComplete}
+      onReread={handleQuizReread}
+    />
+    </>
   );
 };
 

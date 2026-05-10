@@ -5,6 +5,7 @@ import { BookOpen, Gavel, Scale } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { InstitutionLawsPlaceholder } from "@/components/InstitutionLawsPlaceholder";
+import { InstitutionClosedBanner } from "@/components/InstitutionClosedBanner";
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
@@ -40,6 +41,7 @@ const JusticePage = () => {
       />
 
       <main className="pb-20">
+        <InstitutionClosedBanner branchId="justice_lawyers" organizationLabel="هيئة المحاماة — وزارة العدل" />
         <section id="lawyers" className="scroll-mt-28 w-full px-4 md:px-8 xl:px-12 mt-10">
           <InstitutionRoster
             {...lawyerRoster}

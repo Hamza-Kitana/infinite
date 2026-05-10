@@ -11,6 +11,10 @@ export type RosterPerson = {
   tagline?: string;
   /** نقاط مسؤوليات أو مجالات عمل */
   highlights?: string[];
+  /** PublicUser.id المرتبط بالعضو — يُستخدم لتمييز ملفه الشخصي والصلاحيات */
+  userId?: string;
+  /** Discord ID للحساب المرتبط (لعرض المراسلة/التحقق) */
+  discordId?: string;
 };
 
 type InstitutionRosterProps = {

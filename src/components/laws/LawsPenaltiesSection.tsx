@@ -46,7 +46,7 @@ export function LawsPenaltiesSection({ block, reduceMotion }: Props) {
       {/* Specific penalties */}
       <div>
         <h3 className="mb-6 font-display text-xl font-bold md:text-2xl">العقوبات المحددة</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div dir="rtl" className="grid gap-4 [direction:rtl] sm:grid-cols-2 lg:grid-cols-3">
           {block.specificPenalties.map((item, i) => (
             <motion.div
               key={`${item.id}-${item.title}`}
@@ -129,7 +129,7 @@ export function LawsPenaltiesSection({ block, reduceMotion }: Props) {
         <p className="mb-6 max-w-3xl text-sm text-muted-foreground">
           أماكن محظور فيها العنف والجرائم. للشرطة حق الدخول والتعامل وفق القوانين المعتمدة.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div dir="rtl" className="grid gap-3 [direction:rtl] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {block.safeZones.map((zone, i) => (
             <motion.div
               key={zone.label}

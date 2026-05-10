@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import InstitutionHero from "@/components/InstitutionHero";
 import LawsReaderDialog from "@/components/LawsReaderDialog";
 import Stepper, { Step } from "@/components/Stepper";
 import { Button } from "@/components/ui/button";
@@ -22,9 +23,15 @@ import { cn, isValidArabicNamePart } from "@/lib/utils";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
-import { Navigate } from "react-router-dom";
+import type { LawsQuizResult } from "@/data/publicApplicationTypes";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useSiteVisibility } from "@/lib/siteVisibility";
+import {
+  branchIdFromApplicationRoleKey,
+  useApplicationsClosure,
+} from "@/lib/applicationsClosure";
 import { usePublicUser } from "@/contexts/PublicUserContext";
+import { BadgeCheck, IdCard, Lock, ShieldAlert } from "lucide-react";
 
 const TOTAL_STEPS = 10;
 /** نص جاهز للمستخدمين بدون سجل سابق أو بدون نبذة */
@@ -134,7 +141,7 @@ const targets: Record<string, ApplicationTarget> = {
   vip: {
     title: "طلب باقة VIP",
     subtitle: "أدخل معلوماتك ونوع الباقة المطلوبة (سيارات/تجهيزات).",
-    dashboardPath: "/vip-cars",
+    dashboardPath: "/store",
     heroEyebrow: "VIP PACKAGE",
     heroTitleParts: ["طلب", "باقة VIP"],
   },
@@ -142,18 +149,31 @@ const targets: Record<string, ApplicationTarget> = {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-primary/25 bg-background/50 px-4 py-3 text-right">
+    <div className="flex flex-col gap-1 rounded-xl border border-primary/25 bg-background/50 px-4 py-3 text-right backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-background/60">
       <span className="font-display text-[11px] tracking-wide text-primary">{label}</span>
-      <span className="text-sm text-foreground">{value || "—"}</span>
+      <span className="text-sm font-medium text-foreground">{value || "—"}</span>
     </div>
   );
 }
 
 const ApplicationFormPage = () => {
   const { role = "" } = useParams();
+  const navigate = useNavigate();
   const { submitApplication } = useApplicationsContent();
   const publicUser = usePublicUser();
   const visibility = useSiteVisibility();
+  const closure = useApplicationsClosure();
+  const closureBranchId = branchIdFromApplicationRoleKey(role);
+  const isRoleClosed = closureBranchId
+    ? closure.closed[closureBranchId] === true
+    : false;
+  const closureNote = closureBranchId ? closure.notes[closureBranchId] : undefined;
+  const isDiscordUser = publicUser.user?.authProvider === "discord";
+  /** ملف المستخدم الكامل — يحتوي على discordId والاسم على Discord */
+  const profile = useMemo(
+    () => (publicUser.user ? publicUser.getProfile() : null),
+    [publicUser],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const finalSubmitStarted = useRef(false);
@@ -164,7 +184,18 @@ const ApplicationFormPage = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState<Gender>("");
-  const [discord, setDiscord] = useState("");
+  /**
+   * بيانات Discord تُحدَّث تلقائياً من حساب المستخدم — يُمنع التعديل اليدوي
+   * (لذلك ما عاد فيه setDiscord علني للنموذج).
+   */
+  const discord = useMemo(() => {
+    if (!profile) return "";
+    const handle = profile.username?.trim() ?? "";
+    const id = profile.discordId?.trim() ?? "";
+    if (handle && id) return `${handle} (ID: ${id})`;
+    if (handle) return handle;
+    return id;
+  }, [profile]);
   /** مدن أو سيرفرات RP لعب بها المستخدم سابقًا */
   const [previousCities, setPreviousCities] = useState("");
   const [birthYear, setBirthYear] = useState("");
@@ -174,6 +205,8 @@ const ApplicationFormPage = () => {
   const [experience, setExperience] = useState("");
   const [lawsAccepted, setLawsAccepted] = useState(false);
   const [lawsDialogOpen, setLawsDialogOpen] = useState(false);
+  /** نتيجة اختبار قراءة قوانين المدينة — تُرفق بالطلب وتظهر للأدمن */
+  const [lawsQuizResult, setLawsQuizResult] = useState<LawsQuizResult | null>(null);
 
   const target = useMemo<ApplicationTarget>(() => {
     const t = targets[role];
@@ -399,6 +432,10 @@ const ApplicationFormPage = () => {
 
   const handleFinal = useCallback(() => {
     if (finalSubmitStarted.current) return;
+    if (isRoleClosed) {
+      toast.error("التقديم مغلق حالياً لهذه الجهة");
+      return;
+    }
     if (!validateAllFields()) return;
     finalSubmitStarted.current = true;
     setIsSubmitting(true);
@@ -421,6 +458,7 @@ const ApplicationFormPage = () => {
           previousCities: previousCities.trim(),
           experience: experience.trim(),
           lawsAccepted,
+          lawsQuizResult: lawsQuizResult ?? undefined,
         },
       });
       if (result === "ok") {
@@ -446,6 +484,7 @@ const ApplicationFormPage = () => {
       setIsSubmitting(false);
     }
   }, [
+    isRoleClosed,
     validateAllFields,
     role,
     target.title,
@@ -459,6 +498,7 @@ const ApplicationFormPage = () => {
     previousCities,
     experience,
     lawsAccepted,
+    lawsQuizResult,
     submitApplication,
   ]);
 
@@ -480,62 +520,207 @@ const ApplicationFormPage = () => {
     return <Navigate to="/" replace />;
   }
 
+  if (!publicUser.user) {
+    return (
+      <div dir="rtl" className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,hsl(272_82%_58%/0.22),transparent_70%),radial-gradient(60%_60%_at_50%_100%,hsl(287_72%_50%/0.18),transparent_70%)]" />
+        <Navbar />
+        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-200px)] max-w-3xl flex-col items-center justify-center px-4 py-24 md:px-8">
+          <div className="w-full overflow-hidden rounded-3xl border border-indigo-200/80 bg-gradient-to-l from-indigo-50 via-white to-violet-50 p-8 text-right shadow-[0_28px_70px_-30px_rgba(99,102,241,0.45)] md:p-10">
+            <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-right">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#5865F2] text-white shadow-inner">
+                <DiscordIcon className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-indigo-700/90">
+                  تسجيل الدخول مطلوب
+                </p>
+                <h1 className="flex flex-wrap items-center justify-center gap-2 font-display text-2xl font-bold text-slate-900 sm:justify-start md:text-3xl">
+                  <ShieldAlert className="h-6 w-6 text-indigo-600" aria-hidden />
+                  سجّل الدخول للمتابعة
+                </h1>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  لا يمكن إرسال طلب التقديم بدون تسجيل الدخول. اضغط زر تسجيل الدخول في الشريط العلوي
+                  واختر <span className="font-semibold">Discord</span> للمتابعة.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                    onClick={() => navigate("/", { replace: true })}
+                  >
+                    الذهاب للصفحة الرئيسية
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (publicUser.user && !isDiscordUser) {
+    return (
+      <div dir="rtl" className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,hsl(272_82%_58%/0.22),transparent_70%),radial-gradient(60%_60%_at_50%_100%,hsl(287_72%_50%/0.18),transparent_70%)]" />
+        <Navbar />
+        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-200px)] max-w-3xl flex-col items-center justify-center px-4 py-24 md:px-8">
+          <div className="w-full overflow-hidden rounded-3xl border border-indigo-200/80 bg-gradient-to-l from-indigo-50 via-white to-violet-50 p-8 text-right shadow-[0_28px_70px_-30px_rgba(99,102,241,0.45)] md:p-10">
+            <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-right">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#5865F2] text-white shadow-inner">
+                <DiscordIcon className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-indigo-700/90">
+                  تسجيل الدخول مطلوب
+                </p>
+                <h1 className="flex flex-wrap items-center justify-center gap-2 font-display text-2xl font-bold text-slate-900 sm:justify-start md:text-3xl">
+                  <ShieldAlert className="h-6 w-6 text-indigo-600" aria-hidden />
+                  التقديم متاح عبر Discord فقط
+                </h1>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  للحفاظ على هويتك ومنع الازدواجية، التقديم الإلكتروني يتطلب تسجيل الدخول عبر حسابك على
+                  Discord. حسابك الحالي مسجّل بطريقة محلية، لذا يُرجى تسجيل الخروج ثم الدخول من جديد عبر
+                  Discord.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <Button
+                    type="button"
+                    className="rounded-xl bg-[#5865F2] text-white shadow-md hover:bg-[#4752c4]"
+                    onClick={() => {
+                      publicUser.logout();
+                      toast.message(
+                        "تم تسجيل الخروج — اضغط زر تسجيل الدخول أعلى الصفحة واختر Discord",
+                      );
+                      navigate("/", { replace: true });
+                    }}
+                  >
+                    <DiscordIcon className="ms-2 h-4 w-4" />
+                    تسجيل الخروج والدخول عبر Discord
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                    onClick={() => navigate(target.dashboardPath)}
+                  >
+                    العودة إلى الجهة
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isRoleClosed) {
+    return (
+      <div dir="rtl" className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,hsl(0_72%_50%/0.18),transparent_70%),radial-gradient(60%_60%_at_50%_100%,hsl(272_82%_58%/0.18),transparent_70%)]" />
+        <Navbar />
+        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-200px)] max-w-3xl flex-col items-center justify-center px-4 py-24 md:px-8">
+          <div className="w-full overflow-hidden rounded-3xl border border-rose-200/80 bg-gradient-to-l from-rose-50 via-white to-rose-50 p-8 text-right shadow-[0_28px_70px_-30px_rgba(244,63,94,0.45)] md:p-10">
+            <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-right">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 shadow-inner">
+                <Lock className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-rose-700/80">
+                  ملاحظة هامة
+                </p>
+                <h1 className="font-display text-2xl font-bold text-rose-800 md:text-3xl">
+                  التقديم مغلق حالياً
+                </h1>
+                <p className="text-sm leading-relaxed text-rose-900/80">
+                  لا يمكن إرسال طلبات جديدة لـ
+                  <span className="mx-1 font-semibold text-rose-900">{target.title}</span>
+                  في هذه الفترة. يُرجى المتابعة لاحقاً عند إعادة فتح التقديم.
+                </p>
+                {closureNote ? (
+                  <div className="mt-3 rounded-xl border border-rose-200 bg-white/80 px-4 py-3 text-sm leading-relaxed text-rose-800 shadow-sm">
+                    <span className="font-semibold text-rose-700">من الإدارة:</span> {closureNote}
+                  </div>
+                ) : null}
+                <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-rose-300 bg-white text-rose-700 hover:bg-rose-50"
+                    onClick={() => navigate(target.dashboardPath)}
+                  >
+                    العودة إلى الجهة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                    onClick={() => navigate("/")}
+                  >
+                    الصفحة الرئيسية
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
       <Navbar />
 
-      <section className="relative h-[46vh] min-h-[300px] max-h-[520px] overflow-hidden">
-        <img
-          src="/INF-CONECT-LOGO.gif"
-          alt={target.title}
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = "/placeholder.svg";
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/75 via-background/10 to-background/85" />
-        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-background/55 to-transparent backdrop-blur-sm" />
-        <div className="absolute inset-x-0 -bottom-8 h-32 bg-gradient-to-t from-background/90 via-background/60 to-transparent backdrop-blur-sm" />
-        <div className="absolute inset-x-0 bottom-1 flex flex-col items-center justify-center gap-2 px-4 text-center sm:bottom-3 md:bottom-4">
-          <p className="font-display text-xs tracking-[0.35em] text-primary/95 drop-shadow-[0_4px_18px_hsl(var(--background)/0.95)]">
-            {target.heroEyebrow}
-          </p>
-          <h1 className="font-display text-4xl font-bold md:text-6xl drop-shadow-[0_8px_24px_hsl(var(--background)/0.85)]">
+      <InstitutionHero
+        badgeEn={target.heroEyebrow}
+        alt={target.title}
+        title={
+          <>
             <span className="text-gradient-neon">{target.heroTitleParts[0]}</span>{" "}
             <span className="text-foreground">{target.heroTitleParts[1]}</span>
-          </h1>
-        </div>
-      </section>
+          </>
+        }
+      />
 
-      <main className="pb-24">
-        <section className="mx-auto mt-10 w-full max-w-4xl px-4 md:px-8 xl:px-12">
-          <p className="mb-8 text-center text-base leading-relaxed text-muted-foreground md:text-right">{target.subtitle}</p>
-
-          {submitSuccess ? (
-            <div className="mx-auto flex max-w-lg flex-col items-center rounded-2xl border border-primary/25 bg-card/40 px-6 py-12 text-center shadow-[0_0_40px_hsl(var(--primary)/0.12)] backdrop-blur-sm md:px-10">
-              <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-success/15 text-success ring-4 ring-success/25">
-                <CheckCircle2 className="h-16 w-16" strokeWidth={1.5} aria-hidden />
-              </div>
-              <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">تم تقديم الطلب بنجاح</h2>
-              <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-                تواصل مع الإدارة على الديسكورد لترتيب موعد المقابلة ومتابعة طلبك.
-              </p>
-              <div className="mt-8 flex w-full justify-center">
-                <Button
-                  type="button"
-                  className="h-12 w-full max-w-sm gap-2 bg-[#5865F2] font-display text-base text-white hover:bg-[#4752C4] sm:w-auto"
-                  asChild
-                >
-                  <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
-                    <DiscordIcon className="h-6 w-6 shrink-0" />
-                    فتح الديسكورد
-                  </a>
-                </Button>
-              </div>
+      <main className="pb-20">
+        <section className="mx-auto w-full max-w-4xl px-4 md:px-8 xl:px-12 mt-10">
+          <div className="glass-panel rounded-2xl p-5 md:p-8">
+            <div className="mb-6 flex flex-col items-center gap-2 text-center md:items-end md:text-right">
+              <div className="h-1 w-12 rounded-full bg-gradient-to-l from-primary to-secondary md:self-end" aria-hidden />
+              <p className="max-w-2xl text-base leading-relaxed text-foreground/85">{target.subtitle}</p>
             </div>
-          ) : (
-          <Stepper
+
+            {submitSuccess ? (
+              <div className="mx-auto max-w-lg overflow-hidden rounded-2xl border border-emerald-500/35 bg-emerald-500/[0.08] p-8 text-center backdrop-blur-sm md:p-10">
+                <div className="mx-auto mb-6 flex h-28 w-28 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300 ring-4 ring-emerald-400/25">
+                  <CheckCircle2 className="h-16 w-16" strokeWidth={1.5} aria-hidden />
+                </div>
+                <h2 className="font-display text-2xl font-bold text-foreground md:text-3xl">تم تقديم الطلب بنجاح</h2>
+                <p className="mt-4 text-base leading-relaxed text-foreground/80">
+                  تواصل مع الإدارة على الديسكورد لترتيب موعد المقابلة ومتابعة طلبك.
+                </p>
+                <div className="mt-8 flex w-full justify-center">
+                  <Button
+                    type="button"
+                    className="h-12 w-full max-w-sm gap-2 rounded-xl bg-[#5865F2] font-display text-base text-white shadow-lg shadow-[#5865F2]/25 hover:bg-[#4752C4] sm:w-auto"
+                    asChild
+                  >
+                    <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                      <DiscordIcon className="h-6 w-6 shrink-0" />
+                      فتح الديسكورد
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+            <Stepper
             initialStep={1}
             onStepChange={() => {}}
             onFinalStepCompleted={handleFinal}
@@ -753,21 +938,45 @@ const ApplicationFormPage = () => {
             </Step>
 
             <Step>
-              {stepIntro(6, "حساب الديسكورد", "نستخدمه للتواصل الرسمي معك.")}
+              {stepIntro(
+                6,
+                "حساب الديسكورد",
+                "بياناتك مأخوذة تلقائياً من حسابك المتصل عبر Discord — لا داعي للكتابة.",
+              )}
               {fieldWrap(
-                <>
-                  <Label htmlFor="discord" className="font-display text-xs text-primary">
-                    الديسكورد
-                  </Label>
-                  <Input
-                    id="discord"
-                    value={discord}
-                    onChange={(e) => setDiscord(e.target.value)}
-                    placeholder="username#0000"
-                    className="mt-3 h-12 rounded-md border-primary/30"
-                    autoComplete="nickname"
-                  />
-                </>,
+                <div className="mt-3 rounded-2xl border border-primary/30 bg-background/40 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5865F2] text-white shadow-md">
+                      <DiscordIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1 text-right">
+                      <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-foreground">
+                        حسابك على Discord
+                        <BadgeCheck className="h-4 w-4 text-emerald-500" aria-hidden />
+                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div className="rounded-lg border border-primary/25 bg-background/60 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">الاسم على Discord</p>
+                          <p className="truncate font-mono text-sm font-semibold text-foreground" dir="ltr">
+                            @{profile?.username ?? "—"}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-primary/25 bg-background/60 px-3 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-muted-foreground">Discord ID</p>
+                            <IdCard className="h-3.5 w-3.5 text-primary/70" aria-hidden />
+                          </div>
+                          <p className="truncate font-mono text-sm font-semibold text-foreground" dir="ltr">
+                            {profile?.discordId || "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+                        إذا أردت تحديث هذه البيانات، حدّث ملفك على Discord ثم أعد تسجيل الدخول.
+                      </p>
+                    </div>
+                  </div>
+                </div>,
               )}
             </Step>
 
@@ -861,8 +1070,12 @@ const ApplicationFormPage = () => {
                 >
                   قراءة القوانين
                 </Button>
-                {lawsAccepted ? (
-                  <p className="text-center text-sm text-success">تم تأكيد قراءة القوانين والموافقة عليها.</p>
+                {lawsAccepted && lawsQuizResult?.passed ? (
+                  <p className="text-center text-sm text-success">تم تأكيد قراءة القوانين واجتياز الأسئلة.</p>
+                ) : lawsAccepted && lawsQuizResult && !lawsQuizResult.passed ? (
+                  <p className="text-center text-sm text-amber-600">
+                    أُرسلت إجاباتك للمراجع — النتيجة: {lawsQuizResult.correctCount} من {lawsQuizResult.totalQuestions}
+                  </p>
                 ) : (
                   <p className="text-center text-xs text-muted-foreground">
                     لن يُسمح بالانتقال للخطوة التالية حتى تؤكد الاطلاع من النافذة.
@@ -872,7 +1085,10 @@ const ApplicationFormPage = () => {
               <LawsReaderDialog
                 open={lawsDialogOpen}
                 onOpenChange={setLawsDialogOpen}
-                onAccept={() => setLawsAccepted(true)}
+                onAccept={(result) => {
+                  setLawsAccepted(true);
+                  setLawsQuizResult(result);
+                }}
               />
             </Step>
 
@@ -895,9 +1111,10 @@ const ApplicationFormPage = () => {
                 <span className="font-display text-[11px] tracking-wide text-primary">نبذة الخبرة</span>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{experience || "—"}</p>
               </div>
-            </Step>
-          </Stepper>
-          )}
+              </Step>
+            </Stepper>
+            )}
+          </div>
         </section>
       </main>
       <Footer />
