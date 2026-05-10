@@ -3,6 +3,10 @@
     {
       "source": "/kick-api/:path*",
       "destination": "https://kick.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
