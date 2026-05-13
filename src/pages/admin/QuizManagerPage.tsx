@@ -21,7 +21,9 @@ import {
   QUIZ_CONTEXTS,
   resetQuizQuestions,
   saveQuizQuestions,
-  useQuizQuestions,
+  loadQuizQuestions,
+  LAWS_QUIZ_CONTENT_CHANGED_EVENT,
+  LAWS_QUIZ_STORAGE_KEY,
   type QuizContextKey,
 } from "@/lib/lawsQuizContent";
 import { cn } from "@/lib/utils";
@@ -76,15 +78,33 @@ function cleanQuestions(questions: QuizQuestion[]): QuizQuestion[] | null {
   return cleaned;
 }
 
+function cloneQuizQuestions(list: QuizQuestion[]): QuizQuestion[] {
+  return list.map((q) => ({
+    ...q,
+    options: q.options.map((opt) => ({ ...opt })),
+  }));
+}
+
 const QuizManagerPage = () => {
   const { user } = useAuth();
   const [activeKey, setActiveKey] = useState<QuizContextKey>("citizen");
-  const storedQuestions = useQuizQuestions(activeKey);
-  const [draft, setDraft] = useState<QuizQuestion[]>(() => storedQuestions);
+  const [draft, setDraft] = useState<QuizQuestion[]>(() => cloneQuizQuestions(loadQuizQuestions("citizen")));
 
   useEffect(() => {
-    setDraft(storedQuestions.map((q) => ({ ...q, options: q.options.map((opt) => ({ ...opt })) })));
-  }, [storedQuestions]);
+    const hydrate = () => {
+      setDraft(cloneQuizQuestions(loadQuizQuestions(activeKey)));
+    };
+    hydrate();
+    window.addEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, hydrate);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LAWS_QUIZ_STORAGE_KEY) hydrate();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, hydrate);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [activeKey]);
 
   const activeMeta = useMemo(
     () => QUIZ_CONTEXTS.find((ctx) => ctx.key === activeKey) ?? QUIZ_CONTEXTS[0],

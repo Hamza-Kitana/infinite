@@ -15,8 +15,9 @@ type PersistedQuizContent = {
   quizzes: Partial<Record<QuizContextKey, QuizQuestion[]>>;
 };
 
-const STORAGE_KEY = "ic_laws_quiz_content_v1";
-const EVENT_NAME = "ic-laws-quiz-content";
+export const LAWS_QUIZ_STORAGE_KEY = "ic_laws_quiz_content_v1";
+/** يُطلق عند تغيّر أسئلة الاختبار في التخزين المحلي — لتحديث الواجهات دون إعادة تحميل الصفحة */
+export const LAWS_QUIZ_CONTENT_CHANGED_EVENT = "ic-laws-quiz-content";
 
 export const QUIZ_CONTEXTS: QuizContextMeta[] = [
   {
@@ -72,7 +73,7 @@ function defaultQuizFor(key: QuizContextKey): QuizQuestion[] {
 
 function loadPersisted(): PersistedQuizContent {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(LAWS_QUIZ_STORAGE_KEY);
     if (!raw) return { v: 1, quizzes: {} };
     const parsed = JSON.parse(raw) as PersistedQuizContent;
     if (parsed?.v !== 1 || !parsed.quizzes || typeof parsed.quizzes !== "object") return { v: 1, quizzes: {} };
@@ -110,16 +111,16 @@ export function saveQuizQuestions(key: QuizContextKey, questions: QuizQuestion[]
       [key]: cleaned.length > 0 ? cleaned : defaultQuizFor(key),
     },
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  localStorage.setItem(LAWS_QUIZ_STORAGE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent(LAWS_QUIZ_CONTENT_CHANGED_EVENT));
 }
 
 export function resetQuizQuestions(key: QuizContextKey) {
   const current = loadPersisted();
   const nextQuizzes = { ...current.quizzes };
   delete nextQuizzes[key];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  localStorage.setItem(LAWS_QUIZ_STORAGE_KEY, JSON.stringify({ v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent));
+  window.dispatchEvent(new CustomEvent(LAWS_QUIZ_CONTENT_CHANGED_EVENT));
 }
 
 export function useQuizQuestions(key: QuizContextKey): QuizQuestion[] {
@@ -129,10 +130,10 @@ export function useQuizQuestions(key: QuizContextKey): QuizQuestion[] {
     const sync = () => setQuestions(loadQuizQuestions(key));
     sync();
     window.addEventListener("storage", sync);
-    window.addEventListener(EVENT_NAME, sync as EventListener);
+    window.addEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, sync as EventListener);
     return () => {
       window.removeEventListener("storage", sync);
-      window.removeEventListener(EVENT_NAME, sync as EventListener);
+      window.removeEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, sync as EventListener);
     };
   }, [key]);
 
