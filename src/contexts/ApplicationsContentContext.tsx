@@ -168,8 +168,19 @@ export function ApplicationsContentProvider({ children }: { children: ReactNode 
         /* ignore */
       }
     };
+    const onLocalPurge = () => {
+      try {
+        setApplications(loadPersisted());
+      } catch {
+        /* ignore */
+      }
+    };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("ic-public-applications-changed", onLocalPurge);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("ic-public-applications-changed", onLocalPurge);
+    };
   }, []);
 
   const submitApplication = useCallback(

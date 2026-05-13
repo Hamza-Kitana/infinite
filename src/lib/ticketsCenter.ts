@@ -29,7 +29,10 @@ export type TicketAttachment = {
   id: string;
   name: string;
   mimeType: string;
-  dataUrl: string;
+  /** بيانات مضمّنة للملفات الصغيرة فقط */
+  dataUrl?: string;
+  /** مرجع Blob في IndexedDB للملفات الكبيرة */
+  blobStoreId?: string;
 };
 
 export type TicketThread = {
@@ -73,12 +76,17 @@ function normalize(raw: unknown): TicketThread[] {
                 ? m.attachments
                     .filter((a): a is Partial<TicketAttachment> => !!a && typeof a === "object")
                     .map((a) => ({
-                      id: typeof a.id === "string" ? a.id : crypto.randomUUID(),
+                      id: typeof a.id === "string" && a.id.trim() ? a.id : crypto.randomUUID(),
                       name: typeof a.name === "string" ? a.name : "attachment",
                       mimeType: typeof a.mimeType === "string" ? a.mimeType : "application/octet-stream",
-                      dataUrl: typeof a.dataUrl === "string" ? a.dataUrl : "",
+                      dataUrl: typeof a.dataUrl === "string" && a.dataUrl ? a.dataUrl : undefined,
+                      blobStoreId:
+                        typeof (a as { blobStoreId?: unknown }).blobStoreId === "string" &&
+                        (a as { blobStoreId: string }).blobStoreId.trim()
+                          ? (a as { blobStoreId: string }).blobStoreId.trim()
+                          : undefined,
                     }))
-                    .filter((a) => a.dataUrl)
+                    .filter((a) => !!(a.dataUrl?.length || a.blobStoreId?.length))
                 : [],
             }))
             .filter((m) => m.body.trim().length > 0 || (m.attachments?.length ?? 0) > 0)
@@ -94,8 +102,8 @@ function normalize(raw: unknown): TicketThread[] {
         createdAt: typeof x.createdAt === "string" ? x.createdAt : new Date().toISOString(),
         updatedAt: typeof x.updatedAt === "string" ? x.updatedAt : new Date().toISOString(),
         messages,
-        lastStaffReadAt: typeof (x as any).lastStaffReadAt === "string" ? (x as any).lastStaffReadAt : undefined,
-        lastPublicReadAt: typeof (x as any).lastPublicReadAt === "string" ? (x as any).lastPublicReadAt : undefined,
+        lastStaffReadAt: typeof x.lastStaffReadAt === "string" ? x.lastStaffReadAt : undefined,
+        lastPublicReadAt: typeof x.lastPublicReadAt === "string" ? x.lastPublicReadAt : undefined,
       };
     });
 }

@@ -7,7 +7,7 @@ import {
   INSTITUTION_BRANCH_META,
   institutionRosterBranchIdsFromRoleList,
 } from "@/data/institutionBranches";
-import { adminPageDesc, adminPageWrap, adminTitleIcon } from "@/lib/adminUi";
+import { adminPageDesc, adminPageTitle, adminPageWrap, adminTitleIcon } from "@/lib/adminUi";
 import { cn } from "@/lib/utils";
 
 const CARD_THEMES = [
@@ -17,6 +17,11 @@ const CARD_THEMES = [
     iconBg: "bg-violet-100",
     iconText: "text-violet-700",
     hover: "hover:border-violet-300/60 hover:bg-violet-50/40",
+    darkBorder: "dark:border-slate-600/85",
+    darkBg: "dark:bg-slate-800/95",
+    darkIconBg: "dark:bg-violet-950/70 dark:ring-1 dark:ring-violet-500/25",
+    darkIconText: "dark:text-violet-300",
+    darkHover: "dark:hover:border-violet-500/45 dark:hover:bg-slate-800",
   },
   {
     border: "border-slate-200/90",
@@ -24,6 +29,11 @@ const CARD_THEMES = [
     iconBg: "bg-indigo-100",
     iconText: "text-indigo-700",
     hover: "hover:border-indigo-300/60 hover:bg-indigo-50/40",
+    darkBorder: "dark:border-slate-600/85",
+    darkBg: "dark:bg-slate-800/95",
+    darkIconBg: "dark:bg-indigo-950/70 dark:ring-1 dark:ring-indigo-500/25",
+    darkIconText: "dark:text-indigo-300",
+    darkHover: "dark:hover:border-indigo-500/45 dark:hover:bg-slate-800",
   },
   {
     border: "border-slate-200/90",
@@ -31,6 +41,11 @@ const CARD_THEMES = [
     iconBg: "bg-fuchsia-100",
     iconText: "text-fuchsia-700",
     hover: "hover:border-fuchsia-300/60 hover:bg-fuchsia-50/40",
+    darkBorder: "dark:border-slate-600/85",
+    darkBg: "dark:bg-slate-800/95",
+    darkIconBg: "dark:bg-fuchsia-950/70 dark:ring-1 dark:ring-fuchsia-500/25",
+    darkIconText: "dark:text-fuchsia-300",
+    darkHover: "dark:hover:border-fuchsia-500/45 dark:hover:bg-slate-800",
   },
   {
     border: "border-slate-200/90",
@@ -38,6 +53,11 @@ const CARD_THEMES = [
     iconBg: "bg-purple-100",
     iconText: "text-purple-700",
     hover: "hover:border-purple-300/60 hover:bg-purple-50/40",
+    darkBorder: "dark:border-slate-600/85",
+    darkBg: "dark:bg-slate-800/95",
+    darkIconBg: "dark:bg-purple-950/70 dark:ring-1 dark:ring-purple-500/25",
+    darkIconText: "dark:text-purple-300",
+    darkHover: "dark:hover:border-purple-500/45 dark:hover:bg-slate-800",
   },
 ] as const;
 
@@ -60,7 +80,7 @@ const InstitutionRosterHubPage = () => {
   return (
     <div className={cn(adminPageWrap, "max-w-5xl space-y-8")}>
       <div>
-        <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className={adminPageTitle}>
           <Building2 className={adminTitleIcon} />
           طواقم المؤسسات
         </h1>
@@ -72,18 +92,41 @@ const InstitutionRosterHubPage = () => {
         {branches.map((id, index) => {
           const theme = CARD_THEMES[index % CARD_THEMES.length];
           return (
-          <Link
-            key={id}
-            to={`/dashboard/institution/${id}`}
-            className={`group rounded-2xl border p-5 text-right shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition-colors ${theme.border} ${theme.bg} ${theme.hover}`}
-          >
-            <div className={`mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg ${theme.iconBg}`}>
-              <Building2 className={`h-5 w-5 transition-transform group-hover:scale-105 ${theme.iconText}`} />
-            </div>
-            <h2 className="font-display text-base font-bold text-slate-900">{INSTITUTION_BRANCH_META[id].labelAr}</h2>
-            <p className="mt-1 text-xs text-slate-600">تحرير القائد، النائب، وأعضاء الطاقم</p>
-          </Link>
-        )})}
+            <Link
+              key={id}
+              to={`/dashboard/institution/${id}`}
+              className={cn(
+                "group rounded-2xl border p-5 text-right shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] transition-colors dark:shadow-[0_4px_24px_-8px_rgba(0,0,0,0.35)]",
+                theme.border,
+                theme.bg,
+                theme.hover,
+                theme.darkBorder,
+                theme.darkBg,
+                theme.darkHover,
+              )}
+            >
+              <div
+                className={cn(
+                  "mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg",
+                  theme.iconBg,
+                  theme.darkIconBg,
+                )}
+              >
+                <Building2
+                  className={cn(
+                    "h-5 w-5 transition-transform group-hover:scale-105",
+                    theme.iconText,
+                    theme.darkIconText,
+                  )}
+                />
+              </div>
+              <h2 className="font-display text-base font-bold text-slate-900 dark:text-slate-50">
+                {INSTITUTION_BRANCH_META[id].labelAr}
+              </h2>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">تحرير القائد، النائب، وأعضاء الطاقم</p>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

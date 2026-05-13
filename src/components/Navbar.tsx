@@ -20,12 +20,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useOptionalHeroBackgroundVideo } from "@/contexts/HeroBackgroundVideoContext";
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersContentContext";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { isDiscordOAuthConfigured, startDiscordLogin } from "@/lib/discordOAuth";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
+import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE, isCitizenElectronicApplyComplete } from "@/lib/publicProfileEligibility";
 import { NotificationsBell } from "@/components/NotificationsBell";
 
 const institutionLinks = [
@@ -46,6 +48,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { login, canUseDashboard } = useAuth();
   const publicUser = usePublicUser();
+  const { applications } = useApplicationsContent();
   const { findMembershipForUser } = useInstitutionRostersContent();
   /** عضوية المستخدم الحالي (إن وُجدت) — تحدد إذا كان قائداً/نائباً يحتاج لوحة قيادة */
   const myMembership = findMembershipForUser(publicUser.user?.id);
@@ -74,6 +77,11 @@ const Navbar = () => {
     return true;
   });
   const hideApplyNowForPublicProfile = !!publicUser.user && (location.pathname === "/profile" || location.pathname === "/tickets");
+  const discordPublicProfile =
+    publicUser.user?.authProvider === "discord" ? publicUser.getProfile() : null;
+  const hideCitizenApplyForOnboardedUser =
+    !!discordPublicProfile && isCitizenElectronicApplyComplete(discordPublicProfile, applications);
+  const showPublicApplyButton = !hideApplyNowForPublicProfile && !hideCitizenApplyForOnboardedUser;
   /** صفحات بخلفية فاتحة بنفسجية — يتغيّر معها لون شريط التنقّل عند التمرير */
   const isLightSurface = (() => {
     const lightPaths = ["/profile", "/tickets", "/jobs"];
@@ -105,6 +113,16 @@ const Navbar = () => {
     }
     return total;
   })();
+
+  const goToPublicTickets = () => {
+    const profile = publicUser.getProfile();
+    if (!isPublicTicketsUnlocked(profile, applications)) {
+      toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+      navigate("/profile");
+      return;
+    }
+    navigate("/tickets");
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 30);
@@ -259,7 +277,7 @@ const Navbar = () => {
               type="button"
               onClick={() => {
                 if (publicUser.user) {
-                  navigate("/tickets");
+                  goToPublicTickets();
                 } else {
                   setLoginOpen(true);
                   toast.message("سجّل الدخول أولاً لفتح مركز التكت");
@@ -291,8 +309,10 @@ const Navbar = () => {
                   onClick={() => setPublicMenuOpen((v) => !v)}
                   className={`inline-flex items-center rounded-xl border px-3 py-2 text-sm transition-colors ${navTriggerButtonCls}`}
                 >
-                  <UserCircle2 className="h-4 w-4 ml-1" />
-                  <span className="ml-1">{publicUser.user.displayName}</span>
+                  <UserCircle2 className="h-4 w-4 ml-1 shrink-0" />
+                  <span className="ml-1 max-w-[11rem] truncate" title={publicUser.user.username}>
+                    {publicUser.user.displayName}
+                  </span>
                   <ChevronDown className={`me-2 h-4 w-4 transition-transform ${publicMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {publicMenuOpen ? (
@@ -304,10 +324,13 @@ const Navbar = () => {
                     >
                       البروفايل
                     </Link>
-                    <Link
-                      to="/tickets"
-                      className="flex items-center justify-between border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
-                      onClick={() => setPublicMenuOpen(false)}
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
+                      onClick={() => {
+                        setPublicMenuOpen(false);
+                        goToPublicTickets();
+                      }}
                     >
                       <span>التكت</span>
                       {publicUnreadTickets > 0 ? (
@@ -315,7 +338,7 @@ const Navbar = () => {
                           {publicUnreadTickets}
                         </span>
                       ) : null}
-                    </Link>
+                    </button>
                     <Link
                       to="/jobs"
                       className="block border-t border-violet-100 px-3 py-2 text-right text-sm text-slate-700 transition-colors hover:bg-violet-50 hover:text-violet-800"
@@ -349,7 +372,7 @@ const Navbar = () => {
                 ) : null}
               </div>
             ) : null}
-            {!hideApplyNowForPublicProfile ? (
+            {showPublicApplyButton ? (
               <button
                 type="button"
                 onClick={() => {
@@ -514,7 +537,7 @@ const Navbar = () => {
                 onClick={() => {
                   setOpen(false);
                   if (publicUser.user) {
-                    navigate("/tickets");
+                    goToPublicTickets();
                   } else {
                     setLoginOpen(true);
                     toast.message("سجّل الدخول أولاً لفتح مركز التكت");
@@ -532,7 +555,7 @@ const Navbar = () => {
                   </span>
                 ) : null}
               </button>
-              {!hideApplyNowForPublicProfile ? (
+              {showPublicApplyButton ? (
                 <button
                   type="button"
                   onClick={() => {

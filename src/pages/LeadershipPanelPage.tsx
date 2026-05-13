@@ -100,8 +100,6 @@ const LeadershipPanelPage = () => {
 
   const [confirmRemove, setConfirmRemove] = useState<{ index: number; name: string } | null>(null);
 
-  if (!user) return <Navigate to="/" replace />;
-
   const openEdit = (
     kind: "leader" | "deputy" | "member",
     data: { name: string; rank: string; bio: string; image: string },
@@ -130,17 +128,25 @@ const LeadershipPanelPage = () => {
     }
   }, []);
 
+  if (!user) return <Navigate to="/" replace />;
+
   const saveEdit = () => {
     if (!editTarget || !branchId || !roster) return;
     if (editTarget.kind === "member" && typeof editTarget.memberIndex === "number") {
-      updateMember(branchId, editTarget.memberIndex, {
-        title: editName.trim() || roster.members[editTarget.memberIndex].title,
-        subtitle: editRank.trim() || roster.members[editTarget.memberIndex].subtitle,
-        rankLabel: editRank.trim() || roster.members[editTarget.memberIndex].rankLabel || "عضو",
+      const idx = editTarget.memberIndex;
+      const prev = roster.members[idx];
+      const editingSelfMember = prev?.userId === user.id;
+      const patch: Parameters<typeof updateMember>[2] = {
+        title: editName.trim() || prev.title,
         bio: editBio.trim() || undefined,
-        image: editImage || roster.members[editTarget.memberIndex].image,
-      });
-      toast.success("تم تحديث بيانات العضو");
+        image: editImage || prev.image,
+      };
+      if (!editingSelfMember) {
+        patch.subtitle = editRank.trim() || prev.subtitle;
+        patch.rankLabel = editRank.trim() || prev.rankLabel || "عضو";
+      }
+      updateMember(branchId, idx, patch);
+      toast.success(editingSelfMember ? "تم تحديث صورتك ونبذتك (الرتبة لا تُعدَّل بنفسك)" : "تم تحديث بيانات العضو");
       setEditTarget(null);
       return;
     }
@@ -151,6 +157,10 @@ const LeadershipPanelPage = () => {
       toast.error("لا يمكن تعديل هذا الحقل عبر هذه الصفحة (الشخص ليس له حساب مستخدم مرتبط).");
       return;
     }
+    if (personUserId === user.id) {
+      toast.error("لا يمكنك تغيير رتبتك في الطاقم بنفسك — اطلب قائد المؤسسة أو الإدارة.");
+      return;
+    }
     promoteMember(branchId, { userId: personUserId }, slot, editRank.trim() || undefined);
     /** نحدّث الصورة والاسم بشكل يدوي عبر setBranchRoster لو احتجنا — لكن هنا فقط الرتبة */
     toast.success("تم حفظ التغييرات");
@@ -158,7 +168,12 @@ const LeadershipPanelPage = () => {
   };
 
   const submitPromote = () => {
-    if (!promoteTarget || !branchId) return;
+    if (!promoteTarget || !branchId || !roster) return;
+    const promoted = roster.members[promoteTarget.memberIndex];
+    if (promoted?.userId === user.id) {
+      toast.error("لا يمكنك ترقية نفسك أو تغيير دورك بنفسك من هذه اللوحة.");
+      return;
+    }
     const result = promoteMember(
       branchId,
       { memberIndex: promoteTarget.memberIndex },
@@ -235,6 +250,14 @@ const LeadershipPanelPage = () => {
   }
 
   const isLeader = myMembership.role === "leader";
+  const leaderSlotIsSelf = roster.leader.userId === user.id;
+  const deputySlotIsSelf = roster.deputy.userId === user.id;
+
+  const editingOwnMember =
+    !!editTarget &&
+    editTarget.kind === "member" &&
+    typeof editTarget.memberIndex === "number" &&
+    roster.members[editTarget.memberIndex]?.userId === user.id;
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
@@ -261,8 +284,8 @@ const LeadershipPanelPage = () => {
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 مرحباً <span className="font-semibold text-slate-900">{user.displayName}</span> — أنت تعمل
-                هنا بصفة <span className="font-semibold text-amber-700">{roleLabel(myMembership.role)}</span>،
-                ويمكنك تعديل بيانات الطاقم وترقية/تنزيل أعضائك.
+                هنا بصفة <span className="font-semibold text-amber-700">{roleLabel(myMembership.role)}</span>.
+                يمكنك إدارة أعضاء الطاقم الآخرين؛ لا يمكنك تغيير رتبتك أو دورك بنفسك من هذه اللوحة.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -296,8 +319,8 @@ const LeadershipPanelPage = () => {
               القيادة العليا
             </CardTitle>
             <CardDescription className="text-slate-600">
-              القائد والنائب يظهران في أعلى صفحة المؤسسة. يمكنك تعديل بياناتهما إذا كان حسابك
-              هو القائد ولديك صلاحية على هذه البطاقة.
+              القائد والنائب يظهران في أعلى صفحة المؤسسة. لا يمكنك تعديل بطاقتك الخاصة هنا — غيّر رتبتك عبر
+              الإدارة أو زميل قائد. يمكنك تعديل الآخرين حسب صلاحيتك.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
@@ -306,7 +329,7 @@ const LeadershipPanelPage = () => {
               accent="amber"
               icon={<Crown className="h-5 w-5" />}
               person={roster.leader}
-              canEditSelf={isLeader}
+              canEditSelf={isLeader && !leaderSlotIsSelf}
               onEdit={() =>
                 openEdit("leader", {
                   name: roster.leader.name,
@@ -321,7 +344,7 @@ const LeadershipPanelPage = () => {
               accent="indigo"
               icon={<Star className="h-5 w-5" />}
               person={roster.deputy}
-              canEditSelf={isLeader || (myMembership.role === "deputy")}
+              canEditSelf={(isLeader || myMembership.role === "deputy") && !deputySlotIsSelf}
               onEdit={() =>
                 openEdit("deputy", {
                   name: roster.deputy.name,
@@ -342,8 +365,8 @@ const LeadershipPanelPage = () => {
               أعضاء الطاقم ({roster.members.length})
             </CardTitle>
             <CardDescription className="text-slate-600">
-              هنا تظهر بطاقات أعضاء طاقمك. يمكنك تعديل بيانات أي عضو، تغيير رتبته، أو ترقيته إلى
-              نائب/قائد.
+              هنا تظهر بطاقات أعضاء طاقمك. يمكنك إدارة الآخرين؛ بطاقتك لا يُسمح بتغيير رتبتها أو دورك منها
+              بنفسك.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 p-4 md:p-6">
@@ -353,7 +376,9 @@ const LeadershipPanelPage = () => {
               </div>
             ) : (
               <ul className="space-y-2">
-                {roster.members.map((member, idx) => (
+                {roster.members.map((member, idx) => {
+                  const memberIsSelf = !!member.userId && member.userId === user.id;
+                  return (
                   <li
                     key={`${member.userId ?? idx}-${idx}`}
                     className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-white p-3 shadow-sm md:flex-nowrap"
@@ -397,6 +422,11 @@ const LeadershipPanelPage = () => {
                       >
                         <UserCog className="ms-1 h-3.5 w-3.5" /> تعديل
                       </Button>
+                      {memberIsSelf ? (
+                        <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-600">
+                          لا يمكن تغيير رتبتك أو دورك بنفسك
+                        </span>
+                      ) : (
                       <Button
                         type="button"
                         variant="outline"
@@ -415,7 +445,8 @@ const LeadershipPanelPage = () => {
                       >
                         <ArrowUpDown className="ms-1 h-3.5 w-3.5" /> ترقية / تغيير الدور
                       </Button>
-                      {isLeader ? (
+                      )}
+                      {isLeader && !memberIsSelf ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -428,7 +459,8 @@ const LeadershipPanelPage = () => {
                       ) : null}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </CardContent>
@@ -493,7 +525,14 @@ const LeadershipPanelPage = () => {
                 onChange={(e) => setEditRank(e.target.value)}
                 placeholder="مثال: ضابط مرور — رقيب — مسعف"
                 className="border-violet-200 bg-white"
+                disabled={!!editingOwnMember}
               />
+              {editingOwnMember ? (
+                <p className="text-[11px] text-slate-500">
+                  لا يمكنك تعديل رتبتك بنفسك — اطلب القائد أو الإدارة. يمكنك تحديث الصورة أو الاسم الظاهر أو النبذة
+                  فقط.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">نبذة (اختياري)</Label>

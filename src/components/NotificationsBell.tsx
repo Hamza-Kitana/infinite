@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Bell, Inbox, MessageSquareMore } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
+import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE } from "@/lib/publicProfileEligibility";
 import { cn } from "@/lib/utils";
 
 type NotificationItem = {
@@ -35,6 +38,8 @@ export function NotificationsBell({
   align = "end",
 }: NotificationsBellProps) {
   const publicUser = usePublicUser();
+  const { applications } = useApplicationsContent();
+  const navigate = useNavigate();
   const tickets = useTicketsCenter();
   const [open, setOpen] = useState(false);
 
@@ -150,7 +155,16 @@ export function NotificationsBell({
                 <li key={n.messageId}>
                   <Link
                     to="/tickets"
-                    onClick={() => setOpen(false)}
+                    onClick={(e) => {
+                      if (!isPublicTicketsUnlocked(publicUser.getProfile(), applications)) {
+                        e.preventDefault();
+                        setOpen(false);
+                        toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                        navigate("/profile");
+                        return;
+                      }
+                      setOpen(false);
+                    }}
                     className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-violet-50/70"
                   >
                     <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
@@ -185,7 +199,16 @@ export function NotificationsBell({
         <div className="border-t border-violet-100 bg-violet-50/40 px-4 py-2.5 text-center">
           <Link
             to="/tickets"
-            onClick={() => setOpen(false)}
+            onClick={(e) => {
+              if (!isPublicTicketsUnlocked(publicUser.getProfile(), applications)) {
+                e.preventDefault();
+                setOpen(false);
+                toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                navigate("/profile");
+                return;
+              }
+              setOpen(false);
+            }}
             className="inline-flex items-center justify-center gap-1.5 font-display text-xs font-semibold text-violet-700 transition-colors hover:text-violet-900"
           >
             فتح مركز التكت لمتابعة كل المحادثات

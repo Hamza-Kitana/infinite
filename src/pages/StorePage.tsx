@@ -13,6 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import { cn } from "@/lib/utils";
 
+/** حاوية المحتوى — امتداد أفقي أوضح (مثل القوانين ومن نحن) */
+const PAGE_GUTTER =
+  "mx-auto w-full max-w-[min(100%,92rem)] px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16";
+
 const TAB_KEYS = ["cars", "houses", "packages", "investment"] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
@@ -30,15 +34,31 @@ function SectionHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="text-right">
-      <p className="font-display text-xs tracking-[0.28em] text-primary/90">{eyebrow}</p>
-      <h3 className="mt-2 font-display text-2xl font-bold tracking-tight md:text-3xl">{title}</h3>
-      <div className="mt-4 flex items-center justify-end gap-2">
+    <div className="space-y-6 text-right">
+      <div className="relative">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[38%] max-w-xl bg-gradient-to-l from-primary/[0.06] to-transparent lg:block"
+        />
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:gap-12 xl:gap-16 lg:items-start">
+          <div className="space-y-2 lg:pt-1">
+            <p className="font-display text-xs tracking-[0.28em] text-primary/90">{eyebrow}</p>
+            <h3 className="font-display text-2xl font-bold tracking-tight md:text-3xl lg:text-4xl">{title}</h3>
+          </div>
+          {children ? (
+            <div className="relative min-w-0 border-t border-primary/15 pt-6 lg:border-t-0 lg:border-r lg:border-primary/20 lg:pt-0 lg:pr-10 xl:pr-14">
+              <div className="text-pretty text-sm leading-[1.85] text-muted-foreground md:text-base lg:text-lg lg:leading-[1.9] [&_p]:max-w-none">
+                {children}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
         <div className="h-px flex-1 max-w-[4.5rem] bg-gradient-to-l from-transparent to-primary/40" />
         <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/80 shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
-        <div className="h-px flex-1 max-w-xs bg-gradient-to-l from-primary/50 via-secondary/40 to-transparent" />
+        <div className="h-px flex-1 bg-gradient-to-l from-primary/50 via-secondary/40 to-transparent md:max-w-none" />
       </div>
-      {children ? <div className="mt-4">{children}</div> : null}
     </div>
   );
 }
@@ -90,21 +110,23 @@ const StorePage = () => {
       />
 
       <main className="pb-20">
-        <div className="mx-auto max-w-6xl px-4 md:px-8 xl:px-12">
-          <div className="glass-panel rounded-xl p-6 md:p-8">
-            <div className="flex items-start justify-end gap-3 text-right">
-              <div className="min-w-0">
+        <div className={PAGE_GUTTER}>
+          <div className="glass-panel relative overflow-hidden rounded-xl p-6 sm:p-8 md:p-10">
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 max-w-md bg-gradient-to-l from-primary/[0.07] to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-[28%] max-w-sm bg-gradient-to-r from-secondary/[0.05] to-transparent" />
+            <div className="relative grid gap-6 text-right lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-10 xl:gap-14">
+              <div className="min-w-0 space-y-3">
                 <p className="font-display text-[11px] tracking-[0.32em] text-primary/90">المتجر والاستثمار</p>
-                <h2 className="mt-2 font-display text-2xl font-bold leading-snug md:text-3xl">
+                <h2 className="font-display text-2xl font-bold leading-snug md:text-3xl lg:text-4xl">
                   كل ما تحتاجه داخل <span className="text-gradient-neon">المدينة</span>
                 </h2>
-                <p className="mt-3 text-muted-foreground leading-relaxed md:text-lg">
+                <p className="text-pretty text-muted-foreground leading-[1.85] md:text-lg lg:text-xl lg:leading-[1.9]">
                   سيارات VIP، عقارات وبيوت، بكجات اشتراك، وفرص استثمار — تصفّح الأقسام أدناه ثم اضغط على أي بطاقة
                   للاطّلاع على التفاصيل وفتح نافذة الطلب.
                 </p>
               </div>
-              <div className="hidden shrink-0 rounded-2xl border border-primary/25 bg-primary/[0.08] p-3 text-primary md:block">
-                <Store className="h-7 w-7" aria-hidden />
+              <div className="hidden shrink-0 rounded-2xl border border-primary/25 bg-primary/[0.08] p-4 text-primary md:flex md:items-center md:justify-center">
+                <Store className="h-8 w-8" aria-hidden />
               </div>
             </div>
           </div>
@@ -158,23 +180,23 @@ const StorePage = () => {
             </TabsList>
           </div>
 
-          <div className="mx-auto mt-6 max-w-6xl px-4 md:mt-8 md:px-8 xl:px-12">
+          <div className={`${PAGE_GUTTER} mt-6 md:mt-8`}>
             {visibility.pages.vipCars ? (
               <TabsContent value="cars" className="mt-0 outline-none">
                 <motion.div
                   initial={reduceMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45 }}
-                  className="glass-panel rounded-2xl p-5 md:p-8"
+                  className="glass-panel relative overflow-hidden rounded-2xl p-5 md:p-8 lg:p-10"
                 >
                   <SectionHeader title="كتالوج سيارات VIP" eyebrow="مركبات حصرية">
-                    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                    <p>
                       تصفّح المركبات المتاحة، افتح البطاقة للتفاصيل والصور، ثم استخدم «طلب السيارة» للانتقال
                       لنموذج الطلب.
                     </p>
                   </SectionHeader>
                   <div className="mt-8">
-                    <VipCarsCatalogBlock />
+                    {activeTab === "cars" ? <VipCarsCatalogBlock /> : null}
                   </div>
                 </motion.div>
               </TabsContent>
@@ -186,10 +208,10 @@ const StorePage = () => {
                   initial={reduceMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45 }}
-                  className="glass-panel rounded-2xl p-5 md:p-8"
+                  className="glass-panel relative overflow-hidden rounded-2xl p-5 md:p-8 lg:p-10"
                 >
                   <SectionHeader title="العقارات والبيوت" eyebrow="سكن وتجارة">
-                    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                    <p>
                       فيلات، شقق، ومحلات تجارية ضمن أحياء المدينة. اضغط على أي بطاقة لرؤية المواصفات والصور.
                     </p>
                   </SectionHeader>
@@ -206,10 +228,10 @@ const StorePage = () => {
                   initial={reduceMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45 }}
-                  className="glass-panel rounded-2xl p-5 md:p-8"
+                  className="glass-panel relative overflow-hidden rounded-2xl p-5 md:p-8 lg:p-10"
                 >
                   <SectionHeader title="البكجات" eyebrow="حزم ومزايا">
-                    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                    <p>
                       باقات اشتراك، عروض موسمية، ومزايا داخل اللعبة — اضغط على البكج لرؤية كل ما يتضمّنه.
                     </p>
                   </SectionHeader>
@@ -226,10 +248,10 @@ const StorePage = () => {
                   initial={reduceMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45 }}
-                  className="glass-panel rounded-2xl p-5 md:p-8"
+                  className="glass-panel relative overflow-hidden rounded-2xl p-5 md:p-8 lg:p-10"
                 >
                   <SectionHeader title="فرص الاستثمار في المدينة" eyebrow="شارك في الاقتصاد">
-                    <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                    <p>
                       مطاعم، كازينو، محطات وقود وغيرها — تمثيلية داخل الرول بلاي وتخضع لقوانين السيرفر والموافقات
                       الإدارية.
                     </p>
@@ -244,7 +266,7 @@ const StorePage = () => {
         </Tabs>
 
         {tabsCount === 0 ? (
-          <div className="mx-auto mt-10 max-w-6xl px-4 text-center text-muted-foreground md:px-8">
+          <div className={`${PAGE_GUTTER} mt-10 text-center text-muted-foreground`}>
             لا توجد أقسام متاحة حالياً. تحقّق لاحقاً.
           </div>
         ) : null}

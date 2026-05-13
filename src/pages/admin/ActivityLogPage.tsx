@@ -11,7 +11,6 @@ import {
   ListFilter,
   RotateCcw,
   Search,
-  Ticket,
   Users,
   X,
 } from "lucide-react";
@@ -28,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   adminInput,
   adminPageDesc,
+  adminPageTitle,
   adminPageWrap,
   adminStatCard,
   adminTitleIcon,
@@ -112,21 +112,68 @@ function dtLocalToMs(s: string): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-function exportToCsv(rows: ActivityLogEntry[]): string {
-  const header = ["#", "Time (ISO)", "Time (Local)", "Actor", "Action", "Detail"];
-  const lines = [header.join(",")];
+/** حقل CSV وفق RFC 4180 — مُشار دائماً لاستقرار العربية و Excel */
+function csvCell(value: string): string {
+  const s = String(value ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+/** صف بستة أعمدة لمحاذاة أوضح في Excel */
+function csvRow6(a: string, b: string, c = "", d = "", e = "", f = ""): string {
+  return [csvCell(a), csvCell(b), csvCell(c), csvCell(d), csvCell(e), csvCell(f)].join(",");
+}
+
+type ActivityLogCsvMeta = {
+  exportedAtLabel: string;
+  displayedCount: number;
+  totalInStore: number;
+  rangeLabel: string;
+  activeFiltersCount: number;
+};
+
+/** ملف UTF-8 مع BOM + سطر sep=, ليعرّف Excel الفاصل بشكل صحيح */
+function buildActivityLogCsv(rows: ActivityLogEntry[], meta: ActivityLogCsvMeta): string {
+  const lines: string[] = [];
+  lines.push("sep=,");
+  lines.push(csvRow6("سجل النشاط — Infinite City Hub (تصدير من لوحة التحكم)", "", "", "", "", ""));
+  lines.push(csvRow6("تاريخ التصدير", meta.exportedAtLabel, "", "", "", ""));
+  lines.push(
+    csvRow6(
+      "عدد السجلات في الملف",
+      String(meta.displayedCount),
+      "من أصل",
+      String(meta.totalInStore),
+      "فلاتر نشطة",
+      String(meta.activeFiltersCount),
+    ),
+  );
+  lines.push(csvRow6("نطاق الوقت (حسب الفلتر)", meta.rangeLabel, "", "", "", ""));
+  lines.push(csvRow6("—", "—", "—", "—", "—", "—"));
+  lines.push(csvRow6("م", "التاريخ والوقت (محلي)", "الوقت (ISO)", "الحساب", "الفعل / النشاط", "التفاصيل"));
+
   rows.forEach((e, idx) => {
-    const cells = [
-      String(idx + 1),
-      e.at,
-      formatLogDateTime(e.at),
-      e.actor,
-      e.action,
-      (e.detail ?? "").replace(/[\r\n]+/g, " "),
-    ].map((c) => `"${String(c).replace(/"/g, '""')}"`);
-    lines.push(cells.join(","));
+    const detail = (e.detail ?? "").replace(/[\r\n]+/g, " ").trim();
+    lines.push(
+      csvRow6(
+        String(idx + 1),
+        formatLogDateTime(e.at),
+        e.at,
+        e.actor,
+        e.action,
+        detail || "—",
+      ),
+    );
   });
-  return lines.join("\n");
+
+  return lines.join("\r\n");
+}
+
+function formatExportFilenameStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
 const TICKET_KEYWORDS = ["تكت", "تذكر"]; /** كلمات تُحدد لوجات التكتات */
@@ -263,20 +310,6 @@ const ActivityLogPage = () => {
     return next;
   };
 
-  const handleExportCsv = () => {
-    const csv = exportToCsv(filteredEntries);
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    a.href = url;
-    a.download = `activity-log-${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const rangeLabelText = useMemo(() => {
     const opt = RANGE_OPTIONS.find((o) => o.value === rangePreset);
     if (!opt) return "الكل";
@@ -288,6 +321,26 @@ const ActivityLogPage = () => {
     return opt.label;
   }, [rangePreset, customFrom, customTo]);
 
+  const handleExportCsv = () => {
+    const csv = buildActivityLogCsv(filteredEntries, {
+      exportedAtLabel: formatLogDateTime(new Date().toISOString()),
+      displayedCount: filteredEntries.length,
+      totalInStore: entries.length,
+      rangeLabel: rangeLabelText,
+      activeFiltersCount,
+    });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = formatExportFilenameStamp();
+    a.href = url;
+    a.download = `infinite-city-activity-log-${stamp}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!isSuperAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -295,7 +348,7 @@ const ActivityLogPage = () => {
   return (
     <div className={cn(adminPageWrap, "max-w-7xl space-y-6")}>
       <div className="text-right">
-        <h1 className="flex items-center justify-end gap-2 font-display text-2xl font-bold tracking-tight text-slate-900">
+        <h1 className={adminPageTitle}>
           <History className={adminTitleIcon} />
           سجل النشاط
         </h1>
@@ -308,49 +361,71 @@ const ActivityLogPage = () => {
       {/* بطاقات إحصائية */}
       <div className="grid gap-4 sm:grid-cols-4">
         <div className={adminStatCard}>
-          <p className="text-xs font-medium text-slate-500">إجمالي اللوجات</p>
-          <p className="mt-1 font-display text-2xl font-bold text-violet-700">{totalEntries}</p>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">إجمالي اللوجات</p>
+          <p className="mt-1 font-display text-2xl font-bold text-violet-700 dark:text-violet-300">{totalEntries}</p>
         </div>
         <div className={adminStatCard}>
-          <p className="text-xs font-medium text-slate-500">المعروض</p>
-          <p className="mt-1 font-display text-2xl font-bold text-emerald-700">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">المعروض</p>
+          <p className="mt-1 font-display text-2xl font-bold text-emerald-700 dark:text-emerald-400">
             {displayedEntries}
           </p>
-          <p className="mt-0.5 text-[10px] text-slate-500">
+          <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
             بعد تطبيق {activeFiltersCount} فلتر
           </p>
         </div>
         <div className={adminStatCard}>
-          <p className="text-xs font-medium text-slate-500">النطاق الزمني</p>
-          <p className="mt-1 truncate font-display text-sm font-semibold text-slate-800">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">النطاق الزمني</p>
+          <p className="mt-1 truncate font-display text-sm font-semibold text-slate-800 dark:text-slate-100">
             {rangeLabelText}
           </p>
         </div>
         <div className={adminStatCard}>
-          <p className="text-xs font-medium text-slate-500">آخر حدث</p>
-          <p className="mt-1 truncate font-display text-sm font-semibold text-slate-800">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">آخر حدث</p>
+          <p className="mt-1 truncate font-display text-sm font-semibold text-slate-800 dark:text-slate-100">
             {entries[0] ? relativeFromNow(entries[0].at) : "لا يوجد"}
           </p>
-          <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500" dir="ltr">
+          <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500 dark:text-slate-400" dir="ltr">
             {entries[0] ? formatLogDateTime(entries[0].at) : "—"}
           </p>
         </div>
       </div>
 
       {/* شريط الفلاتر */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_14px_-4px_rgba(15,23,42,0.08)]">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_2px_14px_-4px_rgba(15,23,42,0.08)] dark:border-slate-600/90 dark:bg-slate-800 dark:shadow-[0_2px_14px_-4px_rgba(0,0,0,0.35)]">
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-2 border-b border-slate-200 bg-gradient-to-l from-violet-50/60 to-white px-4 py-3 text-right hover:bg-violet-50/40"
+          className="flex w-full items-center justify-between gap-3 border-b border-slate-200 bg-gradient-to-l from-violet-50/70 to-white px-4 py-3.5 text-right transition-colors hover:from-violet-50 hover:to-violet-50/30 dark:border-slate-600 dark:from-violet-950/40 dark:to-slate-800 dark:hover:from-violet-950/55 dark:hover:to-slate-800"
           onClick={() => setFiltersOpen((v) => !v)}
           aria-expanded={filtersOpen}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+              <Filter className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 text-right">
+              <span className="font-display text-sm font-semibold text-slate-900 dark:text-slate-50">الفلاتر</span>
+              <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                بحث، وقت، حساب، فعل، وتكتات
+              </p>
+            </div>
+            {activeFiltersCount > 0 ? (
+              <Badge className="h-6 shrink-0 rounded-full bg-violet-600 px-2 text-[10px] text-white">
+                {activeFiltersCount}
+              </Badge>
+            ) : null}
+            <ChevronDown
+              className={cn(
+                "ms-1 h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-400",
+                filtersOpen && "rotate-180",
+              )}
+            />
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 gap-1 border-violet-200 bg-white text-violet-700 hover:bg-violet-50"
+              className="h-9 gap-1.5 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/50"
               onClick={(ev) => {
                 ev.stopPropagation();
                 handleExportCsv();
@@ -358,113 +433,89 @@ const ActivityLogPage = () => {
               disabled={filteredEntries.length === 0}
             >
               <Download className="h-3.5 w-3.5" />
-              تصدير CSV
+              تصدير لـ Excel (.csv)
             </Button>
             {activeFiltersCount > 0 ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                className="h-9 gap-1.5 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/60"
                 onClick={(ev) => {
                   ev.stopPropagation();
                   resetAllFilters();
                 }}
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                إعادة تعيين
+                مسح الفلاتر
               </Button>
             ) : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-violet-700" />
-            <span className="font-display text-sm font-semibold text-slate-900">الفلاتر</span>
-            {activeFiltersCount > 0 ? (
-              <Badge className="h-5 rounded-full bg-violet-600 px-2 text-[10px] text-white">
-                {activeFiltersCount} نشط
-              </Badge>
-            ) : null}
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 text-slate-500 transition-transform",
-                filtersOpen && "rotate-180",
-              )}
-            />
           </div>
         </button>
 
         {filtersOpen ? (
-          <div className="space-y-5 p-4 sm:p-5">
-            {/* الصف 1: البحث + التكت */}
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="flex items-center justify-end gap-1.5 text-xs text-slate-700">
-                  <Search className="h-3.5 w-3.5 text-violet-600" /> بحث نصي شامل
-                </Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-500" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="الحساب، الفعل، أو التفاصيل..."
-                    className={cn(adminInput, "pr-9")}
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="flex items-center justify-end gap-1.5 text-xs text-slate-700">
-                  <Ticket className="h-3.5 w-3.5 text-violet-600" /> بحث في تفاصيل التكت (ID
-                  / موضوع / كلمة)
-                </Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <FileSearch className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-500" />
+          <div className="divide-y divide-slate-100 dark:divide-slate-700">
+            {/* بحث */}
+            <div className="space-y-4 p-4 sm:p-5">
+              <FilterSectionTitle icon={<Search className="h-4 w-4" />}>بحث في السجل</FilterSectionTitle>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="act-search-all" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    نص حر (الحساب، الفعل، التفاصيل)
+                  </Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-500 dark:text-violet-400" />
                     <Input
-                      value={ticketFilter}
-                      onChange={(e) => setTicketFilter(e.target.value)}
-                      placeholder="مثال: 4f2a3b1c أو 'شكوى'..."
-                      className={cn(adminInput, "pr-9")}
+                      id="act-search-all"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="اكتب أي جزء من السجل…"
+                      className={cn(adminInput, "h-10 pr-9")}
                       autoComplete="off"
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "shrink-0 border-violet-200",
-                      onlyTicketLogs
-                        ? "bg-violet-100 text-violet-800"
-                        : "bg-white text-slate-700 hover:bg-violet-50",
-                    )}
-                    onClick={() => setOnlyTicketLogs((v) => !v)}
-                  >
-                    لوجات التكتات فقط
-                  </Button>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  مثال — لوجات الردود على تكت: ابحث بـ"رد" أو ضع جزء من ID التكت.
-                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="act-ticket-q" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    تكتات — ID أو كلمة في الفعل/التفاصيل
+                  </Label>
+                  <div className="relative">
+                    <FileSearch className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-violet-500 dark:text-violet-400" />
+                    <Input
+                      id="act-ticket-q"
+                      value={ticketFilter}
+                      onChange={(e) => setTicketFilter(e.target.value)}
+                      placeholder="مثال: معرّف التكت أو «رد» أو «شكوى»"
+                      className={cn(adminInput, "h-10 pr-9")}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center justify-end gap-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-900">
+                    <span className="select-none">عرض سجلات التكتات فقط</span>
+                    <Checkbox
+                      checked={onlyTicketLogs}
+                      onCheckedChange={(c) => setOnlyTicketLogs(c === true)}
+                      className="border-slate-300 data-[state=checked]:bg-violet-600 data-[state=checked]:text-white"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
 
-            {/* الصف 2: النطاق الزمني */}
-            <div className="space-y-2">
-              <Label className="flex items-center justify-end gap-1.5 text-xs text-slate-700">
-                <CalendarRange className="h-3.5 w-3.5 text-violet-600" /> النطاق الزمني
-              </Label>
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {/* وقت */}
+            <div className="space-y-3 p-4 sm:p-5">
+              <FilterSectionTitle icon={<CalendarRange className="h-4 w-4" />}>النطاق الزمني</FilterSectionTitle>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {RANGE_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => setRangePreset(opt.value)}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 font-display text-xs transition",
+                      "min-h-[2.25rem] rounded-xl border px-2 py-2 text-center font-display text-xs leading-tight transition sm:min-h-[2.5rem] sm:px-3 sm:text-[13px]",
                       rangePreset === opt.value
-                        ? "border-violet-500 bg-violet-100 text-violet-800 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50",
+                        ? "border-violet-500 bg-violet-100 font-semibold text-violet-900 shadow-sm dark:border-violet-400 dark:bg-violet-950/50 dark:text-violet-100"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:bg-violet-50/80 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-violet-500/50 dark:hover:bg-violet-950/30",
                     )}
                   >
                     {opt.label}
@@ -472,28 +523,30 @@ const ActivityLogPage = () => {
                 ))}
               </div>
               {rangePreset === "custom" ? (
-                <div className="grid gap-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center justify-end gap-1 text-xs text-slate-700">
-                      <Clock4 className="h-3.5 w-3.5 text-violet-600" /> من تاريخ/ساعة
+                <div className="grid gap-3 rounded-xl border border-violet-200/90 bg-violet-50/50 p-4 sm:grid-cols-2 dark:border-violet-500/30 dark:bg-violet-950/25">
+                  <div className="space-y-2">
+                    <Label className="flex items-center justify-end gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <Clock4 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                      من
                     </Label>
                     <Input
                       type="datetime-local"
                       value={customFrom}
                       onChange={(e) => setCustomFrom(e.target.value)}
-                      className={cn(adminInput, "font-mono")}
+                      className={cn(adminInput, "h-10 font-mono text-sm")}
                       dir="ltr"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center justify-end gap-1 text-xs text-slate-700">
-                      <Clock4 className="h-3.5 w-3.5 text-violet-600" /> إلى تاريخ/ساعة
+                  <div className="space-y-2">
+                    <Label className="flex items-center justify-end gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300">
+                      <Clock4 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+                      إلى
                     </Label>
                     <Input
                       type="datetime-local"
                       value={customTo}
                       onChange={(e) => setCustomTo(e.target.value)}
-                      className={cn(adminInput, "font-mono")}
+                      className={cn(adminInput, "h-10 font-mono text-sm")}
                       dir="ltr"
                     />
                   </div>
@@ -501,88 +554,95 @@ const ActivityLogPage = () => {
               ) : null}
             </div>
 
-            {/* الصف 3: متعدد الاختيار للحساب والفعل */}
-            <div className="grid gap-3 lg:grid-cols-2">
-              <MultiSelectFacet
-                icon={<Users className="h-3.5 w-3.5 text-violet-600" />}
-                label="الحساب (Actor)"
-                placeholder="اختر مستخدم/أدمن لتصفية لوجاته"
-                options={uniqueActors}
-                selected={selectedActors}
-                onToggle={(val) => setSelectedActors((s) => toggleSet(s, val))}
-                onClear={() => setSelectedActors(new Set())}
-                emptyHint="لا توجد حسابات بعد"
-              />
-              <MultiSelectFacet
-                icon={<ListFilter className="h-3.5 w-3.5 text-violet-600" />}
-                label="نوع الفعل (Action)"
-                placeholder="اختر أفعال محددة (تسجيل دخول، رد على تكت...)"
-                options={uniqueActions}
-                selected={selectedActions}
-                onToggle={(val) => setSelectedActions((s) => toggleSet(s, val))}
-                onClear={() => setSelectedActions(new Set())}
-                emptyHint="لا توجد أفعال بعد"
-              />
+            {/* حساب + فعل */}
+            <div className="space-y-4 p-4 sm:p-5">
+              <FilterSectionTitle icon={<Users className="h-4 w-4" />}>تصفية حسب الحساب أو نوع الفعل</FilterSectionTitle>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <MultiSelectFacet
+                  icon={<Users className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />}
+                  label="الحساب"
+                  placeholder="كل الحسابات"
+                  options={uniqueActors}
+                  selected={selectedActors}
+                  onToggle={(val) => setSelectedActors((s) => toggleSet(s, val))}
+                  onClear={() => setSelectedActors(new Set())}
+                  emptyHint="لا توجد حسابات بعد"
+                />
+                <MultiSelectFacet
+                  icon={<ListFilter className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />}
+                  label="نوع الفعل"
+                  placeholder="كل الأفعال"
+                  options={uniqueActions}
+                  selected={selectedActions}
+                  onToggle={(val) => setSelectedActions((s) => toggleSet(s, val))}
+                  onClear={() => setSelectedActions(new Set())}
+                  emptyHint="لا توجد أفعال بعد"
+                />
+              </div>
             </div>
 
             {/* شارات الفلاتر النشطة */}
             {activeFiltersCount > 0 ? (
-              <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-200 pt-3">
-                <span className="font-display text-[11px] text-slate-500">فلاتر نشطة:</span>
-                {searchQuery.trim() ? (
-                  <FilterChip onRemove={() => setSearchQuery("")}>
-                    بحث: «{searchQuery.trim()}»
-                  </FilterChip>
-                ) : null}
-                {rangePreset !== "all" ? (
-                  <FilterChip onRemove={() => setRangePreset("all")}>
-                    وقت: {rangeLabelText}
-                  </FilterChip>
-                ) : null}
-                {selectedActors.size > 0
-                  ? [...selectedActors].map((a) => (
-                      <FilterChip
-                        key={`actor-${a}`}
-                        tone="violet"
-                        onRemove={() =>
-                          setSelectedActors((s) => {
-                            const n = new Set(s);
-                            n.delete(a);
-                            return n;
-                          })
-                        }
-                      >
-                        @{a}
-                      </FilterChip>
-                    ))
-                  : null}
-                {selectedActions.size > 0
-                  ? [...selectedActions].map((a) => (
-                      <FilterChip
-                        key={`action-${a}`}
-                        tone="indigo"
-                        onRemove={() =>
-                          setSelectedActions((s) => {
-                            const n = new Set(s);
-                            n.delete(a);
-                            return n;
-                          })
-                        }
-                      >
-                        {a}
-                      </FilterChip>
-                    ))
-                  : null}
-                {ticketFilter.trim() ? (
-                  <FilterChip tone="amber" onRemove={() => setTicketFilter("")}>
-                    تكت: «{ticketFilter.trim()}»
-                  </FilterChip>
-                ) : null}
-                {onlyTicketLogs ? (
-                  <FilterChip tone="amber" onRemove={() => setOnlyTicketLogs(false)}>
-                    لوجات التكتات فقط
-                  </FilterChip>
-                ) : null}
+              <div className="bg-slate-50/90 px-4 py-3.5 dark:bg-slate-900/50 sm:px-5">
+                <p className="mb-2 text-right font-display text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  فلاتر مطبّقة — اضغط × لإزالة واحدة
+                </p>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {searchQuery.trim() ? (
+                    <FilterChip onRemove={() => setSearchQuery("")}>
+                      بحث: «{searchQuery.trim()}»
+                    </FilterChip>
+                  ) : null}
+                  {rangePreset !== "all" ? (
+                    <FilterChip onRemove={() => setRangePreset("all")}>
+                      وقت: {rangeLabelText}
+                    </FilterChip>
+                  ) : null}
+                  {selectedActors.size > 0
+                    ? [...selectedActors].map((a) => (
+                        <FilterChip
+                          key={`actor-${a}`}
+                          tone="violet"
+                          onRemove={() =>
+                            setSelectedActors((s) => {
+                              const n = new Set(s);
+                              n.delete(a);
+                              return n;
+                            })
+                          }
+                        >
+                          @{a}
+                        </FilterChip>
+                      ))
+                    : null}
+                  {selectedActions.size > 0
+                    ? [...selectedActions].map((a) => (
+                        <FilterChip
+                          key={`action-${a}`}
+                          tone="indigo"
+                          onRemove={() =>
+                            setSelectedActions((s) => {
+                              const n = new Set(s);
+                              n.delete(a);
+                              return n;
+                            })
+                          }
+                        >
+                          {a}
+                        </FilterChip>
+                      ))
+                    : null}
+                  {ticketFilter.trim() ? (
+                    <FilterChip tone="amber" onRemove={() => setTicketFilter("")}>
+                      تكت: «{ticketFilter.trim()}»
+                    </FilterChip>
+                  ) : null}
+                  {onlyTicketLogs ? (
+                    <FilterChip tone="amber" onRemove={() => setOnlyTicketLogs(false)}>
+                      تكتات فقط
+                    </FilterChip>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -590,26 +650,26 @@ const ActivityLogPage = () => {
       </div>
 
       {/* الجدول */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)]">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_4px_24px_-8px_rgba(15,23,42,0.12)] dark:border-slate-600/90 dark:bg-slate-800 dark:shadow-[0_4px_24px_-8px_rgba(0,0,0,0.45)]">
         <div className="overflow-x-auto">
           <div className="min-w-[920px]">
-            <div className="grid grid-cols-[minmax(170px,1fr)_minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(0,2fr)] gap-px bg-slate-200/80">
-              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700">
+            <div className="grid grid-cols-[minmax(170px,1fr)_minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(0,2fr)] gap-px bg-slate-200/80 dark:bg-slate-600/90">
+              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 الوقت
               </div>
-              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700">
+              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 المستخدم
               </div>
-              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700">
+              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 الفعل
               </div>
-              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700">
+              <div className="bg-slate-50 px-3 py-2.5 text-xs font-display font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                 التفاصيل
               </div>
             </div>
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
               {filteredEntries.length === 0 ? (
-                <li className="px-4 py-12 text-center text-sm text-slate-500">
+                <li className="px-4 py-12 text-center text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                   {activeFiltersCount > 0
                     ? "لا توجد لوجات تطابق الفلاتر الحالية. حاول تخفيف الشروط."
                     : "لا توجد أحداث مسجّلة بعد."}
@@ -618,13 +678,13 @@ const ActivityLogPage = () => {
                 filteredEntries.map((e) => (
                   <li
                     key={e.id}
-                    className="grid grid-cols-1 gap-2 px-4 py-3 text-sm odd:bg-white even:bg-slate-50/70 sm:grid-cols-[minmax(170px,1fr)_minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(0,2fr)] sm:items-start sm:gap-4"
+                    className="grid grid-cols-1 gap-2 px-4 py-3 text-sm odd:bg-white even:bg-slate-50/70 dark:odd:bg-slate-800/90 dark:even:bg-slate-900/55 sm:grid-cols-[minmax(170px,1fr)_minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(0,2fr)] sm:items-start sm:gap-4"
                   >
                     <div className="flex flex-col gap-0.5">
-                      <span className="whitespace-nowrap font-mono text-xs text-slate-700" dir="ltr">
+                      <span className="whitespace-nowrap font-mono text-xs text-slate-700 dark:text-slate-200" dir="ltr">
                         {formatLogDateTime(e.at)}
                       </span>
-                      <span className="text-[10px] text-slate-400">{relativeFromNow(e.at)}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">{relativeFromNow(e.at)}</span>
                     </div>
                     <button
                       type="button"
@@ -636,7 +696,7 @@ const ActivityLogPage = () => {
                           return n;
                         });
                       }}
-                      className="text-right font-medium text-slate-900 hover:text-violet-700 hover:underline"
+                      className="text-right font-medium text-slate-900 hover:text-violet-700 hover:underline dark:text-slate-100 dark:hover:text-violet-300"
                       title="فلترة لوجات هذا المستخدم"
                     >
                       {e.actor}
@@ -651,12 +711,12 @@ const ActivityLogPage = () => {
                           return n;
                         });
                       }}
-                      className="text-right font-display text-sm font-medium text-violet-700 hover:underline"
+                      className="text-right font-display text-sm font-medium text-violet-700 hover:underline dark:text-violet-300"
                       title="فلترة لوجات هذا الفعل"
                     >
                       {e.action}
                     </button>
-                    <p className="min-w-0 break-words text-xs leading-relaxed text-slate-600">
+                    <p className="min-w-0 break-words text-xs leading-relaxed text-slate-600 dark:text-slate-300">
                       {e.detail ?? "—"}
                     </p>
                   </li>
@@ -675,6 +735,15 @@ export default ActivityLogPage;
 /* ----------------------------------------------------------- */
 /* مكوّنات داخلية */
 
+function FilterSectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <h3 className="flex items-center justify-end gap-2 border-r-4 border-violet-500 pr-3 font-display text-sm font-semibold text-slate-800 dark:border-violet-400 dark:text-slate-100">
+      <span className="text-violet-600 dark:text-violet-400">{icon}</span>
+      {children}
+    </h3>
+  );
+}
+
 function FilterChip({
   children,
   onRemove,
@@ -686,12 +755,12 @@ function FilterChip({
 }) {
   const toneClass =
     tone === "violet"
-      ? "border-violet-200 bg-violet-50 text-violet-800"
+      ? "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-950/45 dark:text-violet-200"
       : tone === "indigo"
-        ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+        ? "border-indigo-200 bg-indigo-50 text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-950/45 dark:text-indigo-200"
         : tone === "amber"
-          ? "border-amber-200 bg-amber-50 text-amber-800"
-          : "border-slate-200 bg-slate-50 text-slate-700";
+          ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-200"
+          : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200";
   return (
     <span
       className={cn(
@@ -703,7 +772,7 @@ function FilterChip({
       <button
         type="button"
         onClick={onRemove}
-        className="rounded-full p-0.5 hover:bg-black/5"
+        className="rounded-full p-0.5 text-slate-600 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/10"
         aria-label="إزالة الفلتر"
       >
         <X className="h-3 w-3" />
@@ -747,7 +816,7 @@ function MultiSelectFacet({
 
   return (
     <div className="space-y-1.5">
-      <Label className="flex items-center justify-end gap-1.5 text-xs text-slate-700">
+      <Label className="flex items-center justify-end gap-1.5 text-xs text-slate-700 dark:text-slate-300">
         {icon} {label}
       </Label>
       <Popover>
@@ -756,20 +825,21 @@ function MultiSelectFacet({
             type="button"
             variant="outline"
             className={cn(
-              "h-10 w-full justify-between rounded-md border-slate-200 bg-white px-3 text-right text-sm font-normal text-slate-700 hover:bg-violet-50/50",
-              selected.size > 0 && "border-violet-300 bg-violet-50 text-violet-900",
+              "flex h-10 w-full items-center justify-between gap-2 rounded-md border-slate-200 bg-white px-3 text-right text-sm font-normal text-slate-700 hover:bg-violet-50/50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-violet-950/30",
+              selected.size > 0 &&
+                "border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-500/50 dark:bg-violet-950/40 dark:text-violet-100",
             )}
           >
-            <ChevronDown className="h-4 w-4 text-slate-500" />
-            <span className="truncate">{triggerLabel}</span>
+            <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
           align="end"
           dir="rtl"
-          className="w-[min(420px,90vw)] border-violet-200 bg-white p-0 text-slate-900 shadow-xl"
+          className="w-[min(420px,90vw)] border-violet-200 bg-white p-0 text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50"
         >
-          <div className="border-b border-slate-200 p-2">
+          <div className="border-b border-slate-200 p-2 dark:border-slate-700">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -779,7 +849,7 @@ function MultiSelectFacet({
             />
           </div>
           {options.length === 0 ? (
-            <p className="px-4 py-6 text-center text-xs text-slate-500">{emptyHint}</p>
+            <p className="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">{emptyHint}</p>
           ) : (
             <ScrollArea className="max-h-[260px]">
               <ul className="space-y-0.5 p-1">
@@ -793,15 +863,15 @@ function MultiSelectFacet({
                         className={cn(
                           "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-right text-sm transition",
                           checked
-                            ? "bg-violet-50 text-violet-900"
-                            : "text-slate-700 hover:bg-slate-50",
+                            ? "bg-violet-50 text-violet-900 dark:bg-violet-950/55 dark:text-violet-100"
+                            : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800",
                         )}
                       >
                         <Checkbox
                           checked={checked}
                           onCheckedChange={() => onToggle(opt)}
                           onClick={(ev) => ev.stopPropagation()}
-                          className="border-slate-300 data-[state=checked]:bg-violet-600 data-[state=checked]:text-white"
+                          className="border-slate-300 data-[state=checked]:bg-violet-600 data-[state=checked]:text-white dark:border-slate-500"
                         />
                         <span className="min-w-0 flex-1 truncate text-right">{opt}</span>
                       </button>
@@ -809,22 +879,22 @@ function MultiSelectFacet({
                   );
                 })}
                 {filtered.length === 0 ? (
-                  <li className="px-3 py-4 text-center text-xs text-slate-500">
+                  <li className="px-3 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
                     لا توجد نتائج مطابقة.
                   </li>
                 ) : null}
               </ul>
             </ScrollArea>
           )}
-          <div className="flex items-center justify-between border-t border-slate-200 p-2">
-            <span className="text-[11px] text-slate-500">
+          <div className="flex items-center justify-between border-t border-slate-200 p-2 dark:border-slate-700">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
               {selected.size} / {options.length}
             </span>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 border-rose-200 bg-rose-50 px-2 text-[11px] text-rose-700 hover:bg-rose-100"
+              className="h-7 border-rose-200 bg-rose-50 px-2 text-[11px] text-rose-700 hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-950/45 dark:text-rose-200 dark:hover:bg-rose-950/70"
               onClick={onClear}
               disabled={selected.size === 0}
             >

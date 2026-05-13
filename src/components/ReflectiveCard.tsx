@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { KickChannelLiveInfo } from "@/lib/kickChannel";
+import type { TikTokChannelLiveInfo } from "@/lib/tiktokChannel";
 import { ExternalLink } from "lucide-react";
 import "./ReflectiveCard.css";
 
@@ -15,6 +16,10 @@ type ReflectiveCardProps = {
   kickSlug?: string | null;
   /** حالة Kick من الـ API؛ غير معرّف = لم يكتمل أول طلب بعد */
   kickLive?: KickChannelLiveInfo;
+  /** اسم المستخدم على TikTok من الرابط */
+  tiktokUniqueId?: string | null;
+  /** حالة TikTok من صفحة الملف؛ غير معرّف = لم يكتمل أول طلب بعد */
+  tiktokLive?: TikTokChannelLiveInfo;
 };
 
 const ReflectiveCard = ({
@@ -26,17 +31,34 @@ const ReflectiveCard = ({
   featured = false,
   kickSlug,
   kickLive,
+  tiktokUniqueId,
+  tiktokLive,
 }: ReflectiveCardProps) => {
   const isKick = Boolean(kickSlug);
+  const isTikTok = Boolean(tiktokUniqueId) && !isKick;
   const loadingKick = isKick && kickLive === undefined;
-  const fetchOk = kickLive?.fetchOk === true;
-  const isLive = fetchOk && kickLive?.live === true;
-  const isOffline = fetchOk && kickLive?.live === false;
-  const fetchFailed = isKick && kickLive !== undefined && kickLive.fetchOk === false;
+  const loadingTikTok = isTikTok && tiktokLive === undefined;
+  const loadingLive = loadingKick || loadingTikTok;
+
+  const kickFetchOk = kickLive?.fetchOk === true;
+  const tiktokFetchOk = tiktokLive?.fetchOk === true;
+
+  const isLiveKick = isKick && kickFetchOk && kickLive?.live === true;
+  const isLiveTikTok =
+    isTikTok && tiktokFetchOk && tiktokLive?.live === true && Boolean(tiktokLive?.roomId);
+  const isLive = isLiveKick || isLiveTikTok;
+
+  const isOfflineKick = isKick && kickFetchOk && kickLive?.live === false;
+  const isOfflineTikTok = isTikTok && tiktokFetchOk && tiktokLive?.live === false;
+  const isOffline = isOfflineKick || isOfflineTikTok;
+
+  const fetchFailedKick = isKick && kickLive !== undefined && kickLive.fetchOk === false;
+  const fetchFailedTikTok = isTikTok && tiktokLive !== undefined && tiktokLive.fetchOk === false;
+  const fetchFailed = fetchFailedKick || fetchFailedTikTok;
 
   const statusRow = (() => {
-    if (!isKick) return null;
-    if (loadingKick) {
+    if (!isKick && !isTikTok) return null;
+    if (loadingLive) {
       return (
         <div className="reflective-card__status-pill reflective-card__status-pill--loading" aria-live="polite">
           <span className="reflective-card__status-loading-dot" />
@@ -47,7 +69,9 @@ const ReflectiveCard = ({
     if (fetchFailed) {
       return (
         <div className="reflective-card__status-pill reflective-card__status-pill--muted" aria-live="polite">
-          <span className="block">تعذّر التحقق من Kick حالياً</span>
+          <span className="block">
+            {fetchFailedKick ? "تعذّر التحقق من Kick حالياً" : "تعذّر التحقق من TikTok حالياً"}
+          </span>
           <span className="mt-0.5 block text-[10px] font-normal opacity-90">
             يمكنك فتح «رابط البث» أدناه للتحقق يدوياً
           </span>
@@ -58,7 +82,7 @@ const ReflectiveCard = ({
       return (
         <div className="reflective-card__live-pill" aria-live="polite">
           <span className="reflective-card__live-dot" />
-          <span className="reflective-card__live-text">مباشر على Kick</span>
+          <span className="reflective-card__live-text">{isLiveKick ? "مباشر على Kick" : "مباشر على TikTok"}</span>
         </div>
       );
     }
@@ -72,6 +96,8 @@ const ReflectiveCard = ({
     }
     return null;
   })();
+
+  const sessionTitle = isLiveKick ? kickLive?.sessionTitle : isLiveTikTok ? tiktokLive?.sessionTitle : undefined;
 
   const article = (
     <article
@@ -90,9 +116,9 @@ const ReflectiveCard = ({
           </div>
           <p className="reflective-card__role">{role}</p>
           <h3 className="reflective-card__name">{name}</h3>
-          {isLive && kickLive?.sessionTitle ? (
-            <p className="reflective-card__live-title" title={kickLive.sessionTitle}>
-              {kickLive.sessionTitle}
+          {isLive && sessionTitle ? (
+            <p className="reflective-card__live-title" title={sessionTitle}>
+              {sessionTitle}
             </p>
           ) : null}
           <p className="reflective-card__bio">{bio}</p>
@@ -112,7 +138,7 @@ const ReflectiveCard = ({
     </article>
   );
 
-  if (isLive && kickSlug && fetchOk) {
+  if (isLiveKick && kickSlug && kickFetchOk) {
     return (
       <HoverCard openDelay={280} closeDelay={200}>
         <HoverCardTrigger asChild>
@@ -153,6 +179,56 @@ const ReflectiveCard = ({
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               فتح على Kick
+            </a>
+            <span className="text-[10px] text-white/45">معاينة عند تمرير المؤشر على البطاقة</span>
+          </div>
+        </HoverCardContent>
+      </HoverCard>
+    );
+  }
+
+  if (isLiveTikTok && tiktokLive?.roomId && tiktokFetchOk) {
+    const embedSrc = `https://www.tiktok.com/player/v1/embed/live?room_id=${encodeURIComponent(tiktokLive.roomId)}`;
+    return (
+      <HoverCard openDelay={280} closeDelay={200}>
+        <HoverCardTrigger asChild>
+          <div className="group h-full rounded-[22px] outline-none transition-[transform,box-shadow] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+            {article}
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent
+          side="top"
+          align="center"
+          sideOffset={10}
+          className="z-[110] w-[min(94vw,440px)] border-violet-200 bg-[#0f0f12] p-0 text-right shadow-xl data-[state=open]:animate-in"
+          dir="rtl"
+        >
+          <div className="border-b border-white/10 px-3 py-2">
+            <p className="text-xs font-medium text-white/90">{name}</p>
+            {tiktokLive.sessionTitle ? (
+              <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/70">{tiktokLive.sessionTitle}</p>
+            ) : (
+              <p className="mt-1 text-[11px] text-emerald-400/90">بث مباشر على TikTok</p>
+            )}
+          </div>
+          <div className="relative aspect-video w-full bg-black">
+            <iframe
+              title={`TikTok — ${name}`}
+              src={embedSrc}
+              className="absolute inset-0 h-full w-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-3 py-2">
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-300 underline-offset-4 hover:text-white hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              فتح على TikTok
             </a>
             <span className="text-[10px] text-white/45">معاينة عند تمرير المؤشر على البطاقة</span>
           </div>

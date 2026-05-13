@@ -1,47 +1,129 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { Save, ExternalLink } from "lucide-react";
+import { GripVertical, Plus, Save, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { appendActivityLog } from "@/lib/activityLog";
 import {
+  createAboutPillar,
   loadAboutPageContent,
   saveAboutPageContent,
   type AboutPageContent,
+  type AboutPillar,
 } from "@/lib/aboutPageContent";
 import { adminInput } from "@/lib/adminUi";
 
 const inputClassName = adminInput;
 const textareaClassName = cn(adminInput, "min-h-[96px]");
 
-function PillarEditor({
-  index,
-  title,
-  body,
+function SortablePillarEditor({
+  pillar,
+  displayIndex,
   onTitleChange,
   onBodyChange,
+  onRemove,
 }: {
-  index: number;
-  title: string;
-  body: string;
+  pillar: AboutPillar;
+  displayIndex: number;
   onTitleChange: (next: string) => void;
   onBodyChange: (next: string) => void;
+  onRemove: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: pillar.id,
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-violet-50/35 p-4">
-      <p className="mb-3 font-display text-sm text-violet-700">ميزة {index + 1}</p>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-xl border border-slate-200 bg-violet-50/35 p-4 transition-shadow",
+        isDragging && "z-20 opacity-95 shadow-lg ring-2 ring-violet-300/60",
+      )}
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-500 cursor-grab touch-manipulation active:cursor-grabbing"
+            aria-label="سحب لإعادة الترتيب"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <p className="font-display text-sm text-violet-700">ميزة {displayIndex + 1}</p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              حذف
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
+            <AlertDialogHeader className="text-right">
+              <AlertDialogTitle>حذف هذه الميزة؟</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيتم إزالة «{pillar.title.trim() || "الميزة"}» من القائمة بعد الحفظ.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:justify-start">
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={onRemove}>
+                تأكيد الحذف
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
       <div className="space-y-2">
         <Label className="text-slate-700">العنوان</Label>
-        <Input value={title} onChange={(e) => onTitleChange(e.target.value)} className={inputClassName} />
+        <Input value={pillar.title} onChange={(e) => onTitleChange(e.target.value)} className={inputClassName} />
       </div>
       <div className="mt-3 space-y-2">
         <Label className="text-slate-700">الوصف</Label>
-        <Textarea value={body} onChange={(e) => onBodyChange(e.target.value)} className={textareaClassName} />
+        <Textarea value={pillar.body} onChange={(e) => onBodyChange(e.target.value)} className={textareaClassName} />
       </div>
     </div>
   );
@@ -52,17 +134,40 @@ const AboutManagerPage = () => {
   const [draft, setDraft] = useState<AboutPageContent>(() => loadAboutPageContent());
   const [savedSnapshot, setSavedSnapshot] = useState<AboutPageContent>(() => loadAboutPageContent());
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   const isDirty = JSON.stringify(draft) !== JSON.stringify(savedSnapshot);
 
   const setField = <K extends keyof AboutPageContent>(key: K, value: AboutPageContent[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
-  const setPillarField = (index: number, key: "title" | "body", value: string) => {
+  const setPillarField = (id: string, key: "title" | "body", value: string) => {
+    setDraft((prev) => ({
+      ...prev,
+      pillars: prev.pillars.map((p) => (p.id === id ? { ...p, [key]: value } : p)),
+    }));
+  };
+
+  const removePillar = (id: string) => {
+    setDraft((prev) => ({ ...prev, pillars: prev.pillars.filter((p) => p.id !== id) }));
+  };
+
+  const addPillar = () => {
+    setDraft((prev) => ({ ...prev, pillars: [...prev.pillars, createAboutPillar()] }));
+  };
+
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
     setDraft((prev) => {
-      const nextPillars = [...prev.pillars];
-      nextPillars[index] = { ...nextPillars[index], [key]: value };
-      return { ...prev, pillars: nextPillars };
+      const oldIndex = prev.pillars.findIndex((p) => p.id === active.id);
+      const newIndex = prev.pillars.findIndex((p) => p.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return { ...prev, pillars: arrayMove(prev.pillars, oldIndex, newIndex) };
     });
   };
 
@@ -179,18 +284,38 @@ const AboutManagerPage = () => {
               />
             </div>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {draft.pillars.map((item, index) => (
-              <PillarEditor
-                key={index}
-                index={index}
-                title={item.title}
-                body={item.body}
-                onTitleChange={(next) => setPillarField(index, "title", next)}
-                onBodyChange={(next) => setPillarField(index, "body", next)}
-              />
-            ))}
-          </div>
+          <p className="mt-4 text-right font-display text-xs tracking-wide text-slate-500">الترتيب (اسحب بالمقبض) · إضافة وحذف الميزات</p>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={draft.pillars.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              <div className="mt-3 space-y-3">
+                {draft.pillars.length > 0 ? (
+                  draft.pillars.map((pillar, index) => (
+                    <SortablePillarEditor
+                      key={pillar.id}
+                      pillar={pillar}
+                      displayIndex={index}
+                      onTitleChange={(next) => setPillarField(pillar.id, "title", next)}
+                      onBodyChange={(next) => setPillarField(pillar.id, "body", next)}
+                      onRemove={() => removePillar(pillar.id)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-8 text-center text-sm text-slate-600">
+                    لا توجد ميزات بعد. اضغط «إضافة ميزة» أدناه.
+                  </div>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4 w-full border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:w-auto"
+            onClick={addPillar}
+          >
+            <Plus className="ms-2 h-4 w-4" />
+            إضافة ميزة
+          </Button>
         </div>
 
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">

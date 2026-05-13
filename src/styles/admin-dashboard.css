@@ -1,8 +1,37 @@
+/* لوحة التحكم بالوضع الفاتح — رموز shadcn على html لتنعكس على القوائم والحوارات المنبثقة */
+html[data-dashboard-theme="light"] {
+  color-scheme: light;
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 271 81% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 32% 91%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 271 81% 56%;
+}
+
 /* مساحة المحتوى — خلفية محايدة بنقاط خفيفة (داخل AdminLayout فقط) */
 .admin-workspace-main {
   background-color: hsl(250 18% 96%);
   background-image: radial-gradient(hsl(265 28% 82% / 0.55) 0.55px, transparent 0.55px);
   background-size: 22px 22px;
+}
+
+html.dark .admin-workspace-main {
+  background-color: hsl(222 47% 9%);
+  background-image: radial-gradient(hsl(265 35% 38% / 0.22) 0.55px, transparent 0.55px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -11,7 +40,7 @@
   }
 }
 
-/* شريط تمرير أنيق وغير ملحوظ داخل الشريط الجانبي للداشبورد */
+/* شريط تمرير أنيق داخل الشريط الجانبي */
 .admin-sidebar-nav {
   scrollbar-width: thin;
   scrollbar-color: hsl(272 35% 45% / 0.55) transparent;
@@ -39,4 +68,182 @@
 
 .admin-sidebar-nav::-webkit-scrollbar-thumb:hover {
   background-color: hsl(272 70% 70% / 0.85);
+}
+
+/**
+ * لوحة التحكم بالوضع الداكن: إعادة رسم الأصناف الشائعة (بما فيها النوافذ المنبثقة خارج الشجرة)
+ * عندما يكون html.dark مفعّلاً من AdminLayout فقط — لا يُستخدم على الموقع العام.
+ */
+html.dark .bg-white {
+  background-color: rgb(30 41 59) !important;
+}
+
+html.dark .bg-white\/70 {
+  background-color: rgb(30 41 59 / 0.7) !important;
+}
+
+html.dark .bg-white\/80 {
+  background-color: rgb(30 41 59 / 0.8) !important;
+}
+
+html.dark .bg-white\/85 {
+  background-color: rgb(30 41 59 / 0.85) !important;
+}
+
+html.dark .bg-white\/90 {
+  background-color: rgb(30 41 59 / 0.9) !important;
+}
+
+html.dark .bg-white\/95 {
+  background-color: rgb(30 41 59 / 0.95) !important;
+}
+
+html.dark .bg-slate-50 {
+  background-color: rgb(15 23 42) !important;
+}
+
+html.dark .bg-slate-50\/60 {
+  background-color: rgb(15 23 42 / 0.6) !important;
+}
+
+html.dark .bg-slate-50\/90 {
+  background-color: rgb(15 23 42 / 0.9) !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: rgb(30 41 59) !important;
+}
+
+html.dark .bg-slate-200 {
+  background-color: rgb(51 65 85) !important;
+}
+
+html.dark .bg-violet-50\/35 {
+  background-color: rgb(76 29 149 / 0.28) !important;
+}
+
+html.dark .bg-violet-50\/65 {
+  background-color: rgb(76 29 149 / 0.35) !important;
+}
+
+html.dark .bg-violet-50\/75 {
+  background-color: rgb(76 29 149 / 0.38) !important;
+}
+
+html.dark .bg-violet-50\/90 {
+  background-color: rgb(76 29 149 / 0.32) !important;
+}
+
+html.dark .bg-violet-100 {
+  background-color: rgb(76 29 149 / 0.45) !important;
+}
+
+html.dark .bg-violet-200 {
+  background-color: rgb(91 33 182 / 0.5) !important;
+}
+
+html.dark .bg-amber-50\/90 {
+  background-color: rgb(120 53 15 / 0.35) !important;
+}
+
+html.dark .bg-rose-50\/90 {
+  background-color: rgb(136 19 55 / 0.35) !important;
+}
+
+html.dark .bg-emerald-50\/90 {
+  background-color: rgb(6 78 59 / 0.35) !important;
+}
+
+html.dark .text-slate-900 {
+  color: rgb(248 250 252) !important;
+}
+
+html.dark .text-slate-800 {
+  color: rgb(226 232 240) !important;
+}
+
+html.dark .text-slate-700 {
+  color: rgb(203 213 225) !important;
+}
+
+html.dark .text-slate-600 {
+  color: rgb(148 163 184) !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400 {
+  color: rgb(148 163 184) !important;
+}
+
+html.dark .border-slate-100 {
+  border-color: rgb(51 65 85) !important;
+}
+
+html.dark .border-slate-200 {
+  border-color: rgb(71 85 105) !important;
+}
+
+html.dark .border-slate-200\/90 {
+  border-color: rgb(71 85 105 / 0.9) !important;
+}
+
+html.dark .border-slate-300 {
+  border-color: rgb(100 116 139) !important;
+}
+
+html.dark .border-violet-200 {
+  border-color: rgb(109 40 217 / 0.65) !important;
+}
+
+html.dark .border-violet-200\/80 {
+  border-color: rgb(109 40 217 / 0.55) !important;
+}
+
+html.dark .border-violet-200\/90 {
+  border-color: rgb(109 40 217 / 0.6) !important;
+}
+
+html.dark .border-dashed.border-slate-300 {
+  border-color: rgb(100 116 139) !important;
+}
+
+html.dark .hover\:border-slate-200:hover {
+  border-color: rgb(71 85 105) !important;
+}
+
+html.dark .hover\:border-violet-200:hover {
+  border-color: rgb(167 139 250 / 0.55) !important;
+}
+
+html.dark .hover\:bg-slate-50:hover {
+  background-color: rgb(51 65 85 / 0.65) !important;
+}
+
+html.dark .hover\:bg-violet-50:hover {
+  background-color: rgb(76 29 149 / 0.35) !important;
+}
+
+html.dark .hover\:bg-violet-50\/50:hover {
+  background-color: rgb(76 29 149 / 0.28) !important;
+}
+
+html.dark .odd\:bg-white:nth-child(odd) {
+  background-color: rgb(30 41 59) !important;
+}
+
+html.dark .even\:bg-slate-50\/60:nth-child(even) {
+  background-color: rgb(15 23 42 / 0.75) !important;
+}
+
+/* أزرار outline شائعة في المحررات */
+html.dark button.border-violet-200.bg-white,
+html.dark .border-violet-200.bg-white {
+  background-color: rgb(30 41 59) !important;
+  color: rgb(196 181 253) !important;
+}
+
+html.dark button.border-violet-200.bg-white:hover,
+html.dark .border-violet-200.bg-white:hover {
+  background-color: rgb(76 29 149 / 0.35) !important;
+  color: rgb(221 214 254) !important;
 }

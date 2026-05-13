@@ -18,6 +18,7 @@ export type BaseManagedStaffRole =
   | "houses_manager"
   | "packages_manager"
   | "investments_manager"
+  | "quiz_manager"
   | "application_reviewer"
   | "about_manager"
   | "store_orders_manager"
@@ -39,6 +40,7 @@ const BASE_MANAGED: readonly BaseManagedStaffRole[] = [
   "houses_manager",
   "packages_manager",
   "investments_manager",
+  "quiz_manager",
   "application_reviewer",
   "about_manager",
   "store_orders_manager",
@@ -68,8 +70,8 @@ export type ManagedUser = {
   roles: ManagedStaffRole[];
   isActive?: boolean;
   /**
-   * إن كان هذا المستخدم الموظف ناتجاً عن «ترقية مواطن»،
-   * نحفظ هنا مرجع PublicUser.id لتمييز الترقيات عن الموظفين المنشؤين يدوياً.
+   * إن كان ملف الموظف ناتجاً عن «ترقية مواطن»،
+   * نحفظ هنا مرجع PublicUser.id لتمييزه عن السجلات القديمة غير المرتبطة بمواطن.
    */
   linkedPublicUserId?: string;
 };

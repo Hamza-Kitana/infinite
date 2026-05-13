@@ -196,7 +196,7 @@ function RulesGrid({
       <div
         key={query + variant}
         dir="rtl"
-        className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 xl:grid-cols-3 lg:gap-6"
+        className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 lg:gap-6 xl:grid-cols-3 xl:gap-7"
       >
         {filtered.map((rule) => (
           <RuleCard key={`${rule.id}-${rule.title}`} rule={rule} variant={variant} reduceMotion={reduceMotion} />
@@ -209,7 +209,7 @@ function RulesGrid({
     <motion.div
       key={query + variant + rules.map((r) => r.id).join("-")}
       dir="rtl"
-      className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 xl:grid-cols-3 lg:gap-6"
+      className="grid auto-rows-fr gap-5 [direction:rtl] sm:grid-cols-2 lg:gap-6 xl:grid-cols-3 xl:gap-7"
       variants={listVariants}
       initial="hidden"
       animate="show"
@@ -221,6 +221,10 @@ function RulesGrid({
   );
 }
 
+/** حاوية المحتوى — امتداد أفقي أوضح (مثل صفحة من نحن) */
+const PAGE_GUTTER =
+  "mx-auto w-full max-w-[min(100%,92rem)] px-4 sm:px-6 md:px-10 lg:px-14 xl:px-16";
+
 function SectionIntro({
   title,
   subtitle,
@@ -231,15 +235,29 @@ function SectionIntro({
   reduceMotion?: boolean | null;
 }) {
   const inner = (
-    <>
-      <h2 className="font-display text-2xl font-bold tracking-tight md:text-3xl">{title}</h2>
-      <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground md:text-base">{subtitle}</p>
-      <div className="mt-5 flex items-center justify-end gap-2">
+    <div className="space-y-6">
+      <div className="relative">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[38%] max-w-xl bg-gradient-to-l from-primary/[0.06] to-transparent lg:block"
+        />
+        <div className="relative grid gap-6 text-right lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:gap-12 xl:gap-16 lg:items-start">
+          <div className="space-y-2 lg:pt-1">
+            <h2 className="font-display text-2xl font-bold tracking-tight md:text-3xl lg:text-4xl">{title}</h2>
+          </div>
+          <div className="relative min-w-0 border-t border-primary/15 pt-6 lg:border-t-0 lg:border-r lg:border-primary/20 lg:pt-0 lg:pr-10 xl:pr-14">
+            <p className="text-pretty text-[15px] leading-[1.85] text-muted-foreground md:text-base lg:text-lg lg:leading-[1.9]">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-1">
         <div className="h-px flex-1 max-w-[4.5rem] bg-gradient-to-l from-transparent to-primary/40" />
         <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/80 shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
-        <div className="h-px flex-1 max-w-xs bg-gradient-to-l from-primary/50 via-secondary/40 to-transparent" />
+        <div className="h-px flex-1 bg-gradient-to-l from-primary/50 via-secondary/40 to-transparent md:max-w-none" />
       </div>
-    </>
+    </div>
   );
 
   if (reduceMotion) {
@@ -321,16 +339,18 @@ const LawsPage = () => {
       />
 
       <main className="pb-20">
-        <div className="mx-auto max-w-6xl px-4 md:px-8 xl:px-12">
-          <div className="glass-panel rounded-xl p-6 md:p-8">
-            <p className="text-right text-muted-foreground leading-relaxed md:text-lg">
+        <div className={PAGE_GUTTER}>
+          <div className="glass-panel relative overflow-hidden rounded-xl p-6 sm:p-8 md:p-10">
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 max-w-md bg-gradient-to-l from-primary/[0.07] to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-[28%] max-w-sm bg-gradient-to-r from-secondary/[0.05] to-transparent" />
+            <p className="relative text-pretty text-right text-muted-foreground leading-[1.85] md:text-lg lg:text-xl lg:leading-[1.9]">
               أنت على أبواب دخول مدينة إنفينيتي. نسعى لمجتمع أقرب للكمال في الـ Roleplay — نرجو الإلمام الكامل بالقوانين
               والالتزام بها احترامًا للجميع.
             </p>
           </div>
 
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative max-w-md flex-1">
+          <div className="mt-10 flex flex-col gap-4 md:mt-12 md:flex-row md:items-center md:justify-between md:gap-8 lg:gap-12">
+            <div className="relative min-w-0 flex-1 md:max-w-xl lg:max-w-2xl">
               <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/70" />
               <Input
                 value={query}
@@ -339,7 +359,7 @@ const LawsPage = () => {
                 className="h-12 rounded-2xl border-primary/30 bg-card/60 pr-10 text-right backdrop-blur-sm placeholder:text-muted-foreground/70 focus-visible:ring-primary/40"
               />
             </div>
-            <p className="text-center text-xs text-muted-foreground sm:text-right font-display tracking-wide">
+            <p className="shrink-0 text-center text-xs text-muted-foreground md:text-right font-display tracking-wide lg:max-w-md lg:text-sm">
               استخدم التبويبات أدناه ثم ابحث داخل القسم المفتوح
             </p>
           </div>
@@ -371,7 +391,7 @@ const LawsPage = () => {
             </TabsList>
           </div>
 
-          <div className="mx-auto max-w-6xl px-4 md:px-8 xl:px-12">
+          <div className={PAGE_GUTTER}>
             {visibleSections.map((section) => (
               <TabsContent key={section.id} value={section.id} className="mt-8 outline-none" forceMount={false}>
                 {renderSectionContent(
@@ -384,7 +404,7 @@ const LawsPage = () => {
           </div>
         </Tabs>
 
-        <div className="mx-auto max-w-6xl px-4 pt-8 pb-2 text-right md:px-8 xl:px-12">
+        <div className={`${PAGE_GUTTER} pt-8 pb-2 text-right`}>
           <Link
             to="/justice"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"

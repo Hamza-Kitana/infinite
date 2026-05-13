@@ -25,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,6 +144,7 @@ const StreamersEditorPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editing, setEditing] = useState<Omit<StreamerEntry, "id"> & { id?: string }>(emptyForm);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +169,10 @@ const StreamersEditorPage = () => {
       return [...kept, ...added];
     });
   }, [items]);
+
+  useEffect(() => {
+    if (!dialogOpen) setDeleteConfirmOpen(false);
+  }, [dialogOpen]);
 
   const displayedItems = useMemo(() => {
     const byId = new Map(items.map((x) => [x.id, x]));
@@ -363,79 +367,66 @@ const StreamersEditorPage = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           dir="rtl"
-          className="flex max-h-[min(90dvh,90svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-slate-200/95 bg-white p-0 shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:w-full lg:max-w-5xl"
+          className="flex max-h-[min(90dvh,90svh)] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl border border-slate-200/95 bg-white p-0 shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:w-full lg:max-w-5xl"
         >
-          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 sm:px-8 sm:pt-16">
+          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.22),transparent_58%)] px-6 pb-4 pt-14 dark:border-slate-700 dark:bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.12),transparent_55%)] sm:px-8 sm:pt-16">
             <DialogHeader className="space-y-1.5 text-right sm:text-right">
-              <DialogTitle className="font-display text-xl font-bold text-slate-900 sm:text-2xl">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 dark:text-slate-50 sm:text-2xl">
                 {editing.id ? "تعديل صانع محتوى" : "صانع محتوى جديد"}
               </DialogTitle>
-              <DialogDescription className="text-sm leading-relaxed text-slate-600">
+              <DialogDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                 البيانات تُحفظ في المتصفح — عبّئ بيانات البث وارفع الصورة ثم احفظ.
               </DialogDescription>
             </DialogHeader>
             {editing.id ? (
               <div className="mt-3 flex justify-end">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
-                      <Trash2 className="ms-1 h-4 w-4" />
-                      حذف الستريمر
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
-                    <AlertDialogHeader className="text-right">
-                      <AlertDialogTitle>حذف {editing.name || "الستريمر"}؟</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        سيتم حذف العنصر نهائياً من القائمة.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 sm:justify-start">
-                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => {
-                          if (!editing.id) return;
-                          appendActivityLog(user?.username ?? "—", "ستريمرز: حذف", editing.name || editing.id);
-                          remove(editing.id);
-                          setSelectedId((prev) => (prev === editing.id ? null : prev));
-                          setDialogOpen(false);
-                          toast.success("تم حذف الستريمر");
-                        }}
-                      >
-                        تأكيد الحذف
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-rose-600 text-white hover:bg-rose-700"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="ms-1 h-4 w-4" />
+                  حذف الستريمر
+                </Button>
               </div>
             ) : null}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-white px-6 py-5 dark:bg-slate-900 sm:px-8">
             <EditorDialogSection
               title="البطاقة"
-              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
             >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">الاسم</Label>
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">الاسم</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
+                  className={cn(
+                    editorDialogInputClass,
+                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                  )}
                   value={editing.name}
                   onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">الدور (على البطاقة)</Label>
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">الدور (على البطاقة)</Label>
                 <Input
-                  className={cn(editorDialogInputClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
+                  className={cn(
+                    editorDialogInputClass,
+                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                  )}
                   value={editing.role}
                   onChange={(e) => setEditing((p) => ({ ...p, role: e.target.value }))}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">نبذة</Label>
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">نبذة</Label>
                 <Textarea
-                  className={cn(editorDialogTextareaClass, "mt-1.5 min-h-[88px] border-violet-200 bg-white text-slate-900")}
+                  className={cn(
+                    editorDialogTextareaClass,
+                    "mt-1.5 min-h-[88px] border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                  )}
                   value={editing.bio}
                   onChange={(e) => setEditing((p) => ({ ...p, bio: e.target.value }))}
                 />
@@ -444,12 +435,15 @@ const StreamersEditorPage = () => {
 
             <EditorDialogSection
               title="البث"
-              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
             >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">رابط البث (Kick أو غيره)</Label>
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">رابط البث (Kick أو TikTok أو غيره)</Label>
                 <Input
-                  className={cn(editorDialogMonoClass, "mt-1.5 border-violet-200 bg-white text-slate-900")}
+                  className={cn(
+                    editorDialogMonoClass,
+                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                  )}
                   dir="ltr"
                   value={editing.streamUrl}
                   onChange={(e) => setEditing((p) => ({ ...p, streamUrl: e.target.value }))}
@@ -459,11 +453,11 @@ const StreamersEditorPage = () => {
 
             <EditorDialogSection
               title="الصورة"
-              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700"
+              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
             >
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">رفع الصورة</Label>
-                <p className="text-[11px] leading-relaxed text-slate-500">
+                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">رفع الصورة</Label>
+                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                   يتم اعتماد الصورة من رفع الملف فقط (بدون روابط).
                 </p>
                 <input
@@ -480,32 +474,32 @@ const StreamersEditorPage = () => {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="mt-1 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+                  className="mt-1 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700 dark:hover:text-violet-100"
                   onClick={() => fileRef.current?.click()}
                 >
                   <ImagePlus className="ms-2 h-4 w-4" />
                   رفع صورة من الجهاز
                 </Button>
                 {editing.image.startsWith("data:") ? (
-                  <p className="text-xs text-violet-700">تم اختيار صورة مرفوعة — اضغط حفظ لتثبيتها.</p>
+                  <p className="text-xs text-violet-700 dark:text-violet-300">تم اختيار صورة مرفوعة — اضغط حفظ لتثبيتها.</p>
                 ) : null}
               </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-slate-300 bg-white/70 p-3">
+              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 dark:border-slate-600 dark:bg-slate-800/70">
                 <img
                   src={editing.image || "/placeholder.svg"}
                   alt=""
-                  className="max-h-40 max-w-full rounded-md border border-violet-200 object-contain"
+                  className="max-h-40 max-w-full rounded-md border border-violet-200 object-contain dark:border-slate-600"
                 />
               </div>
             </EditorDialogSection>
           </div>
 
-          <div className="shrink-0 border-t border-violet-200 bg-white/80 px-6 py-4 backdrop-blur-sm sm:px-8">
+          <div className="shrink-0 border-t border-violet-200 bg-white/80 px-6 py-4 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95 sm:px-8">
             <DialogFooter className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-start sm:gap-3">
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700 sm:min-w-[7rem]"
                 onClick={() => setEditing((prev) => ({ ...prev, hidden: !prev.hidden }))}
               >
                 {editing.hidden ? "إظهار بالموقع" : "إخفاء من الموقع"}
@@ -513,7 +507,7 @@ const StreamersEditorPage = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 sm:min-w-[7rem]"
+                className="rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700 sm:min-w-[7rem]"
                 onClick={() => setDialogOpen(false)}
               >
                 إلغاء
@@ -525,6 +519,36 @@ const StreamersEditorPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent
+          dir="rtl"
+          className="border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 sm:rounded-2xl"
+        >
+          <AlertDialogHeader className="text-right">
+            <AlertDialogTitle className="dark:text-slate-50">حذف {editing.name || "الستريمر"}؟</AlertDialogTitle>
+            <AlertDialogDescription className="dark:text-slate-400">
+              سيتم حذف العنصر نهائياً من القائمة.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:justify-start">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!editing.id) return;
+                appendActivityLog(user?.username ?? "—", "ستريمرز: حذف", editing.name || editing.id);
+                remove(editing.id);
+                setSelectedId((prev) => (prev === editing.id ? null : prev));
+                setDeleteConfirmOpen(false);
+                setDialogOpen(false);
+                toast.success("تم حذف الستريمر");
+              }}
+            >
+              تأكيد الحذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -18,11 +18,13 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { appendActivityLog } from "@/lib/activityLog";
 import { toast } from "sonner";
+import { TicketAttachmentPicker } from "@/components/tickets/TicketAttachmentPicker";
+import { TicketChatAttachmentMedia } from "@/components/tickets/TicketChatAttachmentMedia";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,6 +40,8 @@ import {
   type TicketStatus,
   type TicketTypeRole,
 } from "@/lib/ticketsCenter";
+import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE } from "@/lib/publicProfileEligibility";
+import { revokePendingTicketAttachment } from "@/lib/ticketAttachmentRead";
 
 const TICKET_TYPES: { label: string; role: TicketTypeRole; icon: LucideIcon; hint: string }[] = [
   { label: "دعم فني", role: "ticket_support_manager", icon: Headphones, hint: "مشاكل تقنية أو الدخول" },
@@ -60,6 +64,11 @@ const STATUS_VARIANT: Record<TicketStatus, "default" | "secondary" | "outline"> 
   closed: "outline",
 };
 
+/** شارة «مغلقة» كانت ترث `text-foreground` فتختفي (بيضاء) على بطاقات التكتات الفاتحة */
+function statusBadgeClassName(status: TicketStatus, extra?: string) {
+  return cn(extra, status === "closed" && "border-slate-400 bg-slate-100 text-slate-900 hover:bg-slate-100");
+}
+
 type UserTicketNotification = {
   id: string;
   ticketId: string;
@@ -72,6 +81,8 @@ const TicketsPage = () => {
   const reduceMotion = useReducedMotion();
   const { user, getProfile } = usePublicUser();
   const profile = getProfile();
+  const { applications } = useApplicationsContent();
+  const ticketsUnlocked = useMemo(() => isPublicTicketsUnlocked(profile, applications), [profile, applications]);
   const tickets = useTicketsCenter();
   const [typeRole, setTypeRole] = useState<TicketTypeRole | null>(null);
   const [body, setBody] = useState("");
@@ -160,33 +171,24 @@ const TicketsPage = () => {
   }, [selectedTicketId, selected?.messages.length]);
 
   if (!user) return <Navigate to="/" replace />;
+  if (!ticketsUnlocked) return <Navigate to="/profile" replace />;
 
   const clearNotificationsForTicket = (ticketId: string) => {
     setNotifications((prev) => prev.filter((n) => n.ticketId !== ticketId));
   };
 
-  const readAttachment = async (file: File): Promise<TicketAttachment> =>
-    new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () =>
-        resolve({
-          id: crypto.randomUUID(),
-          name: file.name,
-          mimeType: file.type || "application/octet-stream",
-          dataUrl: String(r.result),
-        });
-      r.onerror = () => reject(new Error("read"));
-      r.readAsDataURL(file);
-    });
-
   const notifyAttachmentStorageIssue = () => {
-    toast.error("تعذر حفظ التكت مع المرفق. حجم الملف كبير على التخزين المحلي، جرّب ملفًا أصغر.");
+    toast.error("تعذر حفظ التكت. إن كان المرفق كبيرًا جرّب إغلاق بعض التبويبات أو تفريغ مساحة المتصفح.");
   };
 
   const create = () => {
+    if (!isPublicTicketsUnlocked(profile, applications)) {
+      toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+      return;
+    }
     if (!typeRole) return;
     const b = body.trim();
-    if (!b) return;
+    if (!b && !newAttachment) return;
     const label = TICKET_TYPES.find((x) => x.role === typeRole)?.label ?? "تكت";
     let created;
     try {
@@ -195,7 +197,7 @@ const TicketsPage = () => {
         typeLabel: label,
         openedBy: user.displayName || user.username,
         openedById: user.id,
-        body: b,
+        body: b || (newAttachment ? "مرفق" : ""),
         attachments: newAttachment ? [newAttachment] : [],
       });
     } catch {
@@ -211,9 +213,17 @@ const TicketsPage = () => {
   };
 
   const sendReply = () => {
+    if (!isPublicTicketsUnlocked(profile, applications)) {
+      toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+      return;
+    }
     if (!selected) return;
+    if (selected.status === "closed") {
+      toast.message("هذا التكت مغلق. لفتح موضوع جديد استخدم «تكت جديد».");
+      return;
+    }
     const b = reply.trim();
-    if (!b) return;
+    if (!b && !replyAttachment) return;
     const next = loadTickets().map((t) =>
       t.id !== selected.id
         ? t
@@ -226,7 +236,7 @@ const TicketsPage = () => {
                 id: crypto.randomUUID(),
                 at: new Date().toISOString(),
                 author: user.displayName || user.username,
-                body: b,
+                body: b || (replyAttachment ? "مرفق" : ""),
                 senderType: "public",
                 attachments: replyAttachment ? [replyAttachment] : [],
               },
@@ -250,69 +260,7 @@ const TicketsPage = () => {
     attachments?.length ? (
       <div className="mt-2 space-y-2">
         {attachments.map((att) => (
-          <div key={att.id}>
-            {att.mimeType.startsWith("video/") ? (
-              <div className="space-y-1">
-                <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
-                  <video controls className={cn("max-h-56 rounded-lg border bg-black/10", variant === "user" ? "border-white/30" : "border-violet-200")}>
-                    <source src={att.dataUrl} type={att.mimeType} />
-                  </video>
-                </a>
-                <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                  <a
-                    href={att.dataUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={cn(
-                      "rounded-md border px-2 py-1",
-                      variant === "user" ? "border-white/30 bg-white/10 text-violet-100 hover:bg-white/15" : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
-                    )}
-                  >
-                    فتح
-                  </a>
-                  <a
-                    href={att.dataUrl}
-                    download={att.name}
-                    className={cn(
-                      "rounded-md border px-2 py-1",
-                      variant === "user" ? "border-white/30 bg-white/10 text-violet-100 hover:bg-white/15" : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
-                    )}
-                  >
-                    تنزيل
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
-                  <img src={att.dataUrl} alt={att.name} className="max-h-56 cursor-zoom-in rounded-lg border border-white/20 object-contain" />
-                </a>
-                <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                  <a
-                    href={att.dataUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={cn(
-                      "rounded-md border px-2 py-1",
-                      variant === "user" ? "border-white/30 bg-white/10 text-violet-100 hover:bg-white/15" : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
-                    )}
-                  >
-                    فتح
-                  </a>
-                  <a
-                    href={att.dataUrl}
-                    download={att.name}
-                    className={cn(
-                      "rounded-md border px-2 py-1",
-                      variant === "user" ? "border-white/30 bg-white/10 text-violet-100 hover:bg-white/15" : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
-                    )}
-                  >
-                    تنزيل
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
+          <TicketChatAttachmentMedia key={att.id} att={att} variant={variant === "user" ? "ticketsUser" : "ticketsStaff"} />
         ))}
       </div>
     ) : null;
@@ -466,7 +414,7 @@ const TicketsPage = () => {
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <Badge variant={STATUS_VARIANT[t.status]} className="shrink-0 rounded-full">
+                      <Badge variant={STATUS_VARIANT[t.status]} className={statusBadgeClassName(t.status, "shrink-0 rounded-full")}>
                         {STATUS_LABELS[t.status]}
                       </Badge>
                       {unreadForTicket > 0 ? (
@@ -511,7 +459,10 @@ const TicketsPage = () => {
           if (!open) {
             setTypeRole(null);
             setBody("");
-            setNewAttachment(null);
+            setNewAttachment((prev) => {
+              void revokePendingTicketAttachment(prev);
+              return null;
+            });
           }
         }}
       >
@@ -570,20 +521,15 @@ const TicketsPage = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-right text-slate-800">مرفق (اختياري)</Label>
-                  <Input
-                    type="file"
-                    className="cursor-pointer rounded-xl border-violet-200 bg-white file:me-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-violet-800"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      const att = await readAttachment(f);
-                      setNewAttachment(att);
-                    }}
-                  />
-                  {newAttachment ? <p className="text-xs text-violet-700">{newAttachment.name}</p> : null}
+                  <TicketAttachmentPicker value={newAttachment} onChange={setNewAttachment} variant="public" />
                 </div>
                 <div className="flex justify-end pt-2">
-                  <Button type="button" className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 px-8 text-white shadow-lg" onClick={create}>
+                  <Button
+                    type="button"
+                    disabled={!body.trim() && !newAttachment}
+                    className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 px-8 text-white shadow-lg disabled:opacity-50"
+                    onClick={create}
+                  >
                     إرسال التكت
                   </Button>
                 </div>
@@ -603,7 +549,10 @@ const TicketsPage = () => {
           if (!open) {
             setSelectedTicketId(null);
             setReply("");
-            setReplyAttachment(null);
+            setReplyAttachment((prev) => {
+              void revokePendingTicketAttachment(prev);
+              return null;
+            });
           }
         }}
       >
@@ -613,7 +562,7 @@ const TicketsPage = () => {
               <div className="border-b border-violet-100 bg-gradient-to-l from-violet-50 via-white to-fuchsia-50/30 px-6 py-5">
                 <DialogHeader className="space-y-2 text-right">
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Badge variant={STATUS_VARIANT[selected.status]} className="rounded-full">
+                    <Badge variant={STATUS_VARIANT[selected.status]} className={statusBadgeClassName(selected.status, "rounded-full")}>
                       {STATUS_LABELS[selected.status]}
                     </Badge>
                     <Badge variant="outline" className="rounded-full border-violet-300 text-violet-800">
@@ -667,36 +616,76 @@ const TicketsPage = () => {
               </div>
 
               <div className="border-t border-violet-100 bg-white px-4 py-4 md:px-6">
-                <Label className="mb-2 block text-right text-sm font-medium text-slate-800">رسالة جديدة</Label>
-                <Textarea
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      sendReply();
-                    }
-                  }}
-                  placeholder="اكتب ردك… (Enter للإرسال، Shift+Enter سطر جديد)"
-                  className="min-h-[88px] rounded-xl border-violet-200 bg-violet-50/20 text-slate-900"
-                />
-                <Input
-                  type="file"
-                  className="mt-2 cursor-pointer rounded-xl border-violet-200 file:me-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:text-sm file:text-violet-800"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    const att = await readAttachment(f);
-                    setReplyAttachment(att);
-                  }}
-                />
-                {replyAttachment ? <p className="mt-1 text-xs text-violet-700">{replyAttachment.name}</p> : null}
-                <div className="mt-3 flex justify-end">
-                  <Button type="button" className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 text-white shadow-md" onClick={sendReply}>
-                    <Send className="ms-2 h-4 w-4" />
-                    إرسال
-                  </Button>
-                </div>
+                {selected.status === "closed" ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-right">
+                    <p className="text-sm font-semibold text-slate-900">التكت مغلق</p>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                      لا يمكن إرسال ردود أو مرفقات على هذا التكت. إذا احتجت مساعدة جديدة، افتح{" "}
+                      <span className="font-semibold text-violet-800">تكتًا جديدًا</span> من الزر أعلاه.
+                    </p>
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-violet-300 bg-white text-violet-800 hover:bg-violet-50"
+                        onClick={() => {
+                          setReplyAttachment((prev) => {
+                            void revokePendingTicketAttachment(prev);
+                            return null;
+                          });
+                          setReply("");
+                          setSelectedTicketId(null);
+                        }}
+                      >
+                        إغلاق
+                      </Button>
+                      <Button
+                        type="button"
+                        className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 text-white shadow-md"
+                        onClick={() => {
+                          setReplyAttachment((prev) => {
+                            void revokePendingTicketAttachment(prev);
+                            return null;
+                          });
+                          setReply("");
+                          setSelectedTicketId(null);
+                          setIsCreateDialogOpen(true);
+                        }}
+                      >
+                        <TicketPlus className="ms-2 h-4 w-4" />
+                        تكت جديد
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Label className="mb-2 block text-right text-sm font-medium text-slate-800">رسالة جديدة</Label>
+                    <Textarea
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          sendReply();
+                        }
+                      }}
+                      placeholder="اكتب ردك… (Enter للإرسال، Shift+Enter سطر جديد)"
+                      className="min-h-[88px] rounded-xl border-violet-200 bg-violet-50/20 text-slate-900"
+                    />
+                    <TicketAttachmentPicker className="mt-2" value={replyAttachment} onChange={setReplyAttachment} variant="public" />
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        type="button"
+                        disabled={!reply.trim() && !replyAttachment}
+                        className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 text-white shadow-md disabled:opacity-50"
+                        onClick={sendReply}
+                      >
+                        <Send className="ms-2 h-4 w-4" />
+                        إرسال
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           ) : null}

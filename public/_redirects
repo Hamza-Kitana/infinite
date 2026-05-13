@@ -1,2 +1,3 @@
 # Netlify: طلبات Kick من نفس المنشأ (يتجنّب حظر CORS في المتصفّح)
 /kick-api/* https://kick.com/:splat 200
+/tiktok-api/* https://www.tiktok.com/:splat 200

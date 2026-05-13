@@ -41,6 +41,22 @@ export default defineConfig(() => ({
           });
         },
       },
+      "/tiktok-api": {
+        target: "https://www.tiktok.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/tiktok-api/, ""),
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader(
+              "User-Agent",
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            );
+            proxyReq.setHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            proxyReq.setHeader("Accept-Language", "en-US,en;q=0.9");
+          });
+        },
+      },
     },
   },
   plugins: [react()],

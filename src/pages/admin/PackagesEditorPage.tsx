@@ -25,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -193,6 +192,7 @@ const PackagesEditorPage = () => {
   const [statusFilter, setStatusFilter] = useState<"all" | "taken" | "available">("all");
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isNew, setIsNew] = useState(false);
   const [editing, setEditing] = useState<PackageCatalogItem>(emptyItem());
   const [galleryText, setGalleryText] = useState("");
@@ -221,6 +221,10 @@ const PackagesEditorPage = () => {
       return [...kept, ...added];
     });
   }, [packages]);
+
+  useEffect(() => {
+    if (!dialogOpen) setDeleteConfirmOpen(false);
+  }, [dialogOpen]);
 
   const displayed = useMemo(() => {
     const byId = new Map(packages.map((p) => [p.id, p]));
@@ -491,33 +495,15 @@ const PackagesEditorPage = () => {
             </DialogHeader>
             {!isNew ? (
               <div className="mt-3 flex justify-end">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button type="button" size="sm" className="bg-rose-600 text-white hover:bg-rose-700">
-                      <Trash2 className="ms-1 h-4 w-4" />
-                      حذف البكج
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
-                    <AlertDialogHeader className="text-right">
-                      <AlertDialogTitle>حذف {editing.name || "البكج"}؟</AlertDialogTitle>
-                      <AlertDialogDescription>سيتم الحذف نهائياً من القائمة.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 sm:justify-start">
-                      <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => {
-                          remove(editing.id);
-                          setSelectedId((prev) => (prev === editing.id ? null : prev));
-                          setDialogOpen(false);
-                          toast.success("تم حذف البكج");
-                        }}
-                      >
-                        تأكيد الحذف
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-rose-600 text-white hover:bg-rose-700"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  <Trash2 className="ms-1 h-4 w-4" />
+                  حذف البكج
+                </Button>
               </div>
             ) : null}
           </div>
@@ -740,6 +726,29 @@ const PackagesEditorPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
+          <AlertDialogHeader className="text-right">
+            <AlertDialogTitle>حذف {editing.name || "البكج"}؟</AlertDialogTitle>
+            <AlertDialogDescription>سيتم الحذف نهائياً من القائمة.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:justify-start">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                remove(editing.id);
+                setSelectedId((prev) => (prev === editing.id ? null : prev));
+                setDeleteConfirmOpen(false);
+                setDialogOpen(false);
+                toast.success("تم حذف البكج");
+              }}
+            >
+              تأكيد الحذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

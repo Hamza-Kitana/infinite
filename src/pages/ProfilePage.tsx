@@ -1,30 +1,29 @@
-import { useMemo, type ElementType } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import {
   BellRing,
   Briefcase,
-  Building2,
   CheckCircle2,
   ClipboardList,
   Crown,
-  Hash,
   LayoutDashboard,
   LogOut,
-  Mail,
   MessageSquareMore,
   ShieldCheck,
   Star,
   Store,
-  UserRound,
   Users,
   XCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
@@ -32,43 +31,14 @@ import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersConte
 import { INSTITUTION_BRANCH_META } from "@/data/institutionBranches";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
 import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
-import { cn } from "@/lib/utils";
+import {
+  isPublicTicketsUnlocked,
+  MSG_TICKETS_NEED_CITY_PROFILE,
+  MSG_TICKETS_UNLOCKED_AFTER_PROFILE,
+  isCitizenElectronicApplyComplete,
+} from "@/lib/publicProfileEligibility";
+import { cn, isValidArabicNamePart } from "@/lib/utils";
 import { DiscordIcon } from "@/components/DiscordIcon";
-
-function InfoRow({
-  icon: Icon,
-  label,
-  value,
-  mono,
-}: {
-  icon: ElementType;
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="group flex items-center gap-3 rounded-xl border border-violet-200/70 bg-white px-3.5 py-3 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-50/40 sm:gap-4 sm:px-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100/90 text-violet-700 shadow-inner sm:h-11 sm:w-11">
-        <Icon className="h-5 w-5" strokeWidth={2} />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col text-right">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-600/85">
-          {label}
-        </span>
-        <span
-          className={cn(
-            "mt-0.5 truncate text-sm font-semibold leading-tight text-slate-900",
-            mono && "font-mono text-[13px] tracking-tight",
-          )}
-          dir={mono ? "ltr" : "rtl"}
-          title={value || undefined}
-        >
-          {value || "—"}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 function statusLabel(status: "pending" | "approved" | "rejected") {
   if (status === "pending") return "قيد المراجعة";
@@ -79,7 +49,7 @@ function statusLabel(status: "pending" | "approved" | "rejected") {
 const ProfilePage = () => {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
-  const { user, getProfile, logout } = usePublicUser();
+  const { user, getProfile, logout, updateProfile } = usePublicUser();
   const profile = getProfile();
   const { applications } = useApplicationsContent();
   const { findMembershipForUser } = useInstitutionRostersContent();
@@ -109,6 +79,69 @@ const ProfilePage = () => {
       )
       .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
   }, [tickets, user]);
+
+  const profileAge = profile?.age ?? 0;
+  /** المستخدم يعدّل من البروفايل: اسم المدينة + العمر فقط */
+  const profileIncomplete =
+    !!profile &&
+    (profile.cityName.trim().length < 3 || !Number.isFinite(profileAge) || profileAge < 13);
+
+  const cityTicketsOk = isPublicTicketsUnlocked(profile, applications);
+
+  const citizenElectronicApplyDone =
+    profile?.authProvider === "discord" && isCitizenElectronicApplyComplete(profile, applications);
+
+  const [formCity1, setFormCity1] = useState("");
+  const [formCity2, setFormCity2] = useState("");
+  const [formAge, setFormAge] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (!profile) return;
+    const cnCity = profile.cityName.trim();
+    const parts = cnCity.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+      setFormCity1("");
+      setFormCity2("");
+    } else if (parts.length === 1) {
+      setFormCity1(parts[0] ?? "");
+      setFormCity2("");
+    } else {
+      setFormCity1(parts[0] ?? "");
+      setFormCity2(parts.slice(1).join(" "));
+    }
+    setFormAge(profile.age > 0 ? String(profile.age) : "");
+  }, [profile?.id, profile?.cityName, profile?.age]);
+
+  const handleSaveProfile = () => {
+    const cityCombined = `${formCity1.trim()} ${formCity2.trim()}`.trim();
+    const ageNum = Math.floor(Number(formAge));
+    if (!isValidArabicNamePart(formCity1) || !isValidArabicNamePart(formCity2)) {
+      toast.error("اكتب جزءي الاسم داخل المدينة بالعربي فقط — حرفين على الأقل لكل جزء");
+      return;
+    }
+    if (!Number.isFinite(ageNum) || ageNum < 13) {
+      toast.error("أدخل عمرك الحقيقي (13 أو أكثر)");
+      return;
+    }
+    const unlockedBefore = isPublicTicketsUnlocked(profile, applications);
+    setSavingProfile(true);
+    const result = updateProfile({
+      cityName: cityCombined,
+      age: ageNum,
+    });
+    setSavingProfile(false);
+    if (!result.ok) {
+      toast.error(result.reason);
+      return;
+    }
+    const profileAfter = getProfile();
+    if (!unlockedBefore && profileAfter && isPublicTicketsUnlocked(profileAfter, applications)) {
+      toast.success(MSG_TICKETS_UNLOCKED_AFTER_PROFILE);
+    } else {
+      toast.success("تم حفظ بياناتك");
+    }
+  };
 
   /** عدد التكتات التي تحتوي ردًا جديدًا من الإدارة لم يقرأه المستخدم */
   const unreadTicketsCount = useMemo(() => {
@@ -140,12 +173,13 @@ const ProfilePage = () => {
 
   const isDiscord = profile?.authProvider === "discord";
   const cityName = profile?.cityName ?? "";
-  const realName = profile?.realName ?? "";
-  const email = profile?.email ?? "";
-  const discordId = profile?.discordId ?? "";
   const avatarUrl = profile?.avatarUrl ?? "";
 
-  const initials = (cityName || user.displayName || user.username).slice(0, 2).toUpperCase();
+  /** في الشريط ورأس البروفايل: لـ Discord الاسم المعروض على الديسكورد وليس يوزر الموقع */
+  const profileHeadline =
+    isDiscord ? (user.displayName?.trim() || user.username) : (cityName.trim() || user.displayName?.trim() || user.username);
+
+  const initials = (profileHeadline || user.username).slice(0, 2).toUpperCase();
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
@@ -182,10 +216,25 @@ const ProfilePage = () => {
           </div>
 
           <p className="font-display text-[11px] tracking-[0.35em] text-violet-700/90">حسابك</p>
-          <h1 className="mt-1 font-display text-2xl font-bold text-slate-900 md:text-3xl">{cityName || user.displayName}</h1>
-          <p className="mt-1 font-mono text-sm text-slate-500" dir="ltr">
-            @{user.username}
-          </p>
+          <h1 className="mt-1 font-display text-2xl font-bold text-slate-900 md:text-3xl">{profileHeadline}</h1>
+          <div className="mt-3 flex w-full max-w-md flex-col items-center gap-1.5 text-center">
+            <p className="font-mono text-sm text-slate-600" dir="ltr">
+              <span className="select-none text-slate-400">@</span>
+              {user.username}
+            </p>
+            {isDiscord && profile?.discordId?.trim() ? (
+              <p className="font-mono text-xs text-slate-500" dir="ltr">
+                <span className="me-1 font-sans text-[11px] text-slate-500">Discord ID</span>
+                {profile.discordId}
+              </p>
+            ) : null}
+            {isDiscord && cityName.trim() ? (
+              <p className="text-sm text-slate-600">
+                الاسم داخل المدينة:{" "}
+                <span className="font-semibold text-slate-900">{cityName}</span>
+              </p>
+            ) : null}
+          </div>
           {isDiscord ? (
             <Badge className="mt-3 border-[#5865F2]/40 bg-[#5865F2]/12 text-[#3c45a5] hover:bg-[#5865F2]/18">
               متصل بـ Discord — المعرّف مربوط بحسابك
@@ -195,6 +244,26 @@ const ProfilePage = () => {
       </div>
 
       <main className="relative z-10 mx-auto w-full max-w-7xl space-y-8 px-4 pb-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        {profileIncomplete ? (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-amber-300/90 bg-gradient-to-l from-amber-50 to-orange-50/80 px-4 py-3.5 text-right shadow-sm sm:px-5"
+          >
+            <p className="font-display text-sm font-bold text-amber-950">أكمل بيانات حسابك</p>
+            <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
+              من القسم أدناه أكمل <span className="font-semibold">اسمك داخل المدينة</span> على{" "}
+              <span className="font-semibold">جزئين بالعربي</span> و<span className="font-semibold">عمرك</span> ثم احفظ.
+              {!cityTicketsOk ? (
+                <>
+                  {" "}
+                  لا يُعرض تنبيه التكتات قبل الإكمال — بعد الحفظ الصحيح ستظهر لك رسالة أن التكتات أصبحت متاحة.
+                </>
+              ) : null}{" "}
+              الاسم على Discord والبريد ومعرّف Discord للعرض فقط — لتعديلها تواصل مع إدارة السيرفر.
+            </p>
+          </motion.div>
+        ) : null}
         {/* بطاقة العضوية في المؤسسات (تظهر فقط للأعضاء/القادة/النواب) */}
         {myMembership ? (
           <motion.section
@@ -340,34 +409,57 @@ const ProfilePage = () => {
           aria-label="اختصارات سريعة"
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-            <Link
-              to="/apply/citizen"
-              className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-emerald-300/70 bg-gradient-to-l from-emerald-500 via-teal-600 to-cyan-700 px-5 py-5 text-right text-white shadow-[0_24px_60px_-28px_rgba(16,185,129,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(16,185,129,0.65)] sm:px-6 sm:py-6"
-            >
-              <span
-                aria-hidden
-                className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/15 blur-3xl transition-opacity duration-500 group-hover:opacity-90"
-              />
-              <span
-                aria-hidden
-                className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-2xl"
-              />
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-16 sm:w-16">
-                <ClipboardList className="h-7 w-7 sm:h-8 sm:w-8" />
-              </span>
-              <div className="relative min-w-0 flex-1">
-                <p className="font-display text-[10px] tracking-[0.32em] text-white/80">APPLY</p>
-                <p className="mt-1 font-display text-xl font-bold leading-tight sm:text-2xl">
-                  التقديم الإلكتروني
-                </p>
-                <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/85 sm:text-sm">
-                  قدّم لدخول السيرفر — املأ النموذج، اقرأ القوانين، واجتز الاختبار
-                </p>
+            {citizenElectronicApplyDone ? (
+              <div className="relative flex items-center gap-4 overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-l from-emerald-50 via-white to-teal-50 px-5 py-5 text-right text-emerald-950 shadow-[0_18px_44px_-22px_rgba(16,185,129,0.35)] sm:px-6 sm:py-6">
+                <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 sm:h-16 sm:w-16">
+                  <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" />
+                </span>
+                <div className="relative min-w-0 flex-1">
+                  <p className="font-display text-[10px] tracking-[0.32em] text-emerald-700/90">تم</p>
+                  <p className="mt-1 font-display text-xl font-bold leading-tight sm:text-2xl">دخول السيرفر مفعّل</p>
+                  <p className="mt-1 line-clamp-3 text-[13px] leading-snug text-emerald-900/85 sm:text-sm">
+                    تم قبول تقديمك أو تفعيل بياناتك على المدينة — لا حاجة لإعادة التقديم الإلكتروني. تابع من
+                    التكت أو المتجر.
+                  </p>
+                </div>
               </div>
-            </Link>
+            ) : (
+              <Link
+                to="/apply/citizen"
+                className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-emerald-300/70 bg-gradient-to-l from-emerald-500 via-teal-600 to-cyan-700 px-5 py-5 text-right text-white shadow-[0_24px_60px_-28px_rgba(16,185,129,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(16,185,129,0.65)] sm:px-6 sm:py-6"
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/15 blur-3xl transition-opacity duration-500 group-hover:opacity-90"
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-2xl"
+                />
+                <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-16 sm:w-16">
+                  <ClipboardList className="h-7 w-7 sm:h-8 sm:w-8" />
+                </span>
+                <div className="relative min-w-0 flex-1">
+                  <p className="font-display text-[10px] tracking-[0.32em] text-white/80">APPLY</p>
+                  <p className="mt-1 font-display text-xl font-bold leading-tight sm:text-2xl">
+                    التقديم الإلكتروني
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/85 sm:text-sm">
+                    قدّم لدخول السيرفر — املأ النموذج، اقرأ القوانين، واجتز الاختبار
+                  </p>
+                </div>
+              </Link>
+            )}
 
             <Link
               to="/tickets"
+              onClick={(e) => {
+                if (!cityTicketsOk) {
+                  e.preventDefault();
+                  toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                  navigate("/profile");
+                }
+              }}
               className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-violet-200/90 bg-gradient-to-l from-violet-600 via-violet-700 to-fuchsia-700 px-5 py-5 text-right text-white shadow-[0_24px_60px_-28px_rgba(124,58,237,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(124,58,237,0.65)] sm:px-6 sm:py-6"
             >
               <span
@@ -434,11 +526,20 @@ const ProfilePage = () => {
               <div className="min-w-0">
                 <CardTitle className="font-display text-xl text-slate-900">معلومات الحساب</CardTitle>
                 <CardDescription className="mt-1 text-pretty text-slate-600">
-                  جميع الحقول للقراءة فقط. أي تعديل يتم عبر الإدارة أو من خلال ربط Discord عند تسجيل الدخول.
+                  أكمل <span className="font-semibold">اسمك داخل المدينة</span> (جزآن بالعربي) و
+                  <span className="font-semibold"> عمرك</span> في الحقول أدناه ثم احفظ — لا تُفتح التكتات إلا بعد الحفظ
+                  عندما تكون البيانات صحيحة. الاسم على Discord والبريد وDiscord للعرض فقط — تعديلها من الإدارة.
                 </CardDescription>
               </div>
               <Link
                 to="/tickets"
+                onClick={(e) => {
+                  if (!cityTicketsOk) {
+                    e.preventDefault();
+                    toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                    navigate("/profile");
+                  }
+                }}
                 className="hidden shrink-0 items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-display font-semibold text-violet-700 shadow-sm transition-colors hover:bg-violet-50 sm:inline-flex"
                 title="الإشعارات صارت على جرس الشريط العلوي"
               >
@@ -446,12 +547,137 @@ const ProfilePage = () => {
                 الإشعارات صارت بجرس الشريط
               </Link>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoRow icon={Building2} label="الاسم داخل المدينة" value={cityName} />
-                <InfoRow icon={UserRound} label="الاسم الحقيقي" value={realName} />
-                <InfoRow icon={Mail} label="البريد الإلكتروني" value={email} mono />
-                <InfoRow icon={Hash} label="Discord ID" value={discordId} mono />
+            <CardContent className="space-y-5 pt-6">
+              {profileIncomplete && !cityTicketsOk ? (
+                <div
+                  role="status"
+                  className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-right text-sm leading-relaxed text-violet-950"
+                >
+                  <span className="font-semibold">مطلوب:</span> اكتب{" "}
+                  <span className="font-semibold">اسمك داخل المدينة</span> في الجزءين (عربي فقط)، و{" "}
+                  <span className="font-semibold">عمرك</span> (13 أو أكثر)، ثم اضغط «حفظ التغييرات». الحقول أدناه
+                  تبدأ فارغة حتى تكتب اسمك بنفسك — بعد الحفظ الصحيح تُفتح لك التكتات.
+                </div>
+              ) : null}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 text-right sm:col-span-2">
+                  <Label className="text-sm font-medium text-slate-800">اسم المستخدم في الموقع</Label>
+                  <p className="text-[11px] leading-relaxed text-slate-600">
+                    مُعرّف داخلي للتمييز بين الحسابات — يختلف عن الاسم المعروض على Discord في أعلى الصفحة.
+                  </p>
+                  <div
+                    dir="ltr"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 text-left font-mono text-sm text-slate-900"
+                  >
+                    @{user.username}
+                  </div>
+                </div>
+                <div className="space-y-2 text-right sm:col-span-2">
+                  <Label className="text-sm font-medium text-slate-800">الاسم على Discord</Label>
+                  <p className="text-[11px] leading-relaxed text-slate-600">
+                    السطر الكامل كما يظهر في حسابك (الاسم المعروض واسم المستخدم إن وُجدا معاً).
+                  </p>
+                  <div
+                    dir="rtl"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 text-right text-sm font-medium text-slate-900"
+                  >
+                    {profile?.realName?.trim() ? profile.realName : "—"}
+                  </div>
+                </div>
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="prof-city1" className="text-sm font-medium text-slate-800">
+                    الاسم داخل المدينة — الجزء الأول <span className="text-xs font-normal text-slate-600">(عربي)</span>
+                  </Label>
+                  <Input
+                    id="prof-city1"
+                    value={formCity1}
+                    onChange={(e) => setFormCity1(e.target.value)}
+                    placeholder=""
+                    aria-label="الاسم داخل المدينة — الجزء الأول"
+                    className="border-violet-200 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+                  />
+                </div>
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="prof-city2" className="text-sm font-medium text-slate-800">
+                    الاسم داخل المدينة — الجزء الثاني <span className="text-xs font-normal text-slate-600">(عربي)</span>
+                  </Label>
+                  <Input
+                    id="prof-city2"
+                    value={formCity2}
+                    onChange={(e) => setFormCity2(e.target.value)}
+                    placeholder=""
+                    aria-label="الاسم داخل المدينة — الجزء الثاني"
+                    className="border-violet-200 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+                  />
+                </div>
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="prof-email" className="text-sm font-medium text-slate-800">
+                    البريد الإلكتروني
+                  </Label>
+                  <div
+                    id="prof-email"
+                    dir="ltr"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 font-mono text-sm text-slate-900"
+                  >
+                    {profile?.email?.trim() ? profile.email : "—"}
+                  </div>
+                </div>
+                <div className="space-y-2 text-right">
+                  <Label htmlFor="prof-discord" className="text-sm font-medium text-slate-800">
+                    Discord ID
+                  </Label>
+                  <div
+                    id="prof-discord"
+                    dir="ltr"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 font-mono text-sm text-slate-900"
+                  >
+                    {profile?.discordId?.trim() ? profile.discordId : "—"}
+                  </div>
+                </div>
+                <div className="space-y-2 text-right sm:col-span-2">
+                  <Label htmlFor="prof-age" className="text-sm font-medium text-slate-800">
+                    العمر
+                  </Label>
+                  <Input
+                    id="prof-age"
+                    type="number"
+                    inputMode="numeric"
+                    min={13}
+                    max={120}
+                    value={formAge}
+                    onChange={(e) => setFormAge(e.target.value)}
+                    placeholder="مثال: 17"
+                    className="border-violet-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
+                  />
+                  <p className="text-[11px] text-slate-600">
+                    يُخزَّن محلياً مع حسابك ويُستخدم في الطلبات والتكتات حسب سياسة السيرفر.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-violet-100 pt-4">
+                <Button
+                  type="button"
+                  disabled={savingProfile}
+                  className="bg-violet-600 font-display text-white hover:bg-violet-700"
+                  onClick={handleSaveProfile}
+                >
+                  {savingProfile ? "جاري الحفظ…" : "حفظ التعديلات"}
+                </Button>
+              </div>
+              <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3 text-right">
+                <p className="text-[11px] font-medium text-violet-900">معاينة سريعة</p>
+                <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                  <span className="text-slate-600">
+                    الاسم في المدينة:{" "}
+                    <span className="font-semibold text-slate-900">
+                      {`${formCity1.trim()} ${formCity2.trim()}`.trim() || "—"}
+                    </span>
+                  </span>
+                  <span className="text-slate-600">
+                    العمر:{" "}
+                    <span className="font-semibold text-slate-900">{formAge ? `${formAge} سنة` : "—"}</span>
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -486,16 +712,19 @@ const ProfilePage = () => {
                   </div>
                   <p className="font-display text-base font-semibold text-slate-800">لم تقدّم على شيء بعد</p>
                   <p className="max-w-xs text-sm text-slate-500">
-                    استخدم زر «التقديم الإلكتروني» من الشريط العلوي للتقديم على دخول السيرفر، أو افتح صفحة الوظائف
-                    للتوظيف.
+                    {citizenElectronicApplyDone
+                      ? "تم قبول تقديم دخول السيرفر أو تفعيل حسابك — يمكنك التقديم للوظائف من الأسفل عند توفر شواغر."
+                      : "استخدم زر «التقديم الإلكتروني» من الشريط العلوي للتقديم على دخول السيرفر، أو افتح صفحة الوظائف للتوظيف."}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                    <Link
-                      to="/apply/citizen"
-                      className="inline-flex h-9 items-center rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
-                    >
-                      التقديم الإلكتروني
-                    </Link>
+                    {citizenElectronicApplyDone ? null : (
+                      <Link
+                        to="/apply/citizen"
+                        className="inline-flex h-9 items-center rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
+                      >
+                        التقديم الإلكتروني
+                      </Link>
+                    )}
                     <Link
                       to="/jobs"
                       className="inline-flex h-9 items-center gap-1.5 rounded-full border border-violet-300 bg-white px-4 text-sm text-violet-800 shadow-sm transition-colors hover:bg-violet-50"
@@ -625,6 +854,13 @@ const ProfilePage = () => {
                   <div className="mt-2">
                     <Link
                       to="/tickets"
+                      onClick={(e) => {
+                        if (!cityTicketsOk) {
+                          e.preventDefault();
+                          toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                          navigate("/profile");
+                        }
+                      }}
                       className="inline-flex h-9 items-center gap-1.5 rounded-full bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
                     >
                       <MessageSquareMore className="h-4 w-4" />
@@ -704,6 +940,13 @@ const ProfilePage = () => {
                             <td className="px-4 py-3 align-top">
                               <Link
                                 to="/tickets"
+                                onClick={(e) => {
+                                  if (!cityTicketsOk) {
+                                    e.preventDefault();
+                                    toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                                    navigate("/profile");
+                                  }
+                                }}
                                 className="inline-flex h-7 items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 text-[11px] font-display font-semibold text-violet-700 transition-colors hover:bg-violet-50"
                               >
                                 فتح

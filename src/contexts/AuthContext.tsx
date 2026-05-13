@@ -25,6 +25,7 @@ export type CoreStaffRole =
   | "houses_manager"
   | "packages_manager"
   | "investments_manager"
+  | "quiz_manager"
   | "application_reviewer"
   | "about_manager"
   | "store_orders_manager"
@@ -46,6 +47,7 @@ const CORE_STAFF_NO_SUPER: readonly CoreStaffRole[] = [
   "houses_manager",
   "packages_manager",
   "investments_manager",
+  "quiz_manager",
   "application_reviewer",
   "about_manager",
   "store_orders_manager",
@@ -112,6 +114,7 @@ export function getPostLoginDashboardPath(roles: StaffRole[]): string {
     ["houses_manager", "/dashboard/houses"],
     ["packages_manager", "/dashboard/packages"],
     ["investments_manager", "/dashboard/investments"],
+    ["quiz_manager", "/dashboard/quiz"],
     ["about_manager", "/dashboard/about"],
     ["store_orders_manager", "/dashboard/store-orders"],
     ["ticket_support_manager", "/dashboard/tickets"],
@@ -146,6 +149,7 @@ export function primaryStaffRole(roles: StaffRole[] | undefined): StaffRole | nu
     "houses_manager",
     "packages_manager",
     "investments_manager",
+    "quiz_manager",
     "about_manager",
     "store_orders_manager",
     "ticket_support_manager",
@@ -185,6 +189,7 @@ type AuthContextValue = {
   isHousesManager: boolean;
   isPackagesManager: boolean;
   isInvestmentsManager: boolean;
+  isQuizManager: boolean;
   /** يملك أي دور طاقم مؤسسة (فرع محدد بالدور نفسه) */
   isInstitutionRosterManager: boolean;
   /** أول فرع طاقم يُستدل من الأدوار — للمعاينة وقفل المحرر */
@@ -197,6 +202,7 @@ type AuthContextValue = {
   canManageHouses: boolean;
   canManagePackages: boolean;
   canManageInvestments: boolean;
+  canManageQuiz: boolean;
   canEditInstitutionRosters: boolean;
   isApplicationReviewer: boolean;
   canReviewApplications: boolean;
@@ -393,6 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isHousesManager: has("houses_manager"),
       isPackagesManager: has("packages_manager"),
       isInvestmentsManager: has("investments_manager"),
+      isQuizManager: has("quiz_manager"),
       isInstitutionRosterManager: user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false,
       institutionBranchId: rosterBranch,
       canManageStaff: has("super_admin"),
@@ -403,6 +410,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canManageHouses: has("super_admin") || has("houses_manager"),
       canManagePackages: has("super_admin") || has("packages_manager"),
       canManageInvestments: has("super_admin") || has("investments_manager"),
+      canManageQuiz: has("super_admin") || has("quiz_manager"),
       canEditInstitutionRosters:
         has("super_admin") || (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false),
       isApplicationReviewer: has("application_reviewer"),
@@ -416,6 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         has("houses_manager") ||
         has("packages_manager") ||
         has("investments_manager") ||
+        has("quiz_manager") ||
         has("about_manager") ||
         has("ticket_support_manager") ||
         has("ticket_admin_inquiry_manager") ||

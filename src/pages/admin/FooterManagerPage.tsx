@@ -109,11 +109,11 @@ const FooterManagerPage = () => {
                     <div className="flex items-end">
                       <Button
                         type="button"
-                        variant="outline"
-                        className="w-full border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100"
+                        variant="destructive"
+                        className="w-full border border-rose-700/20 bg-rose-600 text-white shadow-sm hover:bg-rose-700 hover:text-white dark:border-rose-500/40 dark:bg-rose-600 dark:hover:bg-rose-700"
                         onClick={() => removeQuickLink(item.id)}
                       >
-                        <Trash2 className="ms-2 h-4 w-4" />
+                        <Trash2 className="ms-2 h-4 w-4 shrink-0 opacity-95" />
                         حذف
                       </Button>
                     </div>

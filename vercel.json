@@ -5,6 +5,10 @@
       "destination": "https://kick.com/:path*"
     },
     {
+      "source": "/tiktok-api/:path*",
+      "destination": "https://www.tiktok.com/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 type PublicUser = {
   id: string;
@@ -69,7 +70,25 @@ type PublicUserContextValue = {
 const USERS_KEY = "ic_public_users_v1";
 const SESSION_KEY = "ic_public_user_session_v1";
 
+/** يُطلق بعد أي كتابة على قائمة المواطنين — لنفس التبويب وغيره */
+export const IC_PUBLIC_USERS_CHANGED_EVENT = "ic-public-users-changed";
+
+const MSG_SUSPENDED_LOGIN =
+  "تم إيقاف حسابك من الإدارة. لا يمكنك تسجيل الدخول حتى يُفعّل الحساب مجدداً — تواصل مع الإدارة إن كان ذلك بالخطأ.";
+const MSG_SUSPENDED_KICKED =
+  "تم إيقاف حسابك من الإدارة. تم تسجيل خروجك من هذا الجهاز.";
+
 const PublicUserContext = createContext<PublicUserContextValue | null>(null);
+
+/** الاسم المعروض على Discord + اسم المستخدم في سطر واحد (لحقل realName عند OAuth) */
+function discordDisplayNameFull(globalName: string | null | undefined, discordUsername: string): string {
+  const g = (globalName ?? "").trim();
+  const disc = discordUsername.trim();
+  if (g && disc && g.toLowerCase() !== disc.toLowerCase()) {
+    return `${g} ${disc}`.trim();
+  }
+  return g || disc;
+}
 
 function loadUsers(): PublicUser[] {
   try {
@@ -103,6 +122,7 @@ function loadUsers(): PublicUser[] {
 
 function saveUsers(users: PublicUser[]) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  window.dispatchEvent(new CustomEvent(IC_PUBLIC_USERS_CHANGED_EVENT));
 }
 
 function loadSession(): PublicSessionUser | null {
@@ -131,6 +151,46 @@ function saveSession(user: PublicSessionUser | null) {
 export function PublicUserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicSessionUser | null>(() => loadSession());
 
+  useEffect(() => {
+    const verifySessionAgainstStorage = () => {
+      const s = loadSession();
+      if (!s) return;
+      const row = loadUsers().find((x) => x.id === s.id);
+      if (!row) {
+        saveSession(null);
+        setUser(null);
+        toast.error("لم يعد لحسابك سجلاً في الموقع. تم تسجيل خروجك.");
+        return;
+      }
+      if (row.isActive === false) {
+        saveSession(null);
+        setUser(null);
+        toast.error(MSG_SUSPENDED_KICKED);
+        return;
+      }
+      const synced: PublicSessionUser = {
+        id: row.id,
+        username: row.username,
+        displayName: row.displayName,
+        authProvider: row.authProvider ?? "local",
+      };
+      if (synced.displayName !== s.displayName || synced.username !== s.username || synced.authProvider !== s.authProvider) {
+        setUser(synced);
+        saveSession(synced);
+      }
+    };
+    verifySessionAgainstStorage();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === USERS_KEY) verifySessionAgainstStorage();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(IC_PUBLIC_USERS_CHANGED_EVENT, verifySessionAgainstStorage);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(IC_PUBLIC_USERS_CHANGED_EVENT, verifySessionAgainstStorage);
+    };
+  }, []);
+
   const value = useMemo<PublicUserContextValue>(
     () => ({
       user,
@@ -138,6 +198,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const users = loadUsers();
         const existing = users.find((x) => x.discordId === discordUserId);
         const displayFromDiscord = (globalName?.trim() || discordUsername).trim();
+        const discordFullName = discordDisplayNameFull(globalName, discordUsername);
         const emailNorm = (email ?? "").trim().toLowerCase();
         const resolvedEmail =
           emailNorm && emailNorm.includes("@") && !emailNorm.startsWith("@") && !emailNorm.endsWith("@")
@@ -145,15 +206,16 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
             : `${discordUserId}@discord.oauth.local`;
 
         if (existing) {
-          if (existing.isActive === false) return { ok: false, reason: "الحساب موقوف من الإدارة" };
+          if (existing.isActive === false) return { ok: false, reason: MSG_SUSPENDED_LOGIN };
           const updatedUsers = users.map((u) =>
             u.id === existing.id
               ? {
                   ...u,
                   authProvider: "discord" as const,
                   avatarUrl: avatarUrl ?? u.avatarUrl,
-                  displayName: displayFromDiscord || u.displayName,
-                  fullName: u.fullName || displayFromDiscord,
+                  realName: u.realName.trim().length >= 3 ? u.realName : discordFullName,
+                  /** الاسم في الشريط والبروفايل: دائماً الاسم المعروض على Discord (لا اسم المدينة) */
+                  displayName: displayFromDiscord || u.displayName?.trim() || u.username,
                   email:
                     emailNorm && emailNorm.includes("@") && !emailNorm.startsWith("@") && !emailNorm.endsWith("@")
                       ? emailNorm
@@ -165,7 +227,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
           const sessionUser: PublicSessionUser = {
             id: existing.id,
             username: existing.username,
-            displayName: displayFromDiscord || existing.displayName,
+            displayName: displayFromDiscord || existing.displayName?.trim() || existing.username,
             authProvider: "discord",
           };
           setUser(sessionUser);
@@ -183,12 +245,14 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
 
         const created: PublicUser = {
           id: crypto.randomUUID(),
-          realName: displayFromDiscord,
-          fullName: displayFromDiscord,
+          /** الاسم على Discord كما يعيده OAuth (معروض + username) — اسم المدينة والعمر من البروفايل */
+          realName: discordFullName,
+          fullName: "",
           username,
           email: resolvedEmail,
           discordId: discordUserId,
-          age: 18,
+          /** لا يُعتمد عمرًا افتراضيًا — يُحدَّد من البروفايل (13+) */
+          age: 0,
           password: "",
           displayName: displayFromDiscord,
           authProvider: "discord",
@@ -213,7 +277,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const u = username.trim().toLowerCase();
         const em = email.trim().toLowerCase();
         const dc = discordId.trim();
-        if (r.length < 3) return { ok: false, reason: "الاسم الحقيقي قصير" };
+        if (r.length < 3) return { ok: false, reason: "الاسم على Discord قصير — اكتبه كما يظهر بالكامل في سطر واحد" };
         if (f.length < 3) return { ok: false, reason: "اسمك داخل المدينة قصير" };
         if (u.length < 3) return { ok: false, reason: "اسم المستخدم قصير" };
         if (!em.includes("@") || em.startsWith("@") || em.endsWith("@")) return { ok: false, reason: "الإيميل غير صحيح" };
@@ -260,10 +324,14 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
       },
       login: ({ username, password }) => {
         const u = username.trim().toLowerCase();
-        const found = loadUsers().find((x) => x.username.toLowerCase() === u && x.password === password);
+        const users = loadUsers();
+        const byUsername = users.find((x) => x.username.toLowerCase() === u);
+        if (byUsername && byUsername.isActive === false) {
+          return { ok: false, reason: MSG_SUSPENDED_LOGIN };
+        }
+        const found = users.find((x) => x.username.toLowerCase() === u && x.password === password);
         if (!found) return { ok: false, reason: "بيانات الدخول غير صحيحة" };
         if (found.authProvider === "discord") return { ok: false, reason: "هذا الحساب مسجّل عبر Discord — استخدم زر Discord" };
-        if (found.isActive === false) return { ok: false, reason: "الحساب موقوف من الإدارة" };
         const sessionUser: PublicSessionUser = {
           id: found.id,
           username: found.username,
@@ -281,7 +349,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
       getProfile: () => {
         if (!user) return null;
         const found = loadUsers().find((x) => x.id === user.id);
-        if (!found) return null;
+        if (!found || found.isActive === false) return null;
         return {
           id: found.id,
           realName: found.realName,
@@ -301,6 +369,11 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const idx = users.findIndex((x) => x.id === user.id);
         if (idx < 0) return { ok: false, reason: "الحساب غير موجود" };
         const current = users[idx];
+        if (current.isActive === false) {
+          saveSession(null);
+          setUser(null);
+          return { ok: false, reason: MSG_SUSPENDED_LOGIN };
+        }
         const nextRealName = (patch.realName ?? current.realName).trim();
         const nextCity = (patch.cityName ?? current.fullName).trim();
         const nextEmail = (patch.email ?? current.email).trim().toLowerCase();
@@ -308,8 +381,8 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         const nextAge = Math.floor(patch.age ?? current.age);
         const nextAvatar = patch.avatarUrl ?? current.avatarUrl;
 
-        if (nextRealName.length < 3) return { ok: false, reason: "الاسم الحقيقي قصير" };
-        if (nextCity.length < 3) return { ok: false, reason: "اسم المدينة قصير" };
+        if (nextRealName.length < 3) return { ok: false, reason: "الاسم على Discord قصير — اكتبه كما يظهر بالكامل في سطر واحد" };
+        if (nextCity.length < 3) return { ok: false, reason: "اسم المدينة قصير — اكتب الجزءين بالعربي" };
         if (!nextEmail.includes("@") || nextEmail.startsWith("@") || nextEmail.endsWith("@")) return { ok: false, reason: "الإيميل غير صحيح" };
         if (nextDiscordId.length < 2) return { ok: false, reason: "Discord ID غير صحيح" };
         if (!Number.isFinite(nextAge) || nextAge < 13) return { ok: false, reason: "العمر يجب أن يكون 13 أو أكثر" };
@@ -323,7 +396,8 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
           discordId: nextDiscordId,
           age: nextAge,
           avatarUrl: nextAvatar,
-          displayName: nextCity,
+          /** حسابات Discord: الاسم المعروض في الواجهة يبقى من الديسكورد وليس اسم المدينة */
+          displayName: current.authProvider === "discord" ? current.displayName : nextCity,
         };
         const updated = [...users];
         updated[idx] = next;

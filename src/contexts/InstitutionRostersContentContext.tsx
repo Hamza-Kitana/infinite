@@ -133,8 +133,19 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
         /* ignore */
       }
     };
+    const onLocalPurge = () => {
+      try {
+        setPersisted(loadPersisted());
+      } catch {
+        /* ignore */
+      }
+    };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener("ic-institution-rosters-changed", onLocalPurge);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("ic-institution-rosters-changed", onLocalPurge);
+    };
   }, []);
 
   const getBranchRoster = useCallback(

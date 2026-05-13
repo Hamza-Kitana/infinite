@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BellRing, Clock3, MessageSquareMore, Send, XCircle } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { TicketAttachmentPicker } from "@/components/tickets/TicketAttachmentPicker";
+import { TicketChatAttachmentMedia } from "@/components/tickets/TicketChatAttachmentMedia";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -15,11 +17,13 @@ import {
   saveTicketRetentionHours,
   saveTickets,
   useTicketsCenter,
+  type TicketAttachment,
   type TicketRetentionHours,
   type TicketStatus,
   type TicketThread,
   type TicketTypeRole,
 } from "@/lib/ticketsCenter";
+import { revokePendingTicketAttachment } from "@/lib/ticketAttachmentRead";
 
 const TICKET_TYPES: { slug: string; label: string; role: TicketTypeRole & StaffRole; accent: string }[] = [
   { slug: "support", label: "دعم فني", role: "ticket_support_manager", accent: "from-blue-100 to-sky-50" },
@@ -37,9 +41,12 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<TicketStatus, string> = {
-  in_review: "border-amber-200 bg-amber-50 text-amber-700",
-  waiting: "border-violet-200 bg-violet-50 text-violet-700",
-  closed: "border-slate-300 bg-slate-100 text-slate-700",
+  in_review:
+    "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/55 dark:bg-amber-950/45 dark:text-amber-200",
+  waiting:
+    "border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-600/50 dark:bg-violet-950/40 dark:text-violet-200",
+  closed:
+    "border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200",
 };
 
 type TicketNotification = {
@@ -65,6 +72,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
   const [chatOpen, setChatOpen] = useState(false);
   const [messageBody, setMessageBody] = useState("");
+  const [messageAttachment, setMessageAttachment] = useState<TicketAttachment | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<TicketNotification[]>([]);
   const [retentionHours, setRetentionHours] = useState<TicketRetentionHours>(() => loadTicketRetentionHours());
@@ -104,6 +112,14 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     () => tickets.filter((t) => t.typeRole === effectiveTypeRole).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)),
     [tickets, effectiveTypeRole],
   );
+
+  useEffect(() => {
+    setMessageBody("");
+    setMessageAttachment((prev) => {
+      void revokePendingTicketAttachment(prev);
+      return null;
+    });
+  }, [selectedTicketId]);
 
   const visibleTickets = useMemo(
     () => (statusFilter === "all" ? scopedTickets : scopedTickets.filter((t) => t.status === statusFilter)),
@@ -215,26 +231,37 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     appendActivityLog(user?.username ?? "admin", "تغيير حالة تكت", `${ticketId.slice(0, 8)} -> ${STATUS_LABELS[status]}`);
   };
 
+  const notifyAttachmentStorageIssue = () => {
+    toast.error("تعذر حفظ الرد. تحقق من مساحة المتصفح أو جرّب ملفًا أصغر.");
+  };
+
   const handleSendMessage = () => {
     if (!selectedTicket) return;
     const body = messageBody.trim();
-    if (!body) return;
-    updateTicket(selectedTicket.id, (ticket) => ({
-      ...ticket,
-      updatedAt: new Date().toISOString(),
-      messages: [
-        ...ticket.messages,
-        {
-          id: crypto.randomUUID(),
-          at: new Date().toISOString(),
-          author: user?.username ?? "staff",
-          body,
-          senderType: "staff",
-        },
-      ],
-    }));
+    if (!body && !messageAttachment) return;
+    try {
+      updateTicket(selectedTicket.id, (ticket) => ({
+        ...ticket,
+        updatedAt: new Date().toISOString(),
+        messages: [
+          ...ticket.messages,
+          {
+            id: crypto.randomUUID(),
+            at: new Date().toISOString(),
+            author: user?.username ?? "staff",
+            body: body || (messageAttachment ? "مرفق" : ""),
+            senderType: "staff",
+            attachments: messageAttachment ? [messageAttachment] : [],
+          },
+        ],
+      }));
+    } catch {
+      notifyAttachmentStorageIssue();
+      return;
+    }
     appendActivityLog(user?.username ?? "staff", "رد الإدمن على تكت", `${selectedTicket.subject} — تم الرد من الإدمن`);
     setMessageBody("");
+    setMessageAttachment(null);
   };
 
   useEffect(() => {
@@ -260,7 +287,11 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
   }, [chatOpen, selectedTicketId, selectedTicket?.messages.length]);
 
   if (visibleTicketTypes.length === 0) {
-    return <div className="rounded-xl border border-violet-200 bg-white/95 p-4 text-right text-sm text-slate-600">لا تملك صلاحية على أي نوع تكت حالياً.</div>;
+    return (
+      <div className="rounded-xl border border-violet-200 bg-white/95 p-4 text-right text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-300">
+        لا تملك صلاحية على أي نوع تكت حالياً.
+      </div>
+    );
   }
   if (!storeOrdersOnly && !ticketType) {
     return <Navigate to={`/dashboard/tickets/${visibleTicketTypes[0].slug}`} replace />;
@@ -268,29 +299,41 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
 
   return (
     <section className="mx-auto max-w-6xl space-y-6">
-      <div className={cn("rounded-2xl border border-violet-200 bg-gradient-to-b p-5 text-right shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]", activeType?.accent ?? "from-white to-violet-50")}>
+      <div
+        className={cn(
+          "rounded-2xl border border-violet-200 bg-gradient-to-b p-5 text-right shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]",
+          activeType?.accent ?? "from-white to-violet-50",
+          "dark:border-slate-600 dark:from-slate-900 dark:to-slate-950 dark:shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)]",
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="font-display text-2xl font-bold text-slate-900">
+            <h1 className="font-display text-2xl font-bold text-slate-900 dark:text-slate-50">
               {storeOrdersOnly ? "طلبات المتاجر" : effectiveTypeLabel}
             </h1>
-            <p className="mt-1 text-sm text-slate-700">
+            <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
               {storeOrdersOnly
                 ? "طلبات المتجر المرسلة من صفحة التكت (نوع «طلب متجر») — اعرض الموضوع والزبون ورد من هنا."
                 : "جدول تكتات احترافي مع فلترة ونافذة شات للرد على الزبون."}
             </p>
             {isSuperAdmin && !storeOrdersOnly ? (
-              <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-violet-300 bg-white text-xs">
+              <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-violet-300 bg-white text-xs dark:border-slate-600 dark:bg-slate-800">
                 <button
                   type="button"
-                  className={cn("px-3 py-1.5", retentionHours === 24 ? "bg-[#36164f] text-white" : "text-slate-700")}
+                  className={cn(
+                    "px-3 py-1.5",
+                    retentionHours === 24 ? "bg-[#36164f] text-white" : "text-slate-700 dark:text-slate-300",
+                  )}
                   onClick={() => handleRetentionChange(24)}
                 >
                   مدة التكت: 24 ساعة
                 </button>
                 <button
                   type="button"
-                  className={cn("border-r border-violet-200 px-3 py-1.5", retentionHours === 72 ? "bg-[#36164f] text-white" : "text-slate-700")}
+                  className={cn(
+                    "border-r border-violet-200 px-3 py-1.5 dark:border-slate-600",
+                    retentionHours === 72 ? "bg-[#36164f] text-white" : "text-slate-700 dark:text-slate-300",
+                  )}
                   onClick={() => handleRetentionChange(72)}
                 >
                   مدة التكت: 3 أيام
@@ -298,17 +341,17 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
               </div>
             ) : null}
             {isSuperAdmin && !storeOrdersOnly ? (
-              <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-slate-500">
+              <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                 مدة الحذف التلقائي (24 ساعة / 3 أيام) لا تُطبَّق على{" "}
-                <strong className="font-semibold text-slate-600">طلبات المتجر</strong>؛ تظل محفوظة بدون انتهاء وقتي، على
-                عكس باقي أنواع التكت.
+                <strong className="font-semibold text-slate-600 dark:text-slate-300">طلبات المتجر</strong>؛ تظل محفوظة
+                بدون انتهاء وقتي، على عكس باقي أنواع التكت.
               </p>
             ) : null}
           </div>
           <div className="relative">
             <button
               type="button"
-              className="relative inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white/90 px-3 py-1 text-xs text-violet-700 hover:bg-white"
+              className="relative inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white/90 px-3 py-1 text-xs text-violet-700 hover:bg-white dark:border-slate-600 dark:bg-slate-800/95 dark:text-violet-200 dark:hover:bg-slate-800"
               onClick={() => setNotificationsOpen((v) => !v)}
             >
               <BellRing className="h-3.5 w-3.5" />
@@ -320,8 +363,8 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
               ) : null}
             </button>
             {notificationsOpen ? (
-              <div className="absolute left-0 z-20 mt-2 w-80 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xl">
-                <div className="border-b border-violet-100 px-3 py-2 text-right text-xs text-slate-600">
+              <div className="absolute left-0 z-20 mt-2 w-80 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-xl dark:border-slate-600 dark:bg-slate-900 dark:shadow-black/40">
+                <div className="border-b border-violet-100 px-3 py-2 text-right text-xs text-slate-600 dark:border-slate-700 dark:text-slate-400">
                   آخر الإشعارات
                 </div>
                 <div className="max-h-72 overflow-y-auto">
@@ -332,16 +375,20 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                         type="button"
                         onClick={() => openFromNotification(n.id, n.typeSlug, n.ticketId)}
                         className={cn(
-                          "w-full border-b border-violet-100 px-3 py-2 text-right hover:bg-violet-50",
-                          n.unread && "bg-violet-50/60",
+                          "w-full border-b border-violet-100 px-3 py-2 text-right hover:bg-violet-50 dark:border-slate-800 dark:hover:bg-slate-800/80",
+                          n.unread && "bg-violet-50/60 dark:bg-slate-800/70",
                         )}
                       >
-                        <p className="text-sm text-slate-800">{n.message}</p>
-                        <p className="mt-1 text-[11px] text-slate-500">{new Date(n.createdAt).toLocaleString("ar")}</p>
+                        <p className="text-sm text-slate-800 dark:text-slate-100">{n.message}</p>
+                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          {new Date(n.createdAt).toLocaleString("ar")}
+                        </p>
                       </button>
                     ))
                   ) : (
-                    <p className="px-3 py-4 text-right text-sm text-slate-500">لا يوجد إشعارات حالياً.</p>
+                    <p className="px-3 py-4 text-right text-sm text-slate-500 dark:text-slate-400">
+                      لا يوجد إشعارات حالياً.
+                    </p>
                   )}
                 </div>
               </div>
@@ -359,8 +406,9 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
               asChild
               variant="outline"
               className={cn(
-                "h-12 justify-center rounded-xl border-violet-300 bg-white text-sm text-violet-800 hover:bg-violet-50 hover:text-violet-900",
-                effectiveTypeRole === item.role && "border-[#36164f] bg-[#36164f] text-white hover:bg-[#2f1344] hover:text-white",
+                "h-12 justify-center rounded-xl border-violet-300 bg-white text-sm text-violet-800 hover:bg-violet-50 hover:text-violet-900 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700 dark:hover:text-violet-100",
+                effectiveTypeRole === item.role &&
+                  "border-[#36164f] bg-[#36164f] text-white hover:bg-[#2f1344] hover:text-white dark:border-[#36164f]",
               )}
             >
               <Link to={`/dashboard/tickets/${item.slug}`} className="relative inline-flex w-full items-center justify-center">
@@ -377,21 +425,65 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-violet-200 bg-white/95 p-4 shadow-[0_16px_36px_-24px_rgba(54,22,79,0.35)]">
+      <div className="rounded-2xl border border-violet-200 bg-white/95 p-4 shadow-[0_16px_36px_-24px_rgba(54,22,79,0.35)] dark:border-slate-700 dark:bg-slate-900/95 dark:shadow-[0_16px_36px_-24px_rgba(0,0,0,0.45)]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="font-display text-sm text-slate-700">{effectiveTypeLabel} — عدد التكتات: {visibleTickets.length}</p>
-          <div className="inline-flex overflow-hidden rounded-lg border border-violet-200 bg-white text-xs">
-            <button type="button" className={cn("px-2.5 py-1.5", statusFilter === "all" ? "bg-[#36164f] text-white" : "text-slate-700")} onClick={() => setStatusFilter("all")}>الكل</button>
-            <button type="button" className={cn("border-r border-violet-200 px-2.5 py-1.5", statusFilter === "in_review" ? "bg-amber-100 text-amber-800" : "text-slate-700")} onClick={() => setStatusFilter("in_review")}>قيد المراجعة</button>
-            <button type="button" className={cn("border-r border-violet-200 px-2.5 py-1.5", statusFilter === "waiting" ? "bg-violet-100 text-violet-800" : "text-slate-700")} onClick={() => setStatusFilter("waiting")}>انتظار</button>
-            <button type="button" className={cn("border-r border-violet-200 px-2.5 py-1.5", statusFilter === "closed" ? "bg-slate-200 text-slate-800" : "text-slate-700")} onClick={() => setStatusFilter("closed")}>مغلقة</button>
+          <p className="font-display text-sm text-slate-700 dark:text-slate-300">
+            {effectiveTypeLabel} — عدد التكتات: {visibleTickets.length}
+          </p>
+          <div className="inline-flex overflow-hidden rounded-lg border border-violet-200 bg-white text-xs dark:border-slate-600 dark:bg-slate-800">
+            <button
+              type="button"
+              className={cn(
+                "px-2.5 py-1.5",
+                statusFilter === "all" ? "bg-[#36164f] text-white" : "text-slate-700 dark:text-slate-300",
+              )}
+              onClick={() => setStatusFilter("all")}
+            >
+              الكل
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "border-r border-violet-200 px-2.5 py-1.5 dark:border-slate-600",
+                statusFilter === "in_review"
+                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950/55 dark:text-amber-100"
+                  : "text-slate-700 dark:text-slate-300",
+              )}
+              onClick={() => setStatusFilter("in_review")}
+            >
+              قيد المراجعة
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "border-r border-violet-200 px-2.5 py-1.5 dark:border-slate-600",
+                statusFilter === "waiting"
+                  ? "bg-violet-100 text-violet-900 dark:bg-violet-950/50 dark:text-violet-100"
+                  : "text-slate-700 dark:text-slate-300",
+              )}
+              onClick={() => setStatusFilter("waiting")}
+            >
+              انتظار
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "border-r border-violet-200 px-2.5 py-1.5 dark:border-slate-600",
+                statusFilter === "closed"
+                  ? "bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100"
+                  : "text-slate-700 dark:text-slate-300",
+              )}
+              onClick={() => setStatusFilter("closed")}
+            >
+              مغلقة
+            </button>
           </div>
         </div>
 
         {visibleTickets.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-violet-200">
+          <div className="overflow-hidden rounded-xl border border-violet-200 dark:border-slate-700">
             <table className="w-full text-right text-sm">
-              <thead className="bg-violet-50/70 text-slate-700">
+              <thead className="bg-violet-50/70 text-slate-700 dark:bg-slate-800/90 dark:text-slate-200">
                 <tr>
                   <th className="px-3 py-2 font-medium">الموضوع</th>
                   <th className="px-3 py-2 font-medium">الزبون</th>
@@ -409,7 +501,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                   return (
                     <tr
                       key={ticket.id}
-                      className="cursor-pointer border-t border-violet-100 bg-white hover:bg-violet-50/45"
+                      className="cursor-pointer border-t border-violet-100 bg-white hover:bg-violet-50/45 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/70"
                       onClick={() => {
                         setSelectedTicketId(ticket.id);
                         setChatOpen(true);
@@ -420,24 +512,26 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                         }));
                       }}
                     >
-                      <td className="px-3 py-2 font-display text-slate-900">
+                      <td className="px-3 py-2 font-display text-slate-900 dark:text-slate-100">
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate">{ticket.subject}</span>
                           {unreadForTicket > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-950/50 dark:text-rose-200">
                               جديد
                               <span className="rounded-full bg-rose-600 px-1 text-[10px] text-white">{unreadForTicket}</span>
                             </span>
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-slate-700">{ticket.openedBy}</td>
+                      <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{ticket.openedBy}</td>
                       <td className="px-3 py-2">
                         <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[ticket.status])}>
                           {STATUS_LABELS[ticket.status]}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs text-slate-500">{new Date(ticket.updatedAt).toLocaleString("ar")}</td>
+                      <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+                        {new Date(ticket.updatedAt).toLocaleString("ar")}
+                      </td>
                     </tr>
                   );
                 })}
@@ -445,78 +539,109 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
             </table>
           </div>
         ) : (
-          <p className="rounded-xl border border-violet-200 bg-violet-50/40 p-3 text-right text-sm text-slate-600">لا توجد تكتات في هذا الفلتر حالياً.</p>
+          <p className="rounded-xl border border-violet-200 bg-violet-50/40 p-3 text-right text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+            لا توجد تكتات في هذا الفلتر حالياً.
+          </p>
         )}
       </div>
 
-      <Dialog open={chatOpen && !!selectedTicket} onOpenChange={setChatOpen}>
-        <DialogContent dir="rtl" className="border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:max-w-3xl sm:rounded-2xl">
+      <Dialog
+        open={chatOpen && !!selectedTicket}
+        onOpenChange={(open) => {
+          setChatOpen(open);
+          if (!open) {
+            setMessageBody("");
+            setMessageAttachment((prev) => {
+              void revokePendingTicketAttachment(prev);
+              return null;
+            });
+          }
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-3xl sm:rounded-2xl"
+        >
           <DialogHeader>
-            <DialogTitle className="font-display text-slate-900">{selectedTicket?.subject ?? "تفاصيل التكت"}</DialogTitle>
+            <DialogTitle className="font-display text-slate-900 dark:text-slate-50">
+              {selectedTicket?.subject ?? "تفاصيل التكت"}
+            </DialogTitle>
           </DialogHeader>
 
           {selectedTicket ? (
             <div className="space-y-4">
-              <div className="rounded-xl border border-violet-200 bg-white/90 p-3">
+              <div className="rounded-xl border border-violet-200 bg-white/90 p-3 dark:border-slate-600 dark:bg-slate-800/90">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-slate-700">الزبون: <span className="font-medium text-slate-900">{selectedTicket.openedBy}</span></p>
-                  <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[selectedTicket.status])}>{STATUS_LABELS[selectedTicket.status]}</span>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
+                    الزبون:{" "}
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{selectedTicket.openedBy}</span>
+                  </p>
+                  <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[selectedTicket.status])}>
+                    {STATUS_LABELS[selectedTicket.status]}
+                  </span>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
-                  <Button type="button" variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100" onClick={() => handleStatusChange(selectedTicket.id, "in_review")}><Clock3 className="ms-1 h-4 w-4" />قيد المراجعة</Button>
-                  <Button type="button" variant="outline" className="border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100" onClick={() => handleStatusChange(selectedTicket.id, "waiting")}>انتظار</Button>
-                  <Button type="button" variant="outline" className="border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200" onClick={() => handleStatusChange(selectedTicket.id, "closed")}><XCircle className="ms-1 h-4 w-4" />مغلقة</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-800/50 dark:bg-amber-950/35 dark:text-amber-200 dark:hover:bg-amber-950/55"
+                    onClick={() => handleStatusChange(selectedTicket.id, "in_review")}
+                  >
+                    <Clock3 className="ms-1 h-4 w-4" />
+                    قيد المراجعة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100 dark:border-violet-600/50 dark:bg-violet-950/35 dark:text-violet-200 dark:hover:bg-violet-950/55"
+                    onClick={() => handleStatusChange(selectedTicket.id, "waiting")}
+                  >
+                    انتظار
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    onClick={() => handleStatusChange(selectedTicket.id, "closed")}
+                  >
+                    <XCircle className="ms-1 h-4 w-4" />
+                    مغلقة
+                  </Button>
                 </div>
               </div>
 
-              <div ref={chatScrollRef} className="max-h-[45vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3">
+              <div
+                ref={chatScrollRef}
+                className="max-h-[45vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3 dark:border-slate-600 dark:bg-slate-950/50"
+              >
                 {selectedTicket.messages.map((msg) => {
                   const mine = msg.author === (user?.username ?? "");
                   return (
                     <div key={msg.id} className={cn("flex", mine ? "justify-start" : "justify-end")}>
-                      <div className={cn("max-w-[85%] rounded-xl border px-3 py-2 text-right", mine ? "border-violet-300 bg-violet-100/70 text-slate-900" : "border-violet-200 bg-white text-slate-900")}>
-                        <p className="text-xs font-medium text-violet-800">{msg.author}</p>
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-xl border px-3 py-2 text-right",
+                          mine
+                            ? "border-violet-300 bg-violet-100/70 text-slate-900 dark:border-violet-600 dark:bg-violet-950/45 dark:text-slate-100"
+                            : "border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100",
+                        )}
+                      >
+                        <p className="text-xs font-medium text-violet-800 dark:text-violet-300">{msg.author}</p>
                         <p className="mt-1 whitespace-pre-wrap text-sm">{msg.body}</p>
                         {msg.attachments?.length ? (
                           <div className="mt-2 space-y-2">
                             {msg.attachments.map((att) => (
-                              <div key={att.id}>
-                                {att.mimeType.startsWith("video/") ? (
-                                  <div className="space-y-1">
-                                    <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
-                                      <video controls className="max-h-56 rounded border border-violet-200">
-                                        <source src={att.dataUrl} type={att.mimeType} />
-                                      </video>
-                                    </a>
-                                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
-                                        فتح
-                                      </a>
-                                      <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
-                                        تنزيل
-                                      </a>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <a href={att.dataUrl} target="_blank" rel="noreferrer" className="block">
-                                      <img src={att.dataUrl} alt={att.name} className="max-h-56 cursor-zoom-in rounded border border-violet-200" />
-                                    </a>
-                                    <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-                                      <a href={att.dataUrl} target="_blank" rel="noreferrer" className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
-                                        فتح
-                                      </a>
-                                      <a href={att.dataUrl} download={att.name} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 hover:bg-violet-100">
-                                        تنزيل
-                                      </a>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
+                              <TicketChatAttachmentMedia
+                                key={att.id}
+                                att={att}
+                                variant={mine ? "dashStaff" : "dashCustomer"}
+                              />
                             ))}
                           </div>
                         ) : null}
-                        <p className="mt-1 text-[11px] text-slate-500">{new Date(msg.at).toLocaleString("ar")}</p>
+                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                          {new Date(msg.at).toLocaleString("ar")}
+                        </p>
                       </div>
                     </div>
                   );
@@ -525,7 +650,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
               </div>
 
               <div className="space-y-2">
-                <Label className="text-right text-slate-700">رد الإداري</Label>
+                <Label className="text-right text-slate-700 dark:text-slate-300">رد الإداري</Label>
                 <Textarea
                   value={messageBody}
                   onChange={(e) => setMessageBody(e.target.value)}
@@ -535,16 +660,29 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                       handleSendMessage();
                     }
                   }}
-                  className="min-h-[80px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
+                  className="min-h-[80px] border-violet-200 bg-white text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                   placeholder="اكتب ردك للزبون..."
                 />
+                <TicketAttachmentPicker value={messageAttachment} onChange={setMessageAttachment} variant="admin" />
               </div>
             </div>
           ) : null}
 
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button type="button" variant="outline" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50" onClick={() => setChatOpen(false)}>إغلاق</Button>
-            <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={handleSendMessage}>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-violet-200 bg-white text-violet-800 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700"
+              onClick={() => setChatOpen(false)}
+            >
+              إغلاق
+            </Button>
+            <Button
+              type="button"
+              disabled={!messageBody.trim() && !messageAttachment}
+              className="bg-[#36164f] text-white hover:bg-[#2f1344] disabled:opacity-50"
+              onClick={handleSendMessage}
+            >
               <Send className="ms-1 h-4 w-4" />
               إرسال الرد
             </Button>

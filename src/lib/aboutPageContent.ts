@@ -4,6 +4,7 @@ const STORAGE_KEY = "ic_about_page_content_v1";
 const EVENT_NAME = "ic-about-page-content";
 
 export type AboutPillar = {
+  id: string;
   title: string;
   body: string;
 };
@@ -31,10 +32,18 @@ export type AboutPageContent = {
   ctaButtonLabel: string;
 };
 
-type AboutPagePersisted = {
+export type AboutPagePersisted = {
   v: 1;
   content: AboutPageContent;
 };
+
+export function createAboutPillar(): AboutPillar {
+  return {
+    id: crypto.randomUUID(),
+    title: "ميزة جديدة",
+    body: "",
+  };
+}
 
 export function defaultAboutPageContent(): AboutPageContent {
   return {
@@ -42,7 +51,7 @@ export function defaultAboutPageContent(): AboutPageContent {
     heroTitleA: "من",
     heroTitleB: "نحن",
     aboutEyebrow: "من نحن",
-    aboutTitle: "Infinite City RP",
+    aboutTitle: "INFINTE CITY CFW",
     aboutBody:
       "نحن فريق ومجتمع يجمع حول مدينة رول بلاي عربية طموحة: قوانين واضحة، وزارات ومؤسسات، وشوارع مليئة بالقصص. هدفنا أن تكون كل جلسة قريبة من الواقع الترفيهي — احترام للقصة، ولللاعب، وللوقت الذي يقضيه الجميع هنا.",
     visionTitle: "رؤيتنا",
@@ -53,14 +62,17 @@ export function defaultAboutPageContent(): AboutPageContent {
     featuresSubtitle: "ثلاثة محاور نبني عليها تجربة المدينة يوماً بعد يوم.",
     pillars: [
       {
+        id: "pillar-seed-1",
         title: "تجربة RP عميقة",
         body: "قصص، أدوار، ومؤسسات تعطي كل جلسة معنى — من المواطن البسيط إلى القطاعات الحكومية والعصابات.",
       },
       {
+        id: "pillar-seed-2",
         title: "مجتمع واعٍ",
         body: "لاعبون يحترمون القوانين والقصة؛ الإدارة تعمل على بيئة عادلة، شفافة، وقريبة من اللاعبين.",
       },
       {
+        id: "pillar-seed-3",
         title: "دعم وفريق",
         body: "نسعى لأن تكون المدينة مساحة مريحة للعب الجاد مع مسارات واضحة للانضمام والمتابعة.",
       },
@@ -80,18 +92,17 @@ function normalize(raw: unknown): AboutPageContent {
   const base = defaultAboutPageContent();
   if (!raw || typeof raw !== "object") return base;
   const p = raw as Partial<AboutPageContent>;
-  const nextPillars = Array.isArray(p.pillars)
-    ? p.pillars
-        .slice(0, 3)
-        .map((x, idx) => ({
-          title: typeof x?.title === "string" ? x.title : base.pillars[idx]?.title ?? "",
-          body: typeof x?.body === "string" ? x.body : base.pillars[idx]?.body ?? "",
-        }))
+  const rawPillars = Array.isArray(p.pillars) ? p.pillars : null;
+  const nextPillars: AboutPillar[] = rawPillars
+    ? rawPillars.map((x, idx) => {
+        const row = x as Partial<AboutPillar>;
+        const title = typeof row.title === "string" ? row.title : base.pillars[idx]?.title ?? "";
+        const body = typeof row.body === "string" ? row.body : base.pillars[idx]?.body ?? "";
+        const id =
+          typeof row.id === "string" && row.id.length > 0 ? row.id : `legacy-pillar-${idx}`;
+        return { id, title, body };
+      })
     : base.pillars;
-
-  while (nextPillars.length < 3) {
-    nextPillars.push(base.pillars[nextPillars.length]);
-  }
 
   return {
     heroEyebrow: typeof p.heroEyebrow === "string" ? p.heroEyebrow : base.heroEyebrow,

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   Handshake,
@@ -21,6 +22,9 @@ import { cn } from "@/lib/utils";
 import { useInvestmentsContent } from "@/contexts/InvestmentsContentContext";
 import type { InvestmentCatalogItem } from "@/data/investmentsCatalog";
 import { StoreGalleryCarousel } from "@/components/store/StoreGalleryCarousel";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
+import { usePublicUser } from "@/contexts/PublicUserContext";
+import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE } from "@/lib/publicProfileEligibility";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -34,16 +38,16 @@ function InvestmentCompactCard({
   return (
     <div
       className={cn(
-        "relative w-full rounded-3xl p-[2px] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.55)] transition-[box-shadow,filter] duration-500",
+        "relative w-full rounded-2xl p-[2px] shadow-[0_16px_44px_-22px_rgba(0,0,0,0.5)] transition-[box-shadow,filter] duration-500",
         "bg-gradient-to-br from-amber-400 via-fuchsia-500 to-violet-500 bg-[length:300%_300%] animate-vip-gradient-shift motion-reduce:animate-none",
-        "hover:shadow-[0_32px_70px_-24px_hsl(var(--primary)/0.4)]",
+        "hover:shadow-[0_22px_52px_-20px_hsl(var(--primary)/0.38)]",
         item.taken && "opacity-[0.92]",
       )}
     >
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="group relative aspect-[4/5] w-full min-h-[300px] overflow-hidden rounded-[calc(1.5rem-2px)] border-0 text-right shadow-inner ring-1 ring-black/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[340px] lg:min-h-[380px]"
+        className="group relative aspect-[5/6] w-full min-h-[200px] overflow-hidden rounded-[calc(1rem-2px)] border-0 text-right shadow-inner ring-1 ring-black/20 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-[220px] lg:min-h-[240px]"
       >
         <img
           src={item.thumbnailUrl}
@@ -71,20 +75,20 @@ function InvestmentCompactCard({
           </Badge>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-[5] space-y-1.5 px-5 pb-6 pt-24 text-right sm:px-7 sm:pb-8 sm:pt-28">
-          <p className="flex items-center justify-end gap-1 text-[11px] font-medium text-white/85">
+        <div className="absolute inset-x-0 bottom-0 z-[5] space-y-1 px-4 pb-4 pt-16 text-right sm:px-5 sm:pb-5 sm:pt-20">
+          <p className="flex items-center justify-end gap-1 text-[10px] font-medium text-white/85">
             <span>{item.location}</span>
-            <MapPin className="h-3 w-3" />
+            <MapPin className="h-2.5 w-2.5" />
           </p>
-          <h2 className="font-display text-xl font-bold leading-snug tracking-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.9)] sm:text-2xl lg:text-[1.55rem]">
+          <h2 className="font-display text-base font-bold leading-snug tracking-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.9)] sm:text-lg lg:text-xl">
             {item.name}
           </h2>
-          <p className="line-clamp-2 text-[12px] leading-snug text-white/85 sm:text-[13px]">
+          <p className="line-clamp-2 text-[11px] leading-snug text-white/85 sm:text-[12px]">
             {item.description}
           </p>
           <div className="flex items-center justify-end">
             <p
-              className="font-latin-display text-2xl font-bold tabular-nums tracking-tight text-primary drop-shadow-[0_2px_16px_rgba(0,0,0,0.85)] sm:text-3xl"
+              className="font-latin-display text-xl font-bold tabular-nums tracking-tight text-primary drop-shadow-[0_2px_16px_rgba(0,0,0,0.85)] sm:text-2xl"
               dir="ltr"
             >
               {usd.format(item.priceUsd)}
@@ -105,6 +109,9 @@ function InvestmentDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
+  const navigate = useNavigate();
+  const { getProfile } = usePublicUser();
+  const { applications } = useApplicationsContent();
   if (!item) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -192,6 +199,13 @@ function InvestmentDialog({
           <div className="flex w-full justify-start sm:w-auto sm:shrink-0">
             <Link
               to="/tickets?type=store"
+              onClick={(e) => {
+                if (!isPublicTicketsUnlocked(getProfile(), applications)) {
+                  e.preventDefault();
+                  toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
+                  navigate("/profile");
+                }
+              }}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-neon px-5 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:opacity-95 sm:h-10 sm:min-w-[10.5rem]"
             >
               <Store className="h-4 w-4" /> الاستفسار عن الفرصة
@@ -233,7 +247,7 @@ export function InvestmentsCatalogBlock() {
   return (
     <>
       <section className="mx-auto max-w-[1600px]">
-        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 xl:gap-5">
           {visible.map((i) => (
             <InvestmentCompactCard key={i.id} item={i} onOpen={open} />
           ))}

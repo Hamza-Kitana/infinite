@@ -24,9 +24,9 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { JOB_ROLE_LAWS, type JobRoleKey } from "@/data/jobRoleLaws";
-import { JOB_ROLE_LAWS_QUIZ } from "@/data/lawsQuiz";
 import { LawsQuizDialog } from "@/components/LawsQuizDialog";
 import type { LawsQuizResult } from "@/data/publicApplicationTypes";
+import { useQuizQuestions, type QuizContextKey } from "@/lib/lawsQuizContent";
 import {
   branchIdFromApplicationRoleKey,
   useApplicationsClosure,
@@ -65,6 +65,8 @@ const JobsApplicationFormPage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const roleKey = (role in JOB_ROLE_LAWS ? role : "") as JobRoleKey | "";
+  const quizContextKey = (roleKey || "citizen") as QuizContextKey;
+  const quizQuestions = useQuizQuestions(quizContextKey);
   const lawSet = roleKey ? JOB_ROLE_LAWS[roleKey] : null;
   const closure = useApplicationsClosure();
   const closureBranchId = roleKey ? branchIdFromApplicationRoleKey(roleKey) : null;
@@ -582,7 +584,7 @@ const JobsApplicationFormPage = () => {
           </div>
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-right text-sm leading-relaxed text-amber-900">
             بعد الضغط على «متابعة وأسئلة الإقرار» سيُعرض عليك اختبار قصير (
-            {(JOB_ROLE_LAWS_QUIZ[roleKey as JobRoleKey] ?? []).length} أسئلة) للتحقق من قراءتك. لن يُعتمد إقرارك إلا
+            {quizQuestions.length} أسئلة) للتحقق من قراءتك. لن يُعتمد إقرارك إلا
             بالإجابة الصحيحة على الأسئلة جميعها.
           </div>
           <div className="mt-4 flex justify-end border-t border-violet-100 pt-4">
@@ -603,7 +605,7 @@ const JobsApplicationFormPage = () => {
       <LawsQuizDialog
         open={quizOpen}
         onOpenChange={setQuizOpen}
-        questions={JOB_ROLE_LAWS_QUIZ[roleKey as JobRoleKey] ?? []}
+        questions={quizQuestions}
         contextLabel={lawSet.title}
         onComplete={(result) => {
           setQuizResult(result);

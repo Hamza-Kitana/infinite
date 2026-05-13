@@ -1,10 +1,11 @@
+import { useRef } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Crown, ExternalLink, EyeOff, MapPin, Sparkles, UserRound } from "lucide-react";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 import { useGangsContent } from "@/contexts/GangsContentContext";
 import { cn } from "@/lib/utils";
-import { parseYoutubeVideoId, youtubeEmbedUrl } from "@/lib/youtube";
+import { parseYoutubeVideoId, scheduleBoostYoutubePlayerQuality, youtubeEmbedUrl } from "@/lib/youtube";
 import type { GangCard } from "@/types/gangsSchema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Navigate } from "react-router-dom";
@@ -167,6 +168,7 @@ function GangsSideRail({ list }: { list: GangCard[] }) {
 }
 
 function GangShowcaseCard({ gang }: { gang: GangCard }) {
+  const youtubeIframeRef = useRef<HTMLIFrameElement>(null);
   const isTaken = gang.status === "taken";
   const youtubeId = parseYoutubeVideoId(gang.youtubeVideo);
 
@@ -278,6 +280,7 @@ function GangShowcaseCard({ gang }: { gang: GangCard }) {
           <div className="relative aspect-video w-full overflow-hidden bg-black">
             {youtubeId ? (
               <iframe
+                ref={youtubeIframeRef}
                 src={youtubeEmbedUrl(youtubeId)}
                 title={`فيديو يوتيوب عن ${gang.name}`}
                 className="absolute inset-0 h-full w-full border-0"
@@ -285,6 +288,7 @@ function GangShowcaseCard({ gang }: { gang: GangCard }) {
                 allowFullScreen
                 loading="lazy"
                 referrerPolicy="strict-origin-when-cross-origin"
+                onLoad={() => scheduleBoostYoutubePlayerQuality(youtubeIframeRef.current)}
               />
             ) : (
               <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 bg-muted p-8 text-center">

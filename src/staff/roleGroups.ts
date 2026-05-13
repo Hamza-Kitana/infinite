@@ -36,6 +36,7 @@ const BASE_VALID: readonly string[] = [
   "houses_manager",
   "packages_manager",
   "investments_manager",
+  "quiz_manager",
   "application_reviewer",
   "about_manager",
   "store_orders_manager",

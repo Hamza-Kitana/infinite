@@ -31,6 +31,10 @@ import {
   useApplicationsClosure,
 } from "@/lib/applicationsClosure";
 import { usePublicUser } from "@/contexts/PublicUserContext";
+import {
+  hasApprovedApplicationForRole,
+  isCitizenElectronicApplyComplete,
+} from "@/lib/publicProfileEligibility";
 import { BadgeCheck, IdCard, Lock, ShieldAlert } from "lucide-react";
 
 const TOTAL_STEPS = 10;
@@ -159,7 +163,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 const ApplicationFormPage = () => {
   const { role = "" } = useParams();
   const navigate = useNavigate();
-  const { submitApplication } = useApplicationsContent();
+  const { submitApplication, applications } = useApplicationsContent();
   const publicUser = usePublicUser();
   const visibility = useSiteVisibility();
   const closure = useApplicationsClosure();
@@ -169,11 +173,19 @@ const ApplicationFormPage = () => {
     : false;
   const closureNote = closureBranchId ? closure.notes[closureBranchId] : undefined;
   const isDiscordUser = publicUser.user?.authProvider === "discord";
+  const effectiveRoleKey = targets[role] ? role : "citizen";
   /** ملف المستخدم الكامل — يحتوي على discordId والاسم على Discord */
   const profile = useMemo(
     () => (publicUser.user ? publicUser.getProfile() : null),
     [publicUser],
   );
+  const electronicApplyBlocked = useMemo(() => {
+    if (!profile || !isDiscordUser) return false;
+    if (effectiveRoleKey === "citizen") {
+      return isCitizenElectronicApplyComplete(profile, applications);
+    }
+    return hasApprovedApplicationForRole(profile, applications, effectiveRoleKey);
+  }, [profile, isDiscordUser, effectiveRoleKey, applications]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const finalSubmitStarted = useRef(false);
@@ -436,10 +448,21 @@ const ApplicationFormPage = () => {
       toast.error("التقديم مغلق حالياً لهذه الجهة");
       return;
     }
+    const roleKey = targets[role] ? role : "citizen";
+    if (profile && isDiscordUser) {
+      if (roleKey === "citizen") {
+        if (isCitizenElectronicApplyComplete(profile, applications)) {
+          toast.error("تم قبولك أو تفعيل حسابك مسبقاً — لا حاجة لإرسال طلب جديد من هنا");
+          return;
+        }
+      } else if (hasApprovedApplicationForRole(profile, applications, roleKey)) {
+        toast.error("يوجد لديك طلب مقبول مسبقاً لهذا المسار — لا حاجة لإرسال طلب جديد");
+        return;
+      }
+    }
     if (!validateAllFields()) return;
     finalSubmitStarted.current = true;
     setIsSubmitting(true);
-    const roleKey = targets[role] ? role : "citizen";
     try {
       const result = submitApplication({
         roleKey,
@@ -500,6 +523,12 @@ const ApplicationFormPage = () => {
     lawsAccepted,
     lawsQuizResult,
     submitApplication,
+    profile,
+    isDiscordUser,
+    applications,
+    publicUser.user?.id,
+    publicUser.user?.username,
+    publicUser.user?.displayName,
   ]);
 
   const stepIntro = (n: number, title: string, hint: string) => (
@@ -608,6 +637,65 @@ const ApplicationFormPage = () => {
                     onClick={() => navigate(target.dashboardPath)}
                   >
                     العودة إلى الجهة
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (electronicApplyBlocked) {
+    return (
+      <div dir="rtl" className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_60%_at_50%_0%,hsl(142_76%_36%/0.16),transparent_70%),radial-gradient(60%_60%_at_50%_100%,hsl(272_82%_58%/0.12),transparent_70%)]"
+        />
+        <Navbar />
+        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-200px)] max-w-3xl flex-col items-center justify-center px-4 py-24 md:px-8">
+          <div className="w-full overflow-hidden rounded-3xl border border-emerald-200/80 bg-gradient-to-l from-emerald-50 via-white to-teal-50 p-8 text-right shadow-[0_28px_70px_-30px_rgba(16,185,129,0.35)] md:p-10">
+            <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-right">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shadow-inner">
+                <BadgeCheck className="h-8 w-8" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-emerald-800/90">
+                  أنت مفعّل بالفعل
+                </p>
+                <h1 className="font-display text-2xl font-bold text-emerald-950 md:text-3xl">
+                  لا حاجة لإعادة التقديم الإلكتروني
+                </h1>
+                <p className="text-sm leading-relaxed text-emerald-900/85">
+                  تم قبول تقديمك لهذا المسار أو تفعيل حسابك على المدينة. استخدم البروفايل والتكت للمتابعة مع
+                  الإدارة.
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  <Button
+                    type="button"
+                    className="rounded-xl bg-emerald-600 text-white shadow-sm hover:bg-emerald-700"
+                    onClick={() => navigate("/profile")}
+                  >
+                    الذهاب إلى البروفايل
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50"
+                    onClick={() => navigate(target.dashboardPath)}
+                  >
+                    العودة إلى الجهة
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                    onClick={() => navigate("/")}
+                  >
+                    الصفحة الرئيسية
                   </Button>
                 </div>
               </div>

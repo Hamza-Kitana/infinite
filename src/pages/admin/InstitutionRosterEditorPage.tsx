@@ -130,45 +130,60 @@ function SortableMemberRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "space-y-2 rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-right",
-        isDragging && "z-20 opacity-90 shadow-lg",
+        "space-y-2 rounded-xl border border-violet-200 bg-violet-50/70 p-3 text-right text-slate-900 dark:border-violet-700/45 dark:bg-slate-800/95 dark:text-slate-100",
+        isDragging && "z-20 opacity-90 shadow-lg dark:shadow-violet-950/40",
       )}
     >
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="inline-flex h-10 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-500 active:cursor-grabbing"
+          className="inline-flex h-10 w-9 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/80 text-slate-600 active:cursor-grabbing dark:border-slate-500 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-900"
           aria-label="سحب"
           {...attributes}
           {...listeners}
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="h-4 w-4 shrink-0 text-slate-600 dark:text-slate-300" />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <img src={member.image} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-violet-200 object-cover" />
+            <img
+              src={member.image}
+              alt=""
+              className="h-14 w-14 shrink-0 rounded-lg border border-violet-200 object-cover dark:border-violet-600/60"
+            />
             <div className="min-w-0 flex-1 text-right">
-              <p className="truncate font-display font-semibold text-slate-900">{member.title}</p>
-              <p className="truncate text-xs text-slate-600">{member.subtitle}</p>
+              <p className="truncate font-display font-semibold text-slate-900 dark:text-slate-50">{member.title}</p>
+              <p className="truncate text-xs text-slate-600 dark:text-slate-400">{member.subtitle}</p>
             </div>
             {member.hidden ? (
-              <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700">
+              <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 font-display text-[10px] text-slate-700 dark:bg-slate-600 dark:text-slate-200">
                 مخفي
               </span>
             ) : null}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <Button type="button" variant="outline" size="sm" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={onEdit}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-violet-600 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-slate-950 dark:hover:text-violet-100"
+            onClick={onEdit}
+          >
             تعديل
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" size="icon" className="shrink-0 border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0 border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800 dark:border-rose-700/60 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-950/70 dark:hover:text-rose-200"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl sm:rounded-2xl">
+            <AlertDialogContent dir="rtl" className="border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 sm:rounded-2xl">
               <AlertDialogHeader className="text-right">
                 <AlertDialogTitle>تأكيد حذف العضو</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -189,21 +204,27 @@ function SortableMemberRow({
 
 function PersonSummaryCard({ label, person, onEdit }: { label: string; person: RosterPerson; onEdit: () => void }) {
   return (
-    <div className="space-y-3 rounded-xl border border-violet-200 bg-white/90 p-4 text-right shadow-[0_14px_30px_-22px_rgba(54,22,79,0.35)]">
+    <div className="space-y-3 rounded-xl border border-violet-200 bg-white/90 p-4 text-right text-slate-900 shadow-[0_14px_30px_-22px_rgba(54,22,79,0.35)] dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-100 dark:shadow-[0_14px_30px_-22px_rgba(0,0,0,0.4)]">
       <div className="flex items-start justify-between gap-3">
         <div className="text-right">
-          <p className="font-display text-sm font-semibold text-violet-700">{label}</p>
+          <p className="font-display text-sm font-semibold text-violet-700 dark:text-violet-300">{label}</p>
           {person.hidden ? (
-            <p className="mt-1 text-[11px] font-display text-slate-500">مخفي من الموقع</p>
+            <p className="mt-1 text-[11px] font-display text-slate-500 dark:text-slate-400">مخفي من الموقع</p>
           ) : null}
-          <p className="mt-1 text-base font-bold text-slate-900">{person.name}</p>
-          <p className="text-xs text-slate-600">{person.title}</p>
+          <p className="mt-1 text-base font-bold text-slate-900 dark:text-slate-50">{person.name}</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">{person.title}</p>
         </div>
-        <Button type="button" variant="outline" size="sm" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={onEdit}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-violet-600 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-slate-950 dark:hover:text-violet-100"
+          onClick={onEdit}
+        >
           تعديل
         </Button>
       </div>
-      <p className="line-clamp-2 text-sm text-slate-600">{person.bio}</p>
+      <p className="line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{person.bio}</p>
     </div>
   );
 }
@@ -721,12 +742,12 @@ const InstitutionRosterEditorPage = () => {
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-display text-sm font-semibold text-violet-700">أعضاء الشبكة (Chroma)</p>
+          <p className="font-display text-sm font-semibold text-violet-700 dark:text-violet-300">أعضاء الشبكة (Chroma)</p>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-violet-600 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-slate-950 dark:hover:text-violet-100"
             onClick={() =>
               setDraft((d) =>
                 d
@@ -757,7 +778,7 @@ const InstitutionRosterEditorPage = () => {
             value={memberSearch}
             onChange={(e) => setMemberSearch(e.target.value)}
             placeholder="ابحث بالاسم أو المنصب..."
-            className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400"
+            className="border-violet-200 bg-white text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500"
             autoComplete="off"
           />
         </div>
@@ -777,7 +798,7 @@ const InstitutionRosterEditorPage = () => {
                 />
               ))}
               {filteredMembers.length === 0 ? (
-                <p className="rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm text-slate-600">
+                <p className="rounded-lg border border-violet-200 bg-white px-4 py-3 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
                   لا يوجد أعضاء مطابقون للبحث.
                 </p>
               ) : null}

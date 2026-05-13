@@ -8,11 +8,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { boostYoutubePlayerQuality } from "@/lib/youtube";
 
 const YOUTUBE_VIDEO_ID = "9w5SHL6nmkg";
 
 export const getYoutubeEmbedUrl = () =>
-  `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${YOUTUBE_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${typeof window !== "undefined" ? window.location.origin : ""}`;
+  `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${YOUTUBE_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : ""}`;
 
 export type HeroBackgroundVideoContextValue = {
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
@@ -50,6 +51,7 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
     } else {
       postPlayerCommand("unMute");
     }
+    boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
   }, [muted, volume, postPlayerCommand]);
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
       if (!muted && volume > 0) {
         postPlayerCommand("unMute");
       }
+      boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
     };
 
     window.addEventListener("pointerdown", unlockSound, { once: true });
@@ -113,6 +116,9 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
     } else {
       postPlayerCommand("mute");
     }
+    boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
+    window.setTimeout(() => boostYoutubePlayerQuality(iframeRef.current?.contentWindow), 800);
+    window.setTimeout(() => boostYoutubePlayerQuality(iframeRef.current?.contentWindow), 2200);
   }, [muted, volume, postPlayerCommand]);
 
   const value = useMemo(

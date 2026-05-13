@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Building2,
   Car,
+  ChevronDown,
   ClipboardList,
   ExternalLink,
   Footprints,
@@ -17,10 +18,14 @@ import {
   Package,
   Scale,
   ShoppingBag,
+  ShieldQuestion,
+  Store,
   Swords,
   TrendingUp,
   Users,
   Video,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { primaryStaffRole, useAuth, type StaffRole } from "@/contexts/AuthContext";
@@ -35,28 +40,45 @@ import {
 } from "@/data/institutionBranches";
 import { cn } from "@/lib/utils";
 import { useTicketsCenter, type TicketTypeRole } from "@/lib/ticketsCenter";
+import { persistAdminDashboardTheme, readAdminDashboardTheme, type AdminDashboardTheme } from "@/lib/adminDashboardTheme";
 import "@/styles/admin-dashboard.css";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: StaffRole[]; end?: boolean };
 
-const STATIC_NAV_CORE: NavItem[] = [
-  { to: "/dashboard", label: "نظرة عامة", icon: LayoutDashboard, roles: ["super_admin"], end: true },
-  { to: "/dashboard/users", label: "المستخدمون والأدوار", icon: Users, roles: ["super_admin"] },
-  { to: "/dashboard/role-groups", label: "مجموعات الرتب", icon: Layers, roles: ["super_admin"] },
-  { to: "/dashboard/activity", label: "سجل النشاط", icon: History, roles: ["super_admin"] },
-  { to: "/dashboard/laws", label: "تحرير القوانين", icon: BookOpen, roles: ["super_admin", "laws_editor"] },
-  { to: "/dashboard/streamers", label: "ستريمر منجر", icon: Video, roles: ["super_admin", "streamer_manager"] },
-  { to: "/dashboard/gangs", label: "مدير العصابات", icon: Swords, roles: ["super_admin", "gang_manager"] },
-  { to: "/dashboard/vip-cars", label: "مدير سيارات VIP", icon: Car, roles: ["super_admin", "vip_cars_manager"] },
-  { to: "/dashboard/houses", label: "مدير البيوت", icon: Home, roles: ["super_admin", "houses_manager"] },
-  { to: "/dashboard/packages", label: "مدير البكجات", icon: Package, roles: ["super_admin", "packages_manager"] },
-  { to: "/dashboard/investments", label: "مدير الاستثمار", icon: TrendingUp, roles: ["super_admin", "investments_manager"] },
+/** روابط إدارة المتجر — تُعرض تحت عنوان «المتجر» في الشريط الجانبي */
+const STORE_SIDEBAR_NAV: NavItem[] = [
+  { to: "/dashboard/vip-cars", label: "سيارات VIP", icon: Car, roles: ["super_admin", "vip_cars_manager"] },
+  { to: "/dashboard/houses", label: "البيوت", icon: Home, roles: ["super_admin", "houses_manager"] },
+  { to: "/dashboard/packages", label: "البكجات", icon: Package, roles: ["super_admin", "packages_manager"] },
+  { to: "/dashboard/investments", label: "الاستثمار", icon: TrendingUp, roles: ["super_admin", "investments_manager"] },
   {
     to: "/dashboard/store-orders",
     label: "طلبات المتاجر",
     icon: ShoppingBag,
     roles: ["super_admin", "store_orders_manager"],
   },
+];
+
+const STORE_SIDEBAR_PREFIXES = [
+  "/dashboard/vip-cars",
+  "/dashboard/houses",
+  "/dashboard/packages",
+  "/dashboard/investments",
+  "/dashboard/store-orders",
+] as const;
+
+const STATIC_NAV_LEADING: NavItem[] = [
+  { to: "/dashboard", label: "نظرة عامة", icon: LayoutDashboard, roles: ["super_admin"], end: true },
+  { to: "/dashboard/users", label: "المستخدمون والأدوار", icon: Users, roles: ["super_admin"] },
+  { to: "/dashboard/role-groups", label: "مجموعات الرتب", icon: Layers, roles: ["super_admin"] },
+  { to: "/dashboard/activity", label: "سجل النشاط", icon: History, roles: ["super_admin"] },
+  { to: "/dashboard/laws", label: "تحرير القوانين", icon: BookOpen, roles: ["super_admin", "laws_editor"] },
+  { to: "/dashboard/quiz", label: "أسئلة التقديم", icon: ShieldQuestion, roles: ["super_admin", "quiz_manager"] },
+  { to: "/dashboard/streamers", label: "ستريمر منجر", icon: Video, roles: ["super_admin", "streamer_manager"] },
+  { to: "/dashboard/gangs", label: "مدير العصابات", icon: Swords, roles: ["super_admin", "gang_manager"] },
+];
+
+const STATIC_NAV_TRAILING: NavItem[] = [
   { to: "/dashboard/about", label: "مدير من نحن", icon: Info, roles: ["super_admin", "about_manager"] },
   { to: "/dashboard/footer", label: "مدير الفوتر", icon: Footprints, roles: ["super_admin", "footer_manager"] },
   {
@@ -111,6 +133,8 @@ function adminRoleShell(role: StaffRole): { title: string; badge: string } {
       return { title: "مدير البكجات", badge: "Packages Manager" };
     case "investments_manager":
       return { title: "مدير الاستثمار", badge: "Investments Manager" };
+    case "quiz_manager":
+      return { title: "مدير الأسئلة", badge: "Quiz Manager" };
     case "application_reviewer":
       return { title: "مراجع التقديمات", badge: "Application Reviewer" };
     case "about_manager":
@@ -143,6 +167,30 @@ function adminRoleShell(role: StaffRole): { title: string; badge: string } {
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [dashboardTheme, setDashboardTheme] = useState<AdminDashboardTheme>(() => readAdminDashboardTheme());
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const isDark = dashboardTheme === "dark";
+    /**
+     * الموقع العام يضع `class="dark"` على body في index.html؛ Tailwind يفعّل `dark:` من أي أسلاف.
+     * لو زال `dark` من html فقط مع بقائه على body تبقى البطاقات والشارت «داكنة» في وضع اللوحة الفاتح.
+     */
+    root.classList.toggle("dark", isDark);
+    body.classList.toggle("dark", isDark);
+    root.setAttribute("data-dashboard-theme", dashboardTheme);
+    return () => {
+      root.classList.remove("dark");
+      body.classList.add("dark");
+      root.removeAttribute("data-dashboard-theme");
+    };
+  }, [dashboardTheme]);
+
+  useEffect(() => {
+    persistAdminDashboardTheme(dashboardTheme);
+  }, [dashboardTheme]);
+
   const {
     user,
     logout,
@@ -201,7 +249,8 @@ const AdminLayout = () => {
     return map;
   }, [totalTicketUnread, storeOrdersUnread]);
 
-  const items = useMemo(() => {
+  const sidebarNav = useMemo(() => {
+    const filterNav = (arr: NavItem[]) => arr.filter((n) => n.roles.some((r) => userRoles.includes(r)));
     const instNav: NavItem[] = [];
     if (isSuperAdmin) {
       instNav.push({
@@ -226,9 +275,21 @@ const AdminLayout = () => {
       }
     }
 
-    const merged = [...STATIC_NAV_CORE, ...instNav, ...STATIC_NAV_TAIL];
-    return merged.filter((n) => n.roles.some((r) => userRoles.includes(r)));
+    return {
+      navLeading: filterNav(STATIC_NAV_LEADING),
+      navStore: filterNav(STORE_SIDEBAR_NAV),
+      navTrailing: [...filterNav(STATIC_NAV_TRAILING), ...instNav, ...filterNav(STATIC_NAV_TAIL)],
+    };
   }, [userRoles, isSuperAdmin]);
+
+  const storeSectionActive = useMemo(
+    () => STORE_SIDEBAR_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)),
+    [location.pathname],
+  );
+  const [storeGroupOpen, setStoreGroupOpen] = useState(true);
+  useEffect(() => {
+    if (storeSectionActive) setStoreGroupOpen(true);
+  }, [storeSectionActive]);
 
   const primary = primaryStaffRole(userRoles);
   const shell = primary ? adminRoleShell(primary) : { title: "لوحة التحكم", badge: "Staff" };
@@ -246,6 +307,8 @@ const AdminLayout = () => {
           ? "سجل النشاط"
           : location.pathname.startsWith("/dashboard/laws")
             ? "تحرير القوانين"
+            : location.pathname.startsWith("/dashboard/quiz")
+              ? "أسئلة التقديم"
             : location.pathname.startsWith("/dashboard/streamers")
               ? "ستريمر منجر"
               : location.pathname.startsWith("/dashboard/gangs")
@@ -281,7 +344,7 @@ const AdminLayout = () => {
 
   const subHint =
     userRoles.length > 1
-      ? `${userRoles.length} صلاحيات نشطة`
+      ? ""
       : isLawsEditor
         ? "صلاحية قوانين"
         : isStreamerManager
@@ -296,6 +359,8 @@ const AdminLayout = () => {
                 ? "صلاحية البكجات"
               : userRoles.includes("investments_manager")
                 ? "صلاحية الاستثمار"
+              : userRoles.includes("quiz_manager")
+                ? "صلاحية أسئلة التقديم"
                   : userRoles.includes("about_manager")
                     ? "صلاحية من نحن"
                     : userRoles.includes("store_orders_manager")
@@ -319,8 +384,41 @@ const AdminLayout = () => {
                   ? "مراجعة تقديمات"
                   : "";
 
+  const isDashDark = dashboardTheme === "dark";
+
+  const renderSidebarLink = (item: NavItem, options?: { indent?: boolean }) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-display text-sm transition-all duration-200",
+          options?.indent && "ps-5",
+          isActive
+            ? "bg-violet-600/35 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-violet-400/35"
+            : "text-slate-400 hover:bg-white/[0.06] hover:text-white",
+        )
+      }
+    >
+      <item.icon className="h-4 w-4 shrink-0 opacity-90" />
+      <span className="min-w-0 flex-1">{item.label}</span>
+      {(unreadByTicketPath.get(item.to) ?? 0) > 0 ? (
+        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white shadow-sm">
+          {unreadByTicketPath.get(item.to)}
+        </span>
+      ) : null}
+    </NavLink>
+  );
+
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-100 text-slate-900 antialiased">
+    <div
+      dir="rtl"
+      className={cn(
+        "admin-dashboard-root min-h-screen antialiased transition-colors duration-200",
+        isDashDark ? "bg-slate-950 text-slate-100" : "bg-slate-100 text-slate-900",
+      )}
+    >
       <div className="flex min-h-screen flex-col lg:flex-row">
         <aside className="admin-sidebar relative z-40 flex max-h-screen w-full shrink-0 flex-col border-b border-white/10 bg-gradient-to-b from-slate-950 via-[hsl(265_32%_14%)] to-slate-950 pt-[env(safe-area-inset-top,0px)] shadow-[0_12px_40px_-24px_rgba(0,0,0,0.65)] lg:fixed lg:inset-y-0 lg:right-0 lg:h-screen lg:max-h-screen lg:w-[17.5rem] lg:border-b-0 lg:border-l lg:border-white/10">
           <div className="shrink-0 border-b border-white/10 px-5 py-6">
@@ -346,29 +444,53 @@ const AdminLayout = () => {
           </div>
           <nav className="admin-sidebar-nav flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-3">
             <span className="px-3 py-2 font-display text-[11px] font-medium text-slate-500">التنقل</span>
-            {items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 font-display text-sm transition-all duration-200",
-                    isActive
-                      ? "bg-violet-600/35 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-violet-400/35"
-                      : "text-slate-400 hover:bg-white/[0.06] hover:text-white",
-                  )
-                }
-              >
-                <item.icon className="h-4 w-4 shrink-0 opacity-90" />
-                <span className="min-w-0 flex-1">{item.label}</span>
-                {(unreadByTicketPath.get(item.to) ?? 0) > 0 ? (
-                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white shadow-sm">
-                    {unreadByTicketPath.get(item.to)}
+            {sidebarNav.navLeading.map((item) => renderSidebarLink(item))}
+            {sidebarNav.navStore.length > 0 ? (
+              <div className="mt-1 rounded-xl border border-violet-500/25 bg-violet-950/40 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <button
+                  type="button"
+                  aria-expanded={storeGroupOpen}
+                  onClick={() => setStoreGroupOpen((o) => !o)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 font-display transition-all duration-200",
+                    storeSectionActive
+                      ? "bg-violet-600/30 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-violet-400/35"
+                      : "text-slate-400 hover:bg-violet-600/15 hover:text-violet-100",
+                  )}
+                >
+                  <Store
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-colors",
+                      storeSectionActive ? "text-fuchsia-300" : "text-violet-400",
+                    )}
+                    aria-hidden
+                  />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 text-right text-sm font-bold tracking-wide sm:text-[15px]",
+                      storeSectionActive
+                        ? "bg-gradient-to-l from-fuchsia-200 via-violet-100 to-violet-200 bg-clip-text text-transparent"
+                        : "bg-gradient-to-l from-slate-200 to-violet-300 bg-clip-text text-transparent",
+                    )}
+                  >
+                    المتجر
                   </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform duration-200",
+                      storeGroupOpen ? "rotate-180 text-violet-200" : "text-slate-500",
+                    )}
+                    aria-hidden
+                  />
+                </button>
+                {storeGroupOpen ? (
+                  <div className="mt-0.5 flex flex-col gap-0.5 pb-0.5">
+                    {sidebarNav.navStore.map((item) => renderSidebarLink(item, { indent: true }))}
+                  </div>
                 ) : null}
-              </NavLink>
-            ))}
+              </div>
+            ) : null}
+            {sidebarNav.navTrailing.map((item) => renderSidebarLink(item))}
 
             <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
               {isLawsEditor ? (
@@ -423,25 +545,66 @@ const AdminLayout = () => {
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:mr-[17.5rem]">
-          <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200/90 bg-white/90 px-4 py-3.5 shadow-[0_1px_0_rgba(15,23,42,0.06)] backdrop-blur-md sm:px-6">
-            <div className="min-w-0 text-right">
-              <p className="truncate font-display text-sm font-semibold text-slate-900">{pageTitle}</p>
-              <p className="truncate text-xs text-slate-500">
-                {isSuperAdmin ? "مرحباً بك يا سوبر أدمن" : `${user?.username} · ${subHint}`}
+          <header
+            className={cn(
+              "sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3.5 backdrop-blur-md sm:gap-4 sm:px-6",
+              isDashDark
+                ? "border-slate-700/90 bg-slate-900/92 shadow-[0_1px_0_rgba(0,0,0,0.35)]"
+                : "border-slate-200/90 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.06)]",
+            )}
+          >
+            <div className="min-w-0 flex-1 text-right">
+              <p
+                className={cn(
+                  "truncate font-display text-sm font-semibold",
+                  isDashDark ? "text-slate-100" : "text-slate-900",
+                )}
+              >
+                {pageTitle}
+              </p>
+              <p className={cn("truncate text-xs", isDashDark ? "text-slate-400" : "text-slate-500")}>
+                {isSuperAdmin
+                  ? "مرحباً بك يا سوبر أدمن"
+                  : subHint
+                    ? `${user?.username} · ${subHint}`
+                    : (user?.username ?? "")}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-900"
-              onClick={() => {
-                logout();
-                navigate("/", { replace: true });
-              }}
-            >
-              <LogOut className="ms-2 h-4 w-4" />
-              خروج
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-9 w-9 shrink-0",
+                  isDashDark
+                    ? "border-slate-600 bg-slate-800 text-amber-300 hover:border-amber-400/50 hover:bg-slate-700 hover:text-amber-200"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-900",
+                )}
+                aria-label={isDashDark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}
+                title={isDashDark ? "وضع فاتح" : "وضع داكن"}
+                onClick={() => setDashboardTheme(isDashDark ? "light" : "dark")}
+              >
+                {isDashDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "shrink-0",
+                  isDashDark
+                    ? "border-slate-600 bg-slate-800 text-slate-200 hover:border-slate-500 hover:bg-slate-700 hover:text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-900",
+                )}
+                onClick={() => {
+                  logout();
+                  navigate("/", { replace: true });
+                }}
+              >
+                <LogOut className="ms-2 h-4 w-4" />
+                خروج
+              </Button>
+            </div>
           </header>
 
           <main className="admin-workspace-main flex-1 px-4 py-8 sm:px-6 lg:px-10">

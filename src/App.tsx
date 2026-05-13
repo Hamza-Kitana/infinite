@@ -30,6 +30,7 @@ import VipCarsEditorPage from "./pages/admin/VipCarsEditorPage.tsx";
 import HousesEditorPage from "./pages/admin/HousesEditorPage.tsx";
 import PackagesEditorPage from "./pages/admin/PackagesEditorPage.tsx";
 import InvestmentsEditorPage from "./pages/admin/InvestmentsEditorPage.tsx";
+import QuizManagerPage from "./pages/admin/QuizManagerPage.tsx";
 import InstitutionRosterEditorPage from "./pages/admin/InstitutionRosterEditorPage.tsx";
 import InstitutionRosterHubPage from "./pages/admin/InstitutionRosterHubPage.tsx";
 import ApplicationsReviewPage from "./pages/admin/ApplicationsReviewPage.tsx";
@@ -127,6 +128,7 @@ const AppRoutes = () => {
                 "houses_manager",
                 "packages_manager",
                 "investments_manager",
+                "quiz_manager",
                 "about_manager",
                 "ticket_support_manager",
                 "ticket_admin_inquiry_manager",
@@ -215,6 +217,14 @@ const AppRoutes = () => {
             element={
               <RequireStaffAuth allowRoles={["super_admin", "investments_manager"]}>
                 <InvestmentsEditorPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="quiz"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin", "quiz_manager"]}>
+                <QuizManagerPage />
               </RequireStaffAuth>
             }
           />

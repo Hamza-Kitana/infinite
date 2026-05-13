@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { LawsQuizDialog } from "@/components/LawsQuizDialog";
-import { CITIZEN_LAWS_QUIZ } from "@/data/lawsQuiz";
+import { useQuizQuestions } from "@/lib/lawsQuizContent";
 import type { LawsQuizResult } from "@/data/publicApplicationTypes";
 
 type RuleItem = { id: number; title: string; description: string };
@@ -114,6 +114,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
   const [slide, setSlide] = useState(0);
   const [agreed, setAgreed] = useState(false);
   const [quizOpen, setQuizOpen] = useState(false);
+  const citizenQuizQuestions = useQuizQuestions("citizen");
 
   const isAckSlide = slide === ACK_SLIDE_INDEX;
 
@@ -212,7 +213,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
                   </Label>
                 </div>
                 <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-200 sm:text-base">
-                  بعد ضغط «متابعة وأسئلة الإقرار»، سيُعرض عليك اختبار قصير من {CITIZEN_LAWS_QUIZ.length} أسئلة. لن
+                  بعد ضغط «متابعة وأسئلة الإقرار»، سيُعرض عليك اختبار قصير من {citizenQuizQuestions.length} أسئلة. لن
                   يُعتمد إقرارك إلا بالإجابة الصحيحة على الأسئلة جميعها.
                 </p>
               </div>
@@ -289,7 +290,7 @@ const LawsReaderDialog = ({ open, onOpenChange, onAccept }: LawsReaderDialogProp
           setAgreed(false);
         }
       }}
-      questions={CITIZEN_LAWS_QUIZ}
+      questions={citizenQuizQuestions}
       contextLabel="قوانين المدينة"
       onComplete={handleQuizComplete}
       onReread={handleQuizReread}

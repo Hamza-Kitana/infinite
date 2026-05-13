@@ -7,15 +7,28 @@ import ReflectiveCard from "@/components/ReflectiveCard";
 import { Button } from "@/components/ui/button";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
 import { useSiteVisibility } from "@/lib/siteVisibility";
-import { countLiveStreamers, useStreamersKickLive } from "@/hooks/useStreamersKickLive";
+import { useStreamersKickLive } from "@/hooks/useStreamersKickLive";
+import { useStreamersTikTokLive } from "@/hooks/useStreamersTikTokLive";
 import { parseKickSlugFromUrl } from "@/lib/kickChannel";
+import { parseTikTokUniqueIdFromUrl } from "@/lib/tiktokChannel";
 
 const StreamersPage = () => {
   const { items } = useStreamersContent();
   const visibility = useSiteVisibility();
   const visibleItems = useMemo(() => items.filter((x) => !x.hidden), [items]);
   const kickLiveMap = useStreamersKickLive(visibleItems);
-  const liveCount = countLiveStreamers(kickLiveMap);
+  const tiktokLiveMap = useStreamersTikTokLive(visibleItems);
+  const liveCount = useMemo(() => {
+    let n = 0;
+    for (const it of visibleItems) {
+      if (parseKickSlugFromUrl(it.streamUrl)) {
+        if (kickLiveMap[it.id]?.live) n += 1;
+      } else if (parseTikTokUniqueIdFromUrl(it.streamUrl)) {
+        if (tiktokLiveMap[it.id]?.live) n += 1;
+      }
+    }
+    return n;
+  }, [visibleItems, kickLiveMap, tiktokLiveMap]);
 
   if (!visibility.pages.streamers) return <Navigate to="/" replace />;
 
@@ -49,15 +62,15 @@ const StreamersPage = () => {
               بروفايلات <span className="text-gradient-neon">صنّاع المحتوى</span>
             </h2>
             <p className="mt-3 text-muted-foreground">
-              لكل صانع محتوى بطاقة تعريفية مختصرة مع رابط البث. القنوات على Kick تُحدَّث تلقائياً كل دقيقة؛ إن كان الصانع
-              مباشراً يظهر تنبيه أخضر وعنوان البث.
+              لكل صانع محتوى بطاقة تعريفية مختصرة مع رابط البث. روابط Kick وTikTok تُحدَّث تلقائياً كل دقيقة تقريباً؛ إن
+              كان الصانع مباشراً يظهر تنبيه أخضر وعنوان البث عند توفره.
             </p>
 
             {liveCount > 0 ? (
               <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-3 text-emerald-900">
                 <Radio className="h-5 w-5 shrink-0 animate-pulse" aria-hidden />
                 <p className="text-sm font-medium">
-                  يوجد الآن <strong>{liveCount}</strong> من صنّاع المحتوى على بث مباشر على Kick.
+                  يوجد الآن <strong>{liveCount}</strong> من صنّاع المحتوى على بث مباشر (Kick أو TikTok).
                 </p>
               </div>
             ) : null}
@@ -73,6 +86,8 @@ const StreamersPage = () => {
                   streamUrl={streamer.streamUrl}
                   kickSlug={parseKickSlugFromUrl(streamer.streamUrl)}
                   kickLive={kickLiveMap[streamer.id]}
+                  tiktokUniqueId={parseTikTokUniqueIdFromUrl(streamer.streamUrl)}
+                  tiktokLive={tiktokLiveMap[streamer.id]}
                 />
               ))}
             </div>

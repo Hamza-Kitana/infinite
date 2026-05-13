@@ -4,7 +4,7 @@
   height: 100%;
   background: transparent;
   display: grid;
-  grid-template-columns: repeat(var(--cols, 3), minmax(min(100%, 280px), 320px));
+  grid-template-columns: repeat(var(--cols, 5), minmax(min(100%, 280px), 320px));
   grid-auto-rows: auto;
   justify-content: center;
   gap: 0.75rem;
@@ -27,7 +27,7 @@
   width: 100%;
   margin-inline: 0;
   padding-inline: 0;
-  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
 }
 
 .chroma-grid.chroma-grid--rtl .chroma-card {

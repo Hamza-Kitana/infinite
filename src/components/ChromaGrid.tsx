@@ -35,7 +35,7 @@ type ChromaGridProps = {
 const ChromaGrid = ({
   items,
   className = "",
-  columns = 3,
+  columns = 5,
   rows = 2,
   rtl = false,
 }: ChromaGridProps) => {

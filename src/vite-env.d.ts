@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_DISCORD_REDIRECT_URI?: string;
   /** اختياري: في الإنتاج إذا حُظِر الطلب المباشر إلى kick.com (CORS)، وجّه نفس مسار بروكسي يخدم `/api/v2/channels/:slug` */
   readonly VITE_KICK_API_BASE?: string;
+  /** اختياري: بروكسي صفحات TikTok (يجب أن يخدم مسارات مثل `/@username`) */
+  readonly VITE_TIKTOK_PAGE_BASE?: string;
 }
 
 interface ImportMeta {

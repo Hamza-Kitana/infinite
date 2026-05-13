@@ -202,24 +202,26 @@ function VipCarCompactCard({
   return (
     <div
       className={cn(
-        "relative w-full rounded-3xl p-[3px] shadow-[0_24px_60px_-28px_rgba(0,0,0,0.55)] transition-[box-shadow,filter] duration-500",
-        "bg-gradient-to-br from-fuchsia-500 via-primary to-cyan-400 bg-[length:320%_320%] animate-vip-gradient-shift motion-reduce:animate-none",
-        "hover:shadow-[0_32px_70px_-24px_hsl(var(--primary)/0.45)]",
+        "relative w-full rounded-2xl p-[2px] shadow-[0_16px_44px_-22px_rgba(0,0,0,0.5)] transition-shadow duration-300",
+        /* تدرّج ثابت بدل الحركة المستمرة — يخفّض جداً إعادة الرسم عند عرض شبكة كبيرة */
+        "bg-gradient-to-br from-fuchsia-500 via-primary to-cyan-400",
+        "hover:shadow-[0_22px_52px_-20px_hsl(var(--primary)/0.4)]",
         car.taken && "opacity-[0.92]",
+        "supports-[content-visibility:auto]:[content-visibility:auto] supports-[content-visibility:auto]:[contain-intrinsic-size:auto_280px]",
       )}
     >
       <button
         type="button"
         onClick={() => onOpen(car)}
         className={cn(
-          "group relative aspect-[4/5] w-full min-h-[300px] overflow-hidden rounded-[calc(1.5rem-3px)] border-0 text-right shadow-inner ring-1 ring-black/20 transition sm:min-h-[340px] lg:min-h-[380px]",
+          "group relative isolate aspect-[5/6] w-full min-h-[200px] overflow-hidden rounded-[calc(1rem-2px)] border-0 text-right shadow-inner ring-1 ring-black/20 transition sm:min-h-[220px] lg:min-h-[240px]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         )}
       >
         <img
           src={car.thumbnailUrl}
           alt={car.name}
-          className="absolute inset-0 z-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.07]"
+          className="absolute inset-0 z-0 h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
           loading="lazy"
           decoding="async"
         />
@@ -227,12 +229,11 @@ function VipCarCompactCard({
           className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/[0.92] via-black/45 via-[32%] to-transparent to-[68%]"
           aria-hidden
         />
-        <div className="pointer-events-none absolute inset-0 z-[3]" aria-hidden>
-          <div className="absolute -inset-[38%] animate-vip-mesh-drift bg-[radial-gradient(ellipse_70%_52%_at_22%_12%,hsl(var(--primary)/0.95),transparent_55%),radial-gradient(ellipse_62%_48%_at_88%_88%,rgba(34,211,238,0.65),transparent_50%),radial-gradient(ellipse_48%_42%_at_48%_52%,hsl(var(--primary-glow)/0.45),transparent_58%)] motion-reduce:animate-none mix-blend-screen opacity-90" />
-        </div>
-        <div className="pointer-events-none absolute inset-0 z-[3] overflow-hidden rounded-[inherit] motion-reduce:hidden" aria-hidden>
-          <div className="absolute left-0 top-0 h-full w-[62%] bg-gradient-to-r from-transparent via-white/50 to-transparent animate-vip-sheen-sweep mix-blend-overlay" />
-        </div>
+        {/* طبقة لمعان ثابتة خفيفة بدل mix-blend + أنيميشن لا نهائي (كان يسبب بطء وتقطيع) */}
+        <div
+          className="pointer-events-none absolute inset-0 z-[3] bg-[radial-gradient(ellipse_80%_55%_at_20%_0%,hsl(var(--primary)/0.22),transparent_58%),radial-gradient(ellipse_70%_50%_at_92%_96%,rgba(34,211,238,0.12),transparent_52%)] opacity-80"
+          aria-hidden
+        />
 
         {car.taken ? (
           <div className="absolute inset-0 z-[4] flex items-center justify-center bg-background/50 backdrop-blur-[4px]">
@@ -242,12 +243,12 @@ function VipCarCompactCard({
           </div>
         ) : null}
 
-        <div className="absolute inset-x-0 bottom-0 z-[5] space-y-2 px-5 pb-6 pt-24 text-right sm:px-7 sm:pb-8 sm:pt-28">
-          <h2 className="font-display text-xl font-bold leading-snug tracking-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.9)] sm:text-2xl lg:text-[1.65rem]">
+        <div className="absolute inset-x-0 bottom-0 z-[5] space-y-1 px-4 pb-4 pt-16 text-right sm:px-5 sm:pb-5 sm:pt-20">
+          <h2 className="font-display text-base font-bold leading-snug tracking-tight text-white drop-shadow-[0_3px_14px_rgba(0,0,0,0.9)] sm:text-lg lg:text-xl">
             {car.name}
           </h2>
           <p
-            className="font-latin-display text-2xl font-bold tabular-nums tracking-tight text-primary drop-shadow-[0_2px_16px_rgba(0,0,0,0.85)] sm:text-3xl"
+            className="font-latin-display text-xl font-bold tabular-nums tracking-tight text-primary drop-shadow-[0_2px_16px_rgba(0,0,0,0.85)] sm:text-2xl"
             dir="ltr"
           >
             {usd.format(car.priceUsd)}
@@ -371,7 +372,7 @@ export function VipCarsCatalogBlock() {
   return (
     <>
       <section className="mx-auto max-w-[1600px] px-0 sm:px-0">
-        <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 lg:gap-9 xl:gap-10">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 xl:gap-5">
           {visibleCars.map((car) => (
             <VipCarCompactCard key={car.id} car={car} onOpen={openCar} />
           ))}

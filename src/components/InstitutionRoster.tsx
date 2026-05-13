@@ -123,7 +123,8 @@ export function InstitutionRoster({
   const visibleDeputy = !deputy.hidden;
   const visibleMembers = members.filter((m) => !m.hidden);
   const n = visibleMembers.length;
-  const cols = chromaColumns ?? (n <= 1 ? 1 : n === 2 ? 2 : 3);
+  /** شبكة الأعضاء: حتى 5 بطاقات في الصف (كان 3 سابقاً) */
+  const cols = chromaColumns ?? (n <= 1 ? 1 : n === 2 ? 2 : 5);
 
   return (
     <section className={cn("w-full", className)}>
