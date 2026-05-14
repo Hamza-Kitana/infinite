@@ -69,11 +69,10 @@ const ReflectiveCard = ({
     if (fetchFailed) {
       return (
         <div className="reflective-card__status-pill reflective-card__status-pill--muted" aria-live="polite">
-          <span className="block">
-            {fetchFailedKick ? "تعذّر التحقق من Kick حالياً" : "تعذّر التحقق من TikTok حالياً"}
-          </span>
-          <span className="mt-0.5 block text-[10px] font-normal opacity-90">
-            يمكنك فتح «رابط البث» أدناه للتحقق يدوياً
+          <span className="block text-[11px] font-normal leading-snug opacity-95">
+            {fetchFailedKick
+              ? "بث Kick: التحديث التلقائي غير متاح حالياً — استخدم رابط البث في البطاقة للتحقق."
+              : "بث TikTok: التحديث التلقائي غير متاح حالياً — استخدم رابط البث في البطاقة للتحقق."}
           </span>
         </div>
       );
