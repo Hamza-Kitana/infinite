@@ -26,10 +26,23 @@ export type TikTokChannelLiveInfo = {
 };
 
 function extractHydrationObject(html: string): unknown | null {
-  const marker = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"';
-  const i = html.indexOf(marker);
+  const markers = [
+    '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"',
+    "<script id='__UNIVERSAL_DATA_FOR_REHYDRATION__'",
+    '<script id=__UNIVERSAL_DATA_FOR_REHYDRATION__',
+  ];
+  let i = -1;
+  let markerLen = 0;
+  for (const m of markers) {
+    const at = html.indexOf(m);
+    if (at !== -1) {
+      i = at;
+      markerLen = m.length;
+      break;
+    }
+  }
   if (i === -1) return null;
-  const gt = html.indexOf(">", i + marker.length);
+  const gt = html.indexOf(">", i + markerLen);
   if (gt === -1) return null;
   const end = html.indexOf("</script>", gt + 1);
   if (end === -1) return null;
@@ -52,6 +65,47 @@ function pickLiveTitleFromLiveRoom(liveRoom: unknown): string | undefined {
   return undefined;
 }
 
+function normalizeRoomId(raw: unknown): string | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return String(Math.floor(raw));
+  }
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (/^[0-9]+$/.test(t)) return t;
+  }
+  return undefined;
+}
+
+function pickRoomIdFromUserRecord(u: Record<string, unknown>): string | undefined {
+  const direct = normalizeRoomId(u.roomId) ?? normalizeRoomId(u.room_id);
+  if (direct) return direct;
+  const lr = u.liveRoom;
+  if (!lr || typeof lr !== "object") return undefined;
+  const L = lr as Record<string, unknown>;
+  return (
+    normalizeRoomId(L.roomId) ??
+    normalizeRoomId(L.room_id) ??
+    normalizeRoomId(L.id) ??
+    normalizeRoomId(L.RoomId)
+  );
+}
+
+/** إن وُجد roomId في HTML لكن المسار داخل JSON تغيّر — بحث ضيق لتفادي أرقام عشوائية */
+function scrapeRoomIdFromProfileHtml(html: string): string | undefined {
+  const patterns = [
+    /"roomId"\s*:\s*"([0-9]{6,24})"/,
+    /"room_id"\s*:\s*"([0-9]{6,24})"/,
+    /"roomId"\s*:\s*([0-9]{6,24})\b/,
+    /\\"roomId\\":\\"([0-9]{6,24})\\"/,
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) return m[1];
+  }
+  return undefined;
+}
+
 export function liveInfoFromTikTokProfileHydration(payload: unknown): TikTokChannelLiveInfo {
   if (!payload || typeof payload !== "object") return { live: false, fetchOk: false };
   const root = payload as Record<string, unknown>;
@@ -69,9 +123,7 @@ export function liveInfoFromTikTokProfileHydration(payload: unknown): TikTokChan
   const user = (userInfo as Record<string, unknown>).user;
   if (!user || typeof user !== "object") return { live: false, fetchOk: true };
   const u = user as Record<string, unknown>;
-  const roomRaw = u.roomId;
-  const roomId =
-    typeof roomRaw === "string" && /^[0-9]+$/.test(roomRaw.trim()) ? roomRaw.trim() : undefined;
+  const roomId = pickRoomIdFromUserRecord(u);
   const live = Boolean(roomId);
   const lr = u.liveRoom;
   const sessionTitle = pickLiveTitleFromLiveRoom(lr);
@@ -114,7 +166,19 @@ async function fetchTikTokProfileOnce(uniqueId: string, signal?: AbortSignal): P
   }
   const json = extractHydrationObject(html);
   if (!json) return { live: false, fetchOk: false };
-  return liveInfoFromTikTokProfileHydration(json);
+  const parsed = liveInfoFromTikTokProfileHydration(json);
+  if (!parsed.fetchOk) return parsed;
+  if (parsed.live && parsed.roomId) return parsed;
+  const scraped = scrapeRoomIdFromProfileHtml(html);
+  if (scraped) {
+    return {
+      live: true,
+      roomId: scraped,
+      sessionTitle: parsed.sessionTitle,
+      fetchOk: true,
+    };
+  }
+  return parsed;
 }
 
 function delay(ms: number) {
