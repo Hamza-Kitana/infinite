@@ -52,10 +52,6 @@ const ReflectiveCard = ({
   const isOfflineTikTok = isTikTok && tiktokFetchOk && tiktokLive?.live === false;
   const isOffline = isOfflineKick || isOfflineTikTok;
 
-  const fetchFailedKick = isKick && kickLive !== undefined && kickLive.fetchOk === false;
-  const fetchFailedTikTok = isTikTok && tiktokLive !== undefined && tiktokLive.fetchOk === false;
-  const fetchFailed = fetchFailedKick || fetchFailedTikTok;
-
   const statusRow = (() => {
     if (!isKick && !isTikTok) return null;
     if (loadingLive) {
@@ -63,17 +59,6 @@ const ReflectiveCard = ({
         <div className="reflective-card__status-pill reflective-card__status-pill--loading" aria-live="polite">
           <span className="reflective-card__status-loading-dot" />
           جاري التحقق من البث…
-        </div>
-      );
-    }
-    if (fetchFailed) {
-      return (
-        <div className="reflective-card__status-pill reflective-card__status-pill--muted" aria-live="polite">
-          <span className="block text-[11px] font-normal leading-snug opacity-95">
-            {fetchFailedKick
-              ? "بث Kick: التحديث التلقائي غير متاح حالياً — استخدم رابط البث في البطاقة للتحقق."
-              : "بث TikTok: التحديث التلقائي غير متاح حالياً — استخدم رابط البث في البطاقة للتحقق."}
-          </span>
         </div>
       );
     }
