@@ -3,7 +3,6 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import {
-  BellRing,
   Briefcase,
   CheckCircle2,
   ClipboardList,
@@ -32,6 +31,7 @@ import { INSTITUTION_BRANCH_META } from "@/data/institutionBranches";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
 import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
 import {
+  applicationBelongsToPublicProfile,
   isPublicTicketsUnlocked,
   MSG_TICKETS_NEED_CITY_PROFILE,
   MSG_TICKETS_UNLOCKED_AFTER_PROFILE,
@@ -158,16 +158,11 @@ const ProfilePage = () => {
 
   /** كل تقديمات هذا المستخدم — دخول السيرفر + التوظيف */
   const myApplications = useMemo(() => {
-    if (!user) return [];
+    if (!user || !profile) return [];
     return applications
-      .filter(
-        (a) =>
-          a.applicantUserId === user.id ||
-          a.applicantUsername === user.username ||
-          a.applicantDisplayName === user.displayName,
-      )
+      .filter((a) => applicationBelongsToPublicProfile(a, profile))
       .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
-  }, [applications, user]);
+  }, [applications, user, profile]);
 
   if (!user) return <Navigate to="/" replace />;
 
@@ -182,9 +177,13 @@ const ProfilePage = () => {
   const initials = (profileHeadline || user.username).slice(0, 2).toUpperCase();
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
+    <div dir="rtl">
       <Navbar />
-
+      {/*
+        body يحمل class="dark" — فـ dark: يجعل بعض البطاقات/النصوص غامقة فوق غامق.
+        light يعطّل dark: داخل هذه الصفحة فقط (Tailwind 3.4+) مع الإبقاء على Navbar بالمظهر العام.
+      */}
+      <div className="light min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
       <div className="relative overflow-hidden pt-[env(safe-area-inset-top,0px)]">
         <div className="pointer-events-none absolute -left-40 top-0 h-72 w-72 rounded-full bg-violet-400/25 blur-[100px]" />
         <div className="pointer-events-none absolute -right-24 top-20 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-[90px]" />
@@ -243,7 +242,7 @@ const ProfilePage = () => {
         </motion.div>
       </div>
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl space-y-8 px-4 pb-20 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+      <main className="relative z-10 mx-auto w-full max-w-7xl space-y-8 px-4 pb-20 text-slate-900 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         {profileIncomplete ? (
           <motion.div
             initial={reduceMotion ? false : { opacity: 0, y: 12 }}
@@ -515,37 +514,20 @@ const ProfilePage = () => {
           </div>
         </motion.section>
 
-        {/* معلومات الحساب — تأخذ العرض الكامل (الإشعارات صارت في جرس الشريط العلوي) */}
+        {/* معلومات الحساب */}
         <motion.section
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.1 }}
         >
-          <Card className="overflow-hidden border-violet-200/90 bg-white/95 shadow-[0_24px_60px_-28px_rgba(54,22,79,0.35)] backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-violet-100/90 bg-gradient-to-l from-violet-50/90 to-white pb-6 text-right">
-              <div className="min-w-0">
-                <CardTitle className="font-display text-xl text-slate-900">معلومات الحساب</CardTitle>
-                <CardDescription className="mt-1 text-pretty text-slate-600">
-                  أكمل <span className="font-semibold">اسمك داخل المدينة</span> (جزآن بالعربي) و
-                  <span className="font-semibold"> عمرك</span> في الحقول أدناه ثم احفظ — لا تُفتح التكتات إلا بعد الحفظ
-                  عندما تكون البيانات صحيحة. الاسم على Discord والبريد وDiscord للعرض فقط — تعديلها من الإدارة.
-                </CardDescription>
-              </div>
-              <Link
-                to="/tickets"
-                onClick={(e) => {
-                  if (!cityTicketsOk) {
-                    e.preventDefault();
-                    toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
-                    navigate("/profile");
-                  }
-                }}
-                className="hidden shrink-0 items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-display font-semibold text-violet-700 shadow-sm transition-colors hover:bg-violet-50 sm:inline-flex"
-                title="الإشعارات صارت على جرس الشريط العلوي"
-              >
-                <BellRing className="h-3.5 w-3.5" />
-                الإشعارات صارت بجرس الشريط
-              </Link>
+          <Card className="overflow-hidden border-violet-200/90 bg-white/95 text-slate-900 shadow-[0_24px_60px_-28px_rgba(54,22,79,0.35)] backdrop-blur-sm">
+            <CardHeader className="border-b border-violet-100/90 bg-gradient-to-l from-violet-50/90 to-white pb-6 text-right">
+              <CardTitle className="font-display text-xl text-slate-900">معلومات الحساب</CardTitle>
+              <CardDescription className="mt-1 text-pretty text-slate-600">
+                أكمل <span className="font-semibold">اسمك داخل المدينة</span> (جزآن بالعربي) و
+                <span className="font-semibold"> عمرك</span> في الحقول أدناه ثم احفظ — لا تُفتح التكتات إلا بعد الحفظ
+                عندما تكون البيانات صحيحة. الاسم على Discord والبريد وDiscord للعرض فقط — تعديلها من الإدارة.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
               {profileIncomplete && !cityTicketsOk ? (
@@ -995,6 +977,7 @@ const ProfilePage = () => {
       </main>
 
       <Footer forceLight />
+      </div>
     </div>
   );
 };

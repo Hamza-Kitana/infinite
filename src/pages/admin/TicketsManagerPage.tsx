@@ -12,10 +12,12 @@ import { useAuth, type StaffRole } from "@/contexts/AuthContext";
 import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
 import {
+  buildAdminTicketPresenceBody,
   loadTicketRetentionHours,
   loadTickets,
   saveTicketRetentionHours,
   saveTickets,
+  ticketNeedsStaffPresenceMessage,
   useTicketsCenter,
   type TicketAttachment,
   type TicketRetentionHours,
@@ -195,10 +197,6 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     navigate(storeOrdersOnly ? "/dashboard/store-orders" : `/dashboard/tickets/${typeSlug}`);
     setSelectedTicketId(ticketId);
     setChatOpen(true);
-    updateTicket(ticketId, (ticket) => ({
-      ...ticket,
-      lastStaffReadAt: new Date().toISOString(),
-    }));
   };
 
   const clearNotificationsForTicket = (ticketId: string) => {
@@ -242,6 +240,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     try {
       updateTicket(selectedTicket.id, (ticket) => ({
         ...ticket,
+        status: ticket.status === "waiting" ? "in_review" : ticket.status,
         updatedAt: new Date().toISOString(),
         messages: [
           ...ticket.messages,
@@ -264,15 +263,36 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     setMessageAttachment(null);
   };
 
+  /** عند فتح نافذة الشات: انتظار → قيد المراجعة، ورسالة ترحيب تلقائية من الإدمن (مرة واحدة)، وتحديث آخر قراءة للطاقم */
   useEffect(() => {
-    if (chatOpen && selectedTicketId) {
-      clearNotificationsForTicket(selectedTicketId);
-      updateTicket(selectedTicketId, (ticket) => ({
-        ...ticket,
-        lastStaffReadAt: new Date().toISOString(),
-      }));
-    }
-  }, [chatOpen, selectedTicketId]);
+    if (!chatOpen || !selectedTicketId || !user) return;
+    clearNotificationsForTicket(selectedTicketId);
+    const now = new Date().toISOString();
+    const adminName = user.username?.trim() || "staff";
+    updateTicket(selectedTicketId, (t) => {
+      if (t.status === "closed") {
+        return { ...t, lastStaffReadAt: now };
+      }
+      const next: TicketThread = { ...t, lastStaffReadAt: now, updatedAt: now };
+      if (t.status === "waiting") {
+        next.status = "in_review";
+      }
+      if (ticketNeedsStaffPresenceMessage(t)) {
+        next.messages = [
+          ...t.messages,
+          {
+            id: crypto.randomUUID(),
+            at: now,
+            author: adminName,
+            body: buildAdminTicketPresenceBody(adminName),
+            senderType: "staff",
+          },
+        ];
+        next.staffPresenceSent = true;
+      }
+      return next;
+    });
+  }, [chatOpen, selectedTicketId, user?.username]);
 
   useEffect(() => {
     if (!chatOpen || !selectedTicket) return;
@@ -505,11 +525,6 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                       onClick={() => {
                         setSelectedTicketId(ticket.id);
                         setChatOpen(true);
-                        clearNotificationsForTicket(ticket.id);
-                        updateTicket(ticket.id, (current) => ({
-                          ...current,
-                          lastStaffReadAt: new Date().toISOString(),
-                        }));
                       }}
                     >
                       <td className="px-3 py-2 font-display text-slate-900 dark:text-slate-100">
@@ -560,17 +575,19 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
       >
         <DialogContent
           dir="rtl"
-          className="border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-3xl sm:rounded-2xl"
+          className={cn(
+            "flex max-h-[min(90dvh,calc(100svh-1.5rem))] w-[calc(100%-1rem)] max-w-5xl flex-col gap-0 overflow-hidden border-slate-200/95 bg-white p-0 text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:w-[min(100%,56rem)] sm:rounded-2xl",
+          )}
         >
-          <DialogHeader>
-            <DialogTitle className="font-display text-slate-900 dark:text-slate-50">
+          <DialogHeader className="shrink-0 space-y-0 px-4 pb-2 pt-5 text-right sm:px-6 sm:pt-6">
+            <DialogTitle className="font-display pe-8 text-slate-900 dark:text-slate-50">
               {selectedTicket?.subject ?? "تفاصيل التكت"}
             </DialogTitle>
           </DialogHeader>
 
           {selectedTicket ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-violet-200 bg-white/90 p-3 dark:border-slate-600 dark:bg-slate-800/90">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 sm:px-6">
+              <div className="shrink-0 rounded-xl border border-violet-200 bg-white/90 p-3 dark:border-slate-600 dark:bg-slate-800/90">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-slate-700 dark:text-slate-300">
                     الزبون:{" "}
@@ -612,7 +629,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
 
               <div
                 ref={chatScrollRef}
-                className="max-h-[45vh] space-y-2 overflow-y-auto rounded-xl border border-violet-200 bg-violet-50/20 p-3 dark:border-slate-600 dark:bg-slate-950/50"
+                className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-xl border border-violet-200 bg-violet-50/20 p-3 dark:border-slate-600 dark:bg-slate-950/50"
               >
                 {selectedTicket.messages.map((msg) => {
                   const mine = msg.author === (user?.username ?? "");
@@ -649,7 +666,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="space-y-2">
+              <div className="shrink-0 space-y-2 pb-1">
                 <Label className="text-right text-slate-700 dark:text-slate-300">رد الإداري</Label>
                 <Textarea
                   value={messageBody}
@@ -668,7 +685,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
             </div>
           ) : null}
 
-          <DialogFooter className="gap-2 sm:justify-start">
+          <DialogFooter className="shrink-0 gap-2 border-t border-violet-100 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900 sm:justify-start sm:px-6">
             <Button
               type="button"
               variant="outline"

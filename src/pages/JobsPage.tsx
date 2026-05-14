@@ -50,7 +50,11 @@ const JobsPage = () => {
   };
   const myApps = applications
     .filter((a) => isJobApplicationRoleKey(a.roleKey))
-    .filter((a) => a.applicantUserId === user.id || a.applicantUsername === user.username)
+    .filter((a) => {
+      const uid = (a.applicantUserId ?? "").trim();
+      if (uid) return uid === user.id;
+      return (a.applicantUsername ?? "").trim().toLowerCase() === user.username.trim().toLowerCase();
+    })
     .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
 
   return (

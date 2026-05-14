@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import {
   Bath,
   BedDouble,
@@ -10,7 +8,6 @@ import {
   MapPin,
   Ruler,
   Sparkles,
-  Store,
 } from "lucide-react";
 import {
   Dialog,
@@ -24,9 +21,7 @@ import { cn } from "@/lib/utils";
 import { useHousesContent } from "@/contexts/HousesContentContext";
 import type { HouseCatalogItem } from "@/data/housesCatalog";
 import { StoreGalleryCarousel } from "@/components/store/StoreGalleryCarousel";
-import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
-import { usePublicUser } from "@/contexts/PublicUserContext";
-import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE } from "@/lib/publicProfileEligibility";
+import { StoreOrderTicketCTA } from "@/components/store/StoreOrderTicketCTA";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -140,9 +135,6 @@ function HouseDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const navigate = useNavigate();
-  const { getProfile } = usePublicUser();
-  const { applications } = useApplicationsContent();
   if (!item) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -216,19 +208,30 @@ function HouseDialog({
 
         <div className="flex min-h-[52px] shrink-0 flex-col gap-2 border-t border-primary/15 bg-muted/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-start sm:gap-6 sm:px-4 sm:py-2.5">
           <div className="flex w-full justify-start sm:w-auto sm:shrink-0">
-            <Link
-              to="/tickets?type=store"
-              onClick={(e) => {
-                if (!isPublicTicketsUnlocked(getProfile(), applications)) {
-                  e.preventDefault();
-                  toast.message(MSG_TICKETS_NEED_CITY_PROFILE);
-                  navigate("/profile");
-                }
-              }}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-neon px-5 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:opacity-95 sm:h-10 sm:min-w-[10.5rem]"
-            >
-              <Store className="h-4 w-4" /> الاستفسار عن العقار
-            </Link>
+            <StoreOrderTicketCTA
+              taken={item.taken}
+              buttonLabel="طلب العقار"
+              confirmSummary={item.name}
+              subject={`عقار — ${item.name}`}
+              productDetailsBody={[
+                "طلب من صفحة المتجر (العقارات).",
+                "",
+                `المعرّف: ${item.id}`,
+                `الاسم: ${item.name}`,
+                item.nameEn ? `الاسم الإنجليزي: ${item.nameEn}` : "",
+                `المنطقة: ${item.district}`,
+                `الفئة: ${CATEGORY_LABEL[item.category]}`,
+                `مؤثث: ${item.furnished ? "نعم" : "لا"}`,
+                `السعر المعروض: ${usd.format(item.priceUsd)}`,
+                `الغرف: ${item.specs.bedrooms}`,
+                `الحمامات: ${item.specs.bathrooms}`,
+                `المرائب: ${item.specs.garages}`,
+                `المساحة: ${item.specs.area}`,
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              onAfterSubmit={() => onOpenChange(false)}
+            />
           </div>
           <p className="min-w-0 flex-1 text-right text-[11px] leading-snug text-muted-foreground sm:text-xs">
             التوافر والأسعار قد تتغيّر حسب حالة الموسم والإدارة.

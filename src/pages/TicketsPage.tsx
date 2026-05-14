@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BellRing,
@@ -36,6 +36,8 @@ import {
   loadTickets,
   saveTickets,
   useTicketsCenter,
+  MSG_TICKET_CREATED_WAIT_FOR_STAFF,
+  MSG_TICKET_USER_REPLY_WAIT,
   type TicketAttachment,
   type TicketStatus,
   type TicketTypeRole,
@@ -84,6 +86,7 @@ const TicketsPage = () => {
   const { applications } = useApplicationsContent();
   const ticketsUnlocked = useMemo(() => isPublicTicketsUnlocked(profile, applications), [profile, applications]);
   const tickets = useTicketsCenter();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [typeRole, setTypeRole] = useState<TicketTypeRole | null>(null);
   const [body, setBody] = useState("");
   const [newAttachment, setNewAttachment] = useState<TicketAttachment | null>(null);
@@ -106,6 +109,20 @@ const TicketsPage = () => {
   }, [tickets, user]);
 
   const selected = myTickets.find((t) => t.id === selectedTicketId) ?? null;
+
+  useEffect(() => {
+    if (!user) return;
+    const focusId = searchParams.get("focus")?.trim();
+    if (!focusId) return;
+    const mine = tickets.filter(
+      (t) => t.openedById === user.id || t.openedBy === user.username || t.openedBy === user.displayName,
+    );
+    if (!mine.some((t) => t.id === focusId)) return;
+    setSelectedTicketId(focusId);
+    const next = new URLSearchParams(searchParams);
+    next.delete("focus");
+    setSearchParams(next, { replace: true });
+  }, [user, tickets, searchParams, setSearchParams]);
 
   const unreadTicketsCount = useMemo(() => {
     let total = 0;
@@ -209,7 +226,10 @@ const TicketsPage = () => {
     setTypeRole(null);
     setIsCreateDialogOpen(false);
     setSelectedTicketId(created.id);
-    toast.success("تم إنشاء التكت");
+    toast.success("تم إنشاء تكتك", {
+      description: MSG_TICKET_CREATED_WAIT_FOR_STAFF,
+      duration: 9000,
+    });
   };
 
   const sendReply = () => {
@@ -253,7 +273,10 @@ const TicketsPage = () => {
     appendActivityLog(user.displayName || user.username, "رد المستخدم على تكت", `${selected.subject} — ${hasAdminReply ? "تم الرد سابقاً من الإدمن" : "بانتظار رد الإدمن"}`);
     setReply("");
     setReplyAttachment(null);
-    toast.success("تم إرسال الرسالة");
+    toast.success("تم إرسال رسالتك", {
+      description: MSG_TICKET_USER_REPLY_WAIT,
+      duration: 7500,
+    });
   };
 
   const renderAttachments = (attachments: TicketAttachment[] | undefined, variant: "user" | "staff") =>

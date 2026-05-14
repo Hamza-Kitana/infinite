@@ -16,7 +16,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { cn } from "@/lib/utils";
-import { Link } from "react-router-dom";
+import { StoreOrderTicketCTA } from "@/components/store/StoreOrderTicketCTA";
 import {
   CircleStop,
   Gauge,
@@ -336,12 +336,26 @@ function VipCarDialog({ car, open, onOpenChange }: { car: VipCatalogCar | null; 
 
         <div className="flex min-h-[52px] shrink-0 flex-col gap-2 border-t border-primary/15 bg-muted/25 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-start sm:gap-6 sm:px-4 sm:py-2.5">
           <div className="flex w-full justify-start sm:w-auto sm:shrink-0">
-            <Link
-              to="/apply/vip"
-              className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-neon px-5 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition hover:opacity-95 sm:h-10 sm:min-w-[10.5rem]"
-            >
-              طلب السيارة
-            </Link>
+            <StoreOrderTicketCTA
+              taken={car.taken}
+              buttonLabel="طلب السيارة"
+              confirmSummary={car.name}
+              subject={`سيارة VIP — ${car.name}`}
+              productDetailsBody={[
+                "طلب من صفحة المتجر (سيارات VIP).",
+                "",
+                `المعرّف: ${car.id}`,
+                `الاسم: ${car.name}`,
+                car.nameEn ? `الاسم الإنجليزي: ${car.nameEn}` : "",
+                `السعر (USD): ${usd.format(car.priceUsd)}`,
+                `قابلة للتعديل داخل السيرفر: ${car.modifiable ? "نعم" : "لا"}`,
+                `أقصى سرعة (معروض): ${car.stats.topSpeed}`,
+                `التسارع 0→100 (معروض): ${car.stats.acceleration}`,
+              ]
+                .filter(Boolean)
+                .join("\n")}
+              onAfterSubmit={() => onOpenChange(false)}
+            />
           </div>
           <p className="min-w-0 flex-1 text-right text-[11px] leading-snug text-muted-foreground sm:text-xs">
             الحالة والتعديل وفق سياسة السيرفر.

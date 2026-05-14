@@ -102,6 +102,8 @@ export type DeletedPublicUserRef = {
   username: string;
   fullName: string;
   discordId: string;
+  /** الاسم المعروض (مثل Discord) — يطابق applicantDisplayName في الطلبات */
+  displayName?: string;
 };
 
 function applicationMatchesDeletedPublicUser(a: ApplicationRecord, target: DeletedPublicUserRef): boolean {
@@ -111,9 +113,12 @@ function applicationMatchesDeletedPublicUser(a: ApplicationRecord, target: Delet
   const fullNameTrim = target.fullName.trim();
   const fullNameLow = fullNameTrim.toLowerCase();
 
-  if (a.applicantUserId && a.applicantUserId === id) return true;
+  const linkedApp = (a.applicantUserId ?? "").trim();
+  if (linkedApp) return linkedApp === id;
   if (a.applicantUsername && a.applicantUsername.trim().toLowerCase() === usernameLow) return true;
   const disp = (a.applicantDisplayName ?? "").trim();
+  const dn = (target.displayName ?? "").trim();
+  if (dn && disp && disp.toLowerCase() === dn.toLowerCase()) return true;
   if (fullNameTrim && disp && disp.toLowerCase() === fullNameLow) return true;
   const snapDc = a.snapshot?.discordId?.trim();
   if (discordNorm && snapDc && snapDc === discordNorm) return true;

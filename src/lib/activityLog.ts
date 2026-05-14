@@ -1,5 +1,7 @@
 /** سجل نشاط للعرض من السوبر أدمِن — تخزين محلي (تجريبي) */
 
+import { useEffect, useState } from "react";
+
 export type ActivityLogEntry = {
   id: string;
   at: string;
@@ -43,6 +45,9 @@ function saveRaw(entries: ActivityLogEntry[]) {
   }
 }
 
+/** يُرسل بعد كل `appendActivityLog` وبعد تحديث localStorage من تبويب آخر */
+export const IC_ACTIVITY_LOG_CHANGED_EVENT = "ic-activity-log";
+
 /** تسجيل حدث (يُستدعى بعد نجاح العمليات) */
 export function appendActivityLog(actor: string, action: string, detail?: string) {
   const a = actor.trim() || "—";
@@ -55,9 +60,30 @@ export function appendActivityLog(actor: string, action: string, detail?: string
   };
   const next = [entry, ...loadRaw()].slice(0, MAX_ENTRIES);
   saveRaw(next);
-  window.dispatchEvent(new CustomEvent("ic-activity-log"));
+  window.dispatchEvent(new CustomEvent(IC_ACTIVITY_LOG_CHANGED_EVENT));
 }
 
 export function loadActivityLog(): ActivityLogEntry[] {
   return loadRaw();
+}
+
+/**
+ * آخر N سجلات مع إعادة القراءة تلقائياً عند إضافة لوج (نفس التبويب أو آخر عبر storage).
+ * للوحة التحكم وغيرها دون الحاجة لتحديث الصفحة يدوياً.
+ */
+export function useActivityLogPreview(maxEntries: number): ActivityLogEntry[] {
+  const [entries, setEntries] = useState<ActivityLogEntry[]>(() => loadRaw().slice(0, maxEntries));
+  useEffect(() => {
+    const pull = () => setEntries(loadRaw().slice(0, maxEntries));
+    window.addEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, pull);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) pull();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, pull);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [maxEntries]);
+  return entries;
 }

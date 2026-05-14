@@ -48,7 +48,32 @@ export type TicketThread = {
   messages: TicketMessage[];
   lastStaffReadAt?: string;
   lastPublicReadAt?: string;
+  /** بعد إرسال رسالة «الإدمن دخل يتابع» — لا تتكرر تلقائياً */
+  staffPresenceSent?: boolean;
 };
+
+/** يظهر للزائر بعد إنشاء تكت جديد */
+export const MSG_TICKET_CREATED_WAIT_FOR_STAFF =
+  "فريق الإدارة سيستلم طلبك قريباً. خذ نفساً وانتظر قليلاً حتى يصلك رد من أحد المشرفين — يمكنك متابعة المحادثة من هنا.";
+
+/** يظهر بعد أن يرسل الزائر رسالة إضافية على تكت مفتوح */
+export const MSG_TICKET_USER_REPLY_WAIT =
+  "تم إرسال رسالتك. انتظر قليلاً بينما يطلع أحد من الإدارة على المحادثة — سنرد عليك بأقرب وقت.";
+
+const STAFF_PRESENCE_SNIPPET = "ثوانٍ أقوم بمراجعة طلبك";
+
+/** رسالة تلقائية عندما يفتح أحد الإداريين نافذة التكت (مرة واحدة لكل تكت) */
+export function buildAdminTicketPresenceBody(staffUsername: string): string {
+  const name = staffUsername.trim() || "الإدارة";
+  return `مرحباً، معك الإدمن ${name}. ثوانٍ أقوم بمراجعة طلبك — يمكنك إضافة أي تفاصيل هنا وسأعود إليك قريباً.`;
+}
+
+export function ticketNeedsStaffPresenceMessage(ticket: TicketThread): boolean {
+  if (ticket.staffPresenceSent === true) return false;
+  return !ticket.messages.some(
+    (m) => (m.senderType ?? "public") === "staff" && m.body.includes(STAFF_PRESENCE_SNIPPET),
+  );
+}
 
 type Persisted = { v: 1; tickets: TicketThread[] };
 
@@ -104,6 +129,7 @@ function normalize(raw: unknown): TicketThread[] {
         messages,
         lastStaffReadAt: typeof x.lastStaffReadAt === "string" ? x.lastStaffReadAt : undefined,
         lastPublicReadAt: typeof x.lastPublicReadAt === "string" ? x.lastPublicReadAt : undefined,
+        staffPresenceSent: x.staffPresenceSent === true,
       };
     });
 }
@@ -234,6 +260,7 @@ export function createTicket(input: {
         attachments: input.attachments ?? [],
       },
     ],
+    staffPresenceSent: false,
   };
   saveTickets([ticket, ...loadTickets()]);
   appendActivityLog(input.openedBy, "فتح تكت", `${ticket.typeLabel} — ${ticket.subject} — بانتظار رد الإدمن`);

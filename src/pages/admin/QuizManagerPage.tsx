@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, HelpCircle, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, HelpCircle, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,6 @@ import type { QuizQuestion } from "@/data/lawsQuiz";
 import { appendActivityLog } from "@/lib/activityLog";
 import {
   QUIZ_CONTEXTS,
-  resetQuizQuestions,
   saveQuizQuestions,
   loadQuizQuestions,
   LAWS_QUIZ_CONTENT_CHANGED_EVENT,
@@ -157,30 +156,24 @@ const QuizManagerPage = () => {
     toast.success("تم حفظ الأسئلة");
   };
 
-  const reset = () => {
-    resetQuizQuestions(activeKey);
-    appendActivityLog(user?.username ?? "admin", "استعادة أسئلة الاختبار الافتراضية", activeMeta.label);
-    toast.success("تمت استعادة الأسئلة الافتراضية");
-  };
-
   return (
-    <div dir="rtl" className="space-y-6 text-slate-900">
-      <Card className="border-violet-200 bg-white shadow-sm">
+    <div dir="rtl" className="space-y-6 text-slate-900 dark:text-slate-100">
+      <Card className="border-violet-200/90 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/95 dark:shadow-none">
         <CardHeader className="text-right">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
-              <Badge className="w-fit bg-violet-100 text-violet-700 hover:bg-violet-100">Quiz Manager</Badge>
-              <CardTitle className="font-display text-2xl">إدارة أسئلة التقديم الإلكتروني</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
+              <Badge className="w-fit bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/60 dark:text-violet-200 dark:hover:bg-violet-950/60">
+                Quiz Manager
+              </Badge>
+              <CardTitle className="font-display text-2xl text-slate-900 dark:text-slate-50">
+                إدارة أسئلة التقديم الإلكتروني
+              </CardTitle>
+              <CardDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                 أضف الأسئلة والخيارات وحدد الإجابة الصحيحة لكل اختبار. هذه الأسئلة تظهر للمستخدم عند الإقرار بالقوانين.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={reset} className="gap-2">
-                <RotateCcw className="h-4 w-4" />
-                افتراضي
-              </Button>
-              <Button type="button" onClick={save} className="gap-2 bg-violet-600 text-white hover:bg-violet-700">
+              <Button type="button" onClick={save} className="gap-2 bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500">
                 <Save className="h-4 w-4" />
                 حفظ
               </Button>
@@ -188,9 +181,9 @@ const QuizManagerPage = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Label className="mb-2 block text-right">اختبار الجهة</Label>
+          <Label className="mb-2 block text-right text-slate-800 dark:text-slate-200">اختبار الجهة</Label>
           <Select value={activeKey} onValueChange={(v) => setActiveKey(v as QuizContextKey)}>
-            <SelectTrigger className="max-w-xl bg-white text-right">
+            <SelectTrigger className="max-w-xl bg-white text-right dark:bg-slate-950 dark:text-slate-100">
               <SelectValue />
             </SelectTrigger>
             <SelectContent dir="rtl" className="max-h-80">
@@ -201,12 +194,20 @@ const QuizManagerPage = () => {
               ))}
             </SelectContent>
           </Select>
-          <p className="mt-2 text-right text-xs text-slate-500">{activeMeta.description}</p>
+          <p className="mt-2 text-right text-xs text-slate-500 dark:text-slate-400">{activeMeta.description}</p>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button type="button" variant="outline" onClick={() => setDraft((prev) => [...prev, makeQuestion()])} className="gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setDraft((prev) => [...prev, makeQuestion()]);
+            toast.success("تم إضافة سؤال");
+          }}
+          className="gap-2 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        >
           <Plus className="h-4 w-4" />
           إضافة سؤال
         </Button>
@@ -214,16 +215,18 @@ const QuizManagerPage = () => {
 
       <div className="space-y-4">
         {draft.map((q, index) => (
-          <Card key={q.id} className="border-slate-200 bg-white shadow-sm">
+          <Card key={q.id} className="border-slate-200 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/95 dark:shadow-none">
             <CardHeader className="text-right">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/55 dark:text-violet-300">
                     <HelpCircle className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <CardTitle className="font-display text-lg">السؤال {index + 1}</CardTitle>
-                    <CardDescription>اختر الخيار الصحيح من القائمة أسفل الخيارات.</CardDescription>
+                    <CardTitle className="font-display text-lg text-slate-900 dark:text-slate-50">السؤال {index + 1}</CardTitle>
+                    <CardDescription className="text-slate-600 dark:text-slate-400">
+                      اختر الخيار الصحيح من القائمة أسفل الخيارات.
+                    </CardDescription>
                   </div>
                 </div>
                 <Button
@@ -232,7 +235,7 @@ const QuizManagerPage = () => {
                   size="icon"
                   disabled={draft.length <= 1}
                   onClick={() => setDraft((prev) => prev.filter((item) => item.id !== q.id))}
-                  className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                  className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/45 dark:text-rose-200 dark:hover:bg-rose-950/70"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -240,11 +243,11 @@ const QuizManagerPage = () => {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2 text-right">
-                <Label>نص السؤال</Label>
+                <Label className="text-slate-800 dark:text-slate-200">نص السؤال</Label>
                 <Textarea
                   value={q.question}
                   onChange={(e) => updateQuestion(q.id, { question: e.target.value })}
-                  className="min-h-24 bg-white text-right"
+                  className="min-h-24 bg-white text-right dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                   placeholder="اكتب السؤال هنا..."
                 />
               </div>
@@ -257,13 +260,17 @@ const QuizManagerPage = () => {
                       key={opt.id}
                       className={cn(
                         "rounded-2xl border p-3",
-                        isCorrect ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50",
+                        isCorrect
+                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
+                          : "border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/80",
                       )}
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="font-display text-sm text-slate-600">خيار {String.fromCharCode(65 + optIdx)}</span>
+                        <span className="font-display text-sm text-slate-600 dark:text-slate-300">
+                          خيار {String.fromCharCode(65 + optIdx)}
+                        </span>
                         {isCorrect ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             صحيح
                           </span>
@@ -273,7 +280,7 @@ const QuizManagerPage = () => {
                         <Input
                           value={opt.label}
                           onChange={(e) => updateOption(q.id, opt.id, e.target.value)}
-                          className="bg-white text-right"
+                          className="bg-white text-right dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                           placeholder="نص الخيار"
                         />
                         <Button
@@ -282,7 +289,7 @@ const QuizManagerPage = () => {
                           size="icon"
                           disabled={q.options.length <= 2}
                           onClick={() => removeOption(q.id, opt.id)}
-                          className="shrink-0"
+                          className="shrink-0 border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -292,11 +299,11 @@ const QuizManagerPage = () => {
                 })}
               </div>
 
-              <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4">
+              <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-700">
                 <div className="min-w-60 space-y-2 text-right">
-                  <Label>الإجابة الصحيحة</Label>
+                  <Label className="text-slate-800 dark:text-slate-200">الإجابة الصحيحة</Label>
                   <Select value={q.correctOptionId} onValueChange={(v) => updateQuestion(q.id, { correctOptionId: v })}>
-                    <SelectTrigger className="bg-white text-right">
+                    <SelectTrigger className="bg-white text-right dark:bg-slate-950 dark:text-slate-100">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent dir="rtl">
@@ -308,7 +315,13 @@ const QuizManagerPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="button" variant="outline" onClick={() => addOption(q.id)} disabled={q.options.length >= OPTION_IDS.length}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => addOption(q.id)}
+                  disabled={q.options.length >= OPTION_IDS.length}
+                  className="border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
                   إضافة خيار
                 </Button>
               </div>

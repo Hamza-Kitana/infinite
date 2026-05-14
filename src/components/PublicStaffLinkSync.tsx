@@ -1,7 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePublicUser } from "@/contexts/PublicUserContext";
-import { findManagedUserByPublicId, loadManagedUsers } from "@/staff/staffDirectory";
+import {
+  findManagedUserByPublicId,
+  loadManagedUsers,
+  IC_MANAGED_STAFF_CHANGED_EVENT,
+  IC_MANAGED_STAFF_STORAGE_KEY,
+} from "@/staff/staffDirectory";
 
 /**
  * يجسر بين جلسة المواطن (Public) وجلسة الموظف (Staff) للمواطنين المرقَّين.
@@ -17,6 +22,20 @@ export function PublicStaffLinkSync() {
   const auth = useAuth();
   const publicId = publicUser.user?.id ?? null;
   const staffManagedId = auth.user?.managedId ?? null;
+  const [managedListEpoch, setManagedListEpoch] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setManagedListEpoch((n) => n + 1);
+    window.addEventListener(IC_MANAGED_STAFF_CHANGED_EVENT, bump);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === IC_MANAGED_STAFF_STORAGE_KEY) bump();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(IC_MANAGED_STAFF_CHANGED_EVENT, bump);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     if (publicId) {
@@ -45,7 +64,7 @@ export function PublicStaffLinkSync() {
         auth.logout();
       }
     }
-  }, [publicId, staffManagedId, auth]);
+  }, [publicId, staffManagedId, auth, managedListEpoch]);
 
   return null;
 }

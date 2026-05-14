@@ -4,7 +4,7 @@ import { UsersRound } from "lucide-react";
 import { primaryStaffRole, type StaffRole } from "@/contexts/AuthContext";
 import { SUPER_ADMIN_USERNAME } from "@/config/staffAuth";
 import { isInstitutionRosterStaffRole } from "@/data/institutionBranches";
-import { loadActivityLog } from "@/lib/activityLog";
+import { IC_ACTIVITY_LOG_CHANGED_EVENT, loadActivityLog } from "@/lib/activityLog";
 import { loadManagedUsers } from "@/staff/staffDirectory";
 import { cn } from "@/lib/utils";
 
@@ -141,11 +141,11 @@ function useStaffEngagementSnapshot() {
     const bump = () => setTick((t) => t + 1);
     window.addEventListener("storage", bump);
     window.addEventListener("ic-managed-staff", bump);
-    window.addEventListener("ic-activity-log", bump);
+    window.addEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, bump);
     return () => {
       window.removeEventListener("storage", bump);
       window.removeEventListener("ic-managed-staff", bump);
-      window.removeEventListener("ic-activity-log", bump);
+      window.removeEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, bump);
     };
   }, []);
   return useMemo(() => buildChartData(), [tick]);

@@ -76,8 +76,13 @@ export type ManagedUser = {
   linkedPublicUserId?: string;
 };
 
-const STORAGE_KEY = "ic_managed_staff_v1";
-const EVENT_NAME = "ic-managed-staff";
+const IC_MANAGED_STAFF_STORAGE_KEY = "ic_managed_staff_v1";
+const IC_MANAGED_STAFF_CHANGED_EVENT = "ic-managed-staff";
+
+export { IC_MANAGED_STAFF_STORAGE_KEY, IC_MANAGED_STAFF_CHANGED_EVENT };
+
+const STORAGE_KEY = IC_MANAGED_STAFF_STORAGE_KEY;
+const EVENT_NAME = IC_MANAGED_STAFF_CHANGED_EVENT;
 
 /** ترحيل: institution_manager + institutionBranchId → institution_roster_<branch> */
 function migrateLegacyRoles(rawRoles: unknown[], institutionBranchId: unknown): ManagedStaffRole[] {

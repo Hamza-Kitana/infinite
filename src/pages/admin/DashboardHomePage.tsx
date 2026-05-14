@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { adminCard, adminPageWrap, adminStatCard } from "@/lib/adminUi";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import type { ApplicationRecord } from "@/data/publicApplicationTypes";
-import { loadActivityLog } from "@/lib/activityLog";
+import { useActivityLogPreview } from "@/lib/activityLog";
 import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
 
 import { DashboardTeamDonut } from "@/components/admin/DashboardTeamDonut";
@@ -33,6 +33,7 @@ const ROLE_LABELS: Record<string, string> = {
 const DashboardHomePage = () => {
   const { isSuperAdmin } = useAuth();
   const { applications } = useApplicationsContent();
+  const latestLogs = useActivityLogPreview(5);
 
   if (!isSuperAdmin) return null;
 
@@ -52,7 +53,6 @@ const DashboardHomePage = () => {
   const vipApprovalRate = vipDecided > 0 ? Math.round((vipApproved / vipDecided) * 100) : 0;
 
   const latestApplications = serverApplications.slice(0, 8);
-  const latestLogs = loadActivityLog().slice(0, 5);
 
   const requestsByRole = serverApplications.reduce<Record<string, number>>((acc, item) => {
     acc[item.roleKey] = (acc[item.roleKey] ?? 0) + 1;

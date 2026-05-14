@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import {
+  ChevronDown,
   Crown,
   Layers,
   Pencil,
@@ -12,6 +13,14 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +70,8 @@ type PublicUserRow = {
   username: string;
   realName: string;
   fullName: string;
+  /** الاسم المعروض في الجلسة (Discord) — لا يُخلط مع اسم المدينة */
+  displayName: string;
   email: string;
   discordId: string;
   age: number;
@@ -74,17 +85,14 @@ const APPLICATIONS_STORAGE_KEY = "ic_public_applications_v1";
 const APPLICATIONS_CHANGED_EVENT = "ic-public-applications-changed";
 
 function applicationMatchesPublicRow(app: ApplicationRecord, row: PublicUserRow): boolean {
-  if (app.applicantUserId && app.applicantUserId === row.id) return true;
+  const linked = (app.applicantUserId ?? "").trim();
+  if (linked) return linked === row.id.trim();
   if (app.applicantUsername && app.applicantUsername.trim().toLowerCase() === row.username.trim().toLowerCase()) {
     return true;
   }
-  if (
-    app.applicantDisplayName &&
-    row.fullName.trim() &&
-    app.applicantDisplayName.trim().toLowerCase() === row.fullName.trim().toLowerCase()
-  ) {
-    return true;
-  }
+  const ad = (app.applicantDisplayName ?? "").trim().toLowerCase();
+  if (ad && row.fullName.trim() && ad === row.fullName.trim().toLowerCase()) return true;
+  if (ad && row.displayName.trim() && ad === row.displayName.trim().toLowerCase()) return true;
   return false;
 }
 
@@ -122,19 +130,26 @@ function loadPublicUsersForAdmin(): PublicUserRow[] {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-      .map((x) => ({
-        id: typeof x.id === "string" ? x.id : crypto.randomUUID(),
-        username: typeof x.username === "string" ? x.username : "—",
-        realName: typeof x.realName === "string" ? x.realName : "—",
-        fullName: typeof x.fullName === "string" ? x.fullName : "—",
-        email: typeof x.email === "string" ? x.email : "—",
-        discordId: typeof x.discordId === "string" ? x.discordId : "—",
-        age: typeof x.age === "number" ? x.age : 0,
-        password: typeof x.password === "string" ? x.password : "",
-        isActive: x.isActive !== false,
-        createdAt: typeof x.createdAt === "string" ? x.createdAt : "",
-        authProvider: x.authProvider === "discord" || x.authProvider === "local" ? x.authProvider : undefined,
-      }));
+      .map((x) => {
+        const fullName = typeof x.fullName === "string" ? x.fullName : "—";
+        const username = typeof x.username === "string" ? x.username : "—";
+        const storedDn = typeof x.displayName === "string" ? x.displayName.trim() : "";
+        const displayName = storedDn || fullName.trim() || username;
+        return {
+          id: typeof x.id === "string" ? x.id : crypto.randomUUID(),
+          username,
+          realName: typeof x.realName === "string" ? x.realName : "—",
+          fullName,
+          displayName,
+          email: typeof x.email === "string" ? x.email : "—",
+          discordId: typeof x.discordId === "string" ? x.discordId : "—",
+          age: typeof x.age === "number" ? x.age : 0,
+          password: typeof x.password === "string" ? x.password : "",
+          isActive: x.isActive !== false,
+          createdAt: typeof x.createdAt === "string" ? x.createdAt : "",
+          authProvider: x.authProvider === "discord" || x.authProvider === "local" ? x.authProvider : undefined,
+        };
+      });
   } catch {
     return [];
   }
@@ -153,7 +168,7 @@ function savePublicUsersForAdmin(users: PublicUserRow[]) {
         discordId: u.discordId,
         age: u.age,
         password: u.password,
-        displayName: u.fullName,
+        displayName: u.displayName?.trim() || u.fullName?.trim() || u.username,
         isActive: u.isActive,
         createdAt: u.createdAt,
         authProvider: u.authProvider,
@@ -187,6 +202,64 @@ const BASE_ROLES: { value: ManagedStaffRole; label: string }[] = [
 function roleLabel(role: ManagedStaffRole): string {
   if (isInstitutionRosterStaffRole(role)) return institutionRosterStaffRoleLabelAr(role);
   return BASE_ROLES.find((r) => r.value === role)?.label ?? role;
+}
+
+/** عرض الرتب في قائمة منسدلة — يوفر مساحة في الجدول */
+function ManagedRolesDropdown({
+  roles,
+  listLabel = "الرتب المعيّنة",
+}: {
+  roles: readonly ManagedStaffRole[];
+  listLabel?: string;
+}) {
+  const sorted = useMemo(
+    () => [...roles].sort((a, b) => roleLabel(a).localeCompare(roleLabel(b), "ar")),
+    [roles],
+  );
+  if (sorted.length === 0) {
+    return (
+      <span className="inline-flex rounded-lg border border-dashed border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-[11px] text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+        لا رتب
+      </span>
+    );
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 max-w-[min(100%,14rem)] gap-1.5 rounded-lg border-violet-200/90 bg-white px-2.5 text-xs font-medium text-violet-900 shadow-sm hover:bg-violet-50/90 dark:border-violet-700/45 dark:bg-slate-900 dark:text-violet-100 dark:hover:bg-violet-950/45"
+        >
+          <Layers className="h-3.5 w-3.5 shrink-0 text-violet-600 opacity-90 dark:text-violet-300" />
+          <span className="min-w-0 truncate">
+            {sorted.length === 1 ? "رتبة واحدة" : `${sorted.length} رتب`}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        dir="rtl"
+        className="max-h-64 w-[min(20rem,calc(100vw-2rem))] overflow-y-auto text-right"
+      >
+        <DropdownMenuLabel className="text-xs font-normal text-slate-500 dark:text-slate-400">
+          {listLabel}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {sorted.map((r) => (
+          <DropdownMenuItem
+            key={r}
+            className="cursor-default justify-end text-sm text-slate-800 focus:bg-violet-50 dark:text-slate-100 dark:focus:bg-violet-950/45"
+            onSelect={(e) => e.preventDefault()}
+          >
+            {roleLabel(r)}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 function rolesPickerHasMore(selected: Set<ManagedStaffRole>): boolean {
@@ -636,6 +709,7 @@ const StaffUsersPage = () => {
       username: target.username,
       fullName: target.fullName,
       discordId: target.discordId,
+      displayName: target.displayName,
     });
     savePublicUsersForAdmin(publicUsers.filter((u) => u.id !== id));
     refresh();
@@ -1093,31 +1167,31 @@ const StaffUsersPage = () => {
               return (
                 <li
                   key={u.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-right"
+                  className="grid gap-3 px-4 py-3 text-right sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4"
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 space-y-2">
                     <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900 dark:text-slate-50">
-                      {u.username}
-                      <span className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-[11px]",
-                        u.isActive === false
-                          ? "bg-rose-50 text-rose-700 dark:bg-rose-950/45 dark:text-rose-200"
-                          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200",
-                      )}>
+                      <span className="truncate">{u.username}</span>
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+                          u.isActive === false
+                            ? "bg-rose-50 text-rose-700 dark:bg-rose-950/45 dark:text-rose-200"
+                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200",
+                        )}
+                      >
                         {u.isActive === false ? "موقوف" : "نشط"}
                       </span>
                       {isPromoted ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-display text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-display text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                           <Crown className="h-3 w-3 text-amber-700 dark:text-amber-300" />
                           مواطن مرقّى
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-                      {u.roles.map((role) => roleLabel(role)).join(" · ")}
-                    </p>
+                    <ManagedRolesDropdown roles={u.roles} />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:justify-start">
                     <Button
                       type="button"
                       variant="outline"
@@ -1534,45 +1608,53 @@ const StaffUsersPage = () => {
                     applicationMatchesPublicRow(app, u),
                 );
               return (
-                <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-right">
-                  <div className="min-w-0 flex-1">
+                <li
+                  key={u.id}
+                  className="grid gap-3 px-4 py-3 text-right sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-4"
+                >
+                  <div className="min-w-0 space-y-2">
                     <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900 dark:text-slate-50">
-                      {u.username}
-                      <span className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-[11px]",
-                        u.isActive
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-                          : "bg-rose-50 text-rose-700 dark:bg-rose-950/45 dark:text-rose-200",
-                      )}>
+                      <span className="truncate">{u.username}</span>
+                      <span
+                        className={cn(
+                          "inline-flex shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+                          u.isActive
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                            : "bg-rose-50 text-rose-700 dark:bg-rose-950/45 dark:text-rose-200",
+                        )}
+                      >
                         {u.isActive ? "نشط" : "موقوف"}
                       </span>
                       {linked ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-display text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-display text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                           <Crown className="h-3 w-3 text-amber-700 dark:text-amber-300" />
-                          مرقّى — {linked.roles.length} رتبة
+                          مرقّى كموظف
                         </span>
                       ) : null}
                       {citizenElectronicApproved ? (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-display text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-display text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
                           <ShieldCheck className="h-3 w-3 text-emerald-700 dark:text-emerald-300" />
                           تقديم إلكتروني مفعّل
                         </span>
                       ) : null}
                     </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      داخل المدينة: {u.fullName} · Discord: {u.realName}
+                    <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                      <span className="text-slate-500 dark:text-slate-500">داخل المدينة:</span> {u.fullName}
+                      <span className="mx-1.5 text-slate-300 dark:text-slate-600">|</span>
+                      <span className="text-slate-500 dark:text-slate-500">Discord:</span> {u.realName}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-500">{u.email}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-500">{u.email}</p>
                     {linked ? (
-                      <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-200">
-                        صلاحيات: {linked.roles.map(roleLabel).join(" · ")}
-                      </p>
+                      <div className="pt-0.5">
+                        <ManagedRolesDropdown roles={linked.roles} listLabel="صلاحيات الترقية" />
+                      </div>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-slate-500">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                    <span className="text-center text-[11px] text-slate-500 sm:text-end">
                       {u.createdAt ? new Date(u.createdAt).toLocaleString("ar") : "—"}
                     </span>
+                    <div className="flex flex-wrap justify-center gap-1.5 sm:justify-end">
                     <Button
                       type="button"
                       size="sm"
@@ -1659,6 +1741,7 @@ const StaffUsersPage = () => {
                       <Trash2 className="h-4 w-4 ms-1 shrink-0 text-current" />
                       حذف
                     </Button>
+                    </div>
                   </div>
                 </li>
               );

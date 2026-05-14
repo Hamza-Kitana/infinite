@@ -30,6 +30,8 @@ export type PublicUserProfile = {
   realName: string;
   cityName: string;
   username: string;
+  /** الاسم المعروض في الواجهة (Discord مثلاً) — يُستخدم لربط طلبات التقديم بالحساب */
+  displayName: string;
   email: string;
   discordId: string;
   age: number;
@@ -150,6 +152,8 @@ function saveSession(user: PublicSessionUser | null) {
 
 export function PublicUserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicSessionUser | null>(() => loadSession());
+  /** يزيد عند تغيّر `ic_public_users_v1` حتى تعيد الصفحات مثل البروفايل قراءة `getProfile()` فوراً */
+  const [profileDataEpoch, setProfileDataEpoch] = useState(0);
 
   useEffect(() => {
     const verifySessionAgainstStorage = () => {
@@ -178,6 +182,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         setUser(synced);
         saveSession(synced);
       }
+      setProfileDataEpoch((t) => t + 1);
     };
     verifySessionAgainstStorage();
     const onStorage = (e: StorageEvent) => {
@@ -355,6 +360,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
           realName: found.realName,
           cityName: found.fullName,
           username: found.username,
+          displayName: (found.displayName ?? found.username).trim() || found.username,
           email: found.email,
           discordId: found.discordId,
           age: found.age,
@@ -413,7 +419,7 @@ export function PublicUserProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       },
     }),
-    [user],
+    [user, profileDataEpoch],
   );
 
   return <PublicUserContext.Provider value={value}>{children}</PublicUserContext.Provider>;

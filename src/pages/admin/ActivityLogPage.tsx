@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ActivityLogEntry } from "@/lib/activityLog";
-import { loadActivityLog } from "@/lib/activityLog";
+import { IC_ACTIVITY_LOG_CHANGED_EVENT, loadActivityLog } from "@/lib/activityLog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -195,13 +195,13 @@ const ActivityLogPage = () => {
 
   useEffect(() => {
     const on = () => refresh();
-    window.addEventListener("ic-activity-log", on as EventListener);
+    window.addEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, on as EventListener);
     const onStorage = (e: StorageEvent) => {
       if (e.key === "ic_activity_log_v1") refresh();
     };
     window.addEventListener("storage", onStorage);
     return () => {
-      window.removeEventListener("ic-activity-log", on as EventListener);
+      window.removeEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, on as EventListener);
       window.removeEventListener("storage", onStorage);
     };
   }, [refresh]);

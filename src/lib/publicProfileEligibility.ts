@@ -11,7 +11,9 @@ export const MSG_TICKETS_UNLOCKED_AFTER_PROFILE =
   "تم حفظ بياناتك وتفعيل حسابك على المدينة — يمكنك الآن فتح «التكت والمتابعة» من قائمة الموقع.";
 
 function applicationMatchesPublicUser(app: ApplicationRecord, profile: PublicUserProfile): boolean {
-  if (app.applicantUserId && app.applicantUserId === profile.id) return true;
+  const linkedId = (app.applicantUserId ?? "").trim();
+  /** إن وُجد ربط صريح بالحساب لا نعتمد الاسم المعروض — وإلا يبقى طلب مقبول لحساب محذوف يُظهر للحساب الجديد (نفس Discord) أنه «مفعّل» */
+  if (linkedId) return linkedId === profile.id.trim();
   if (
     app.applicantUsername &&
     app.applicantUsername.trim().toLowerCase() === profile.username.trim().toLowerCase()
@@ -26,6 +28,14 @@ function applicationMatchesPublicUser(app: ApplicationRecord, profile: PublicUse
     return true;
   }
   return false;
+}
+
+/** هل طلب التقديم هذا يخص حساب المواطن الحالي (للفلترة في البروفايل وغيره) */
+export function applicationBelongsToPublicProfile(
+  app: ApplicationRecord,
+  profile: PublicUserProfile,
+): boolean {
+  return applicationMatchesPublicUser(app, profile);
 }
 
 /**
