@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import {
   Star,
   Store,
   Users,
+  Video,
   XCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -21,7 +22,6 @@ import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { getPostLoginDashboardPath, useAuth } from "@/contexts/AuthContext";
@@ -29,15 +29,28 @@ import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { useInstitutionRostersContent } from "@/contexts/InstitutionRostersContentContext";
 import { INSTITUTION_BRANCH_META } from "@/data/institutionBranches";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
-import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
+import { isJobApplicationRoleKey, type JobRoleKey } from "@/data/jobRoleLaws";
 import {
   applicationBelongsToPublicProfile,
   isPublicTicketsUnlocked,
   MSG_TICKETS_NEED_CITY_PROFILE,
-  MSG_TICKETS_UNLOCKED_AFTER_PROFILE,
-  isCitizenElectronicApplyComplete,
+  hasApprovedCitizenApplication,
 } from "@/lib/publicProfileEligibility";
-import { cn, isValidArabicNamePart } from "@/lib/utils";
+import { jobRoleKeyFromInstitutionBranch, institutionBranchFromJobRoleKey } from "@/lib/institutionJobRole";
+import {
+  defaultJobMemberRankAr,
+  isJobRoleKey,
+  resolveProfileJobRankLabel,
+} from "@/lib/jobRoleRankLabels";
+import type { ApplicationRecord } from "@/data/publicApplicationTypes";
+import { useSiteVisibility } from "@/lib/siteVisibility";
+import {
+  hasApprovedStreamerApplication,
+  hasPendingStreamerApplication,
+  STREAMER_MANAGER_DEFAULT_ROLE,
+} from "@/lib/streamerApplication";
+import { useStreamersContent } from "@/contexts/StreamersContentContext";
+import { cn } from "@/lib/utils";
 import { DiscordIcon } from "@/components/DiscordIcon";
 
 function statusLabel(status: "pending" | "approved" | "rejected") {
@@ -49,11 +62,13 @@ function statusLabel(status: "pending" | "approved" | "rejected") {
 const ProfilePage = () => {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
-  const { user, getProfile, logout, updateProfile } = usePublicUser();
+  const { user, getProfile, logout } = usePublicUser();
   const profile = getProfile();
   const { applications } = useApplicationsContent();
+  const { items: streamerCards } = useStreamersContent();
   const { findMembershipForUser } = useInstitutionRostersContent();
   const tickets = useTicketsCenter();
+  const visibility = useSiteVisibility();
   /** جلسة الموظف — تكون موجودة تلقائياً للمواطن المرقّى عبر PublicStaffLinkSync */
   const auth = useAuth();
   const dashboardPath = useMemo(
@@ -89,59 +104,22 @@ const ProfilePage = () => {
   const cityTicketsOk = isPublicTicketsUnlocked(profile, applications);
 
   const citizenElectronicApplyDone =
-    profile?.authProvider === "discord" && isCitizenElectronicApplyComplete(profile, applications);
+    profile?.authProvider === "discord" && hasApprovedCitizenApplication(profile, applications);
 
-  const [formCity1, setFormCity1] = useState("");
-  const [formCity2, setFormCity2] = useState("");
-  const [formAge, setFormAge] = useState("");
-  const [savingProfile, setSavingProfile] = useState(false);
+  const streamerApplyApproved = hasApprovedStreamerApplication(profile, applications);
+  const streamerApplyPending = hasPendingStreamerApplication(profile, applications);
+  const myStreamerCard = useMemo(() => {
+    if (!user?.id) return null;
+    return streamerCards.find((c) => c.linkedUserId === user.id && !c.hidden) ?? null;
+  }, [streamerCards, user?.id]);
+  const streamerCardTitle = myStreamerCard?.role?.trim() || STREAMER_MANAGER_DEFAULT_ROLE;
 
-  useEffect(() => {
-    if (!profile) return;
-    const cnCity = profile.cityName.trim();
-    const parts = cnCity.split(/\s+/).filter(Boolean);
-    if (parts.length === 0) {
-      setFormCity1("");
-      setFormCity2("");
-    } else if (parts.length === 1) {
-      setFormCity1(parts[0] ?? "");
-      setFormCity2("");
-    } else {
-      setFormCity1(parts[0] ?? "");
-      setFormCity2(parts.slice(1).join(" "));
-    }
-    setFormAge(profile.age > 0 ? String(profile.age) : "");
-  }, [profile?.id, profile?.cityName, profile?.age]);
-
-  const handleSaveProfile = () => {
-    const cityCombined = `${formCity1.trim()} ${formCity2.trim()}`.trim();
-    const ageNum = Math.floor(Number(formAge));
-    if (!isValidArabicNamePart(formCity1) || !isValidArabicNamePart(formCity2)) {
-      toast.error("اكتب جزءي الاسم داخل المدينة بالعربي فقط — حرفين على الأقل لكل جزء");
-      return;
-    }
-    if (!Number.isFinite(ageNum) || ageNum < 13) {
-      toast.error("أدخل عمرك الحقيقي (13 أو أكثر)");
-      return;
-    }
-    const unlockedBefore = isPublicTicketsUnlocked(profile, applications);
-    setSavingProfile(true);
-    const result = updateProfile({
-      cityName: cityCombined,
-      age: ageNum,
-    });
-    setSavingProfile(false);
-    if (!result.ok) {
-      toast.error(result.reason);
-      return;
-    }
-    const profileAfter = getProfile();
-    if (!unlockedBefore && profileAfter && isPublicTicketsUnlocked(profileAfter, applications)) {
-      toast.success(MSG_TICKETS_UNLOCKED_AFTER_PROFILE);
-    } else {
-      toast.success("تم حفظ بياناتك");
-    }
-  };
+  const cityNameParts = useMemo(() => {
+    const parts = profile?.cityName.trim().split(/\s+/).filter(Boolean) ?? [];
+    if (parts.length === 0) return { first: "—", second: "—" };
+    if (parts.length === 1) return { first: parts[0] ?? "—", second: "—" };
+    return { first: parts[0] ?? "—", second: parts.slice(1).join(" ") };
+  }, [profile?.cityName]);
 
   /** عدد التكتات التي تحتوي ردًا جديدًا من الإدارة لم يقرأه المستخدم */
   const unreadTicketsCount = useMemo(() => {
@@ -163,6 +141,61 @@ const ProfilePage = () => {
       .filter((a) => applicationBelongsToPublicProfile(a, profile))
       .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
   }, [applications, user, profile]);
+
+  const resolveApprovedJobRank = useCallback(
+    (roleKey: JobRoleKey): string => {
+      const branchId = institutionBranchFromJobRoleKey(roleKey);
+      if (myMembership && branchId && myMembership.branchId === branchId) {
+        return resolveProfileJobRankLabel(roleKey, myMembership.role, myMembership.rankLabel);
+      }
+      return defaultJobMemberRankAr(roleKey);
+    },
+    [myMembership],
+  );
+
+  /** رتب الوظائف المقبولة — للعرض تحت اسم المستخدم */
+  const profileJobBadges = useMemo(() => {
+    if (!user || !profile) return [];
+    const seen = new Set<string>();
+    const badges: { id: string; institutionLabel: string; rankLabel: string }[] = [];
+
+    if (myMembership) {
+      const roleKey = jobRoleKeyFromInstitutionBranch(myMembership.branchId);
+      if (roleKey) {
+        seen.add(roleKey);
+        badges.push({
+          id: `roster-${myMembership.branchId}`,
+          institutionLabel: INSTITUTION_BRANCH_META[myMembership.branchId].labelAr,
+          rankLabel: resolveApprovedJobRank(roleKey),
+        });
+      }
+    }
+
+    for (const app of myApplications) {
+      if (!isJobApplicationRoleKey(app.roleKey) || app.status !== "approved") continue;
+      if (!isJobRoleKey(app.roleKey)) continue;
+      if (seen.has(app.roleKey)) continue;
+      seen.add(app.roleKey);
+      const branchId = institutionBranchFromJobRoleKey(app.roleKey);
+      badges.push({
+        id: `app-${app.id}`,
+        institutionLabel: branchId
+          ? INSTITUTION_BRANCH_META[branchId].labelAr
+          : app.targetTitle,
+        rankLabel: resolveApprovedJobRank(app.roleKey),
+      });
+    }
+    return badges;
+  }, [user, profile, myMembership, myApplications, resolveApprovedJobRank]);
+
+  const rankLabelForApplication = useCallback(
+    (app: ApplicationRecord): string | null => {
+      if (!isJobApplicationRoleKey(app.roleKey) || app.status !== "approved") return null;
+      if (!isJobRoleKey(app.roleKey)) return null;
+      return resolveApprovedJobRank(app.roleKey);
+    },
+    [resolveApprovedJobRank],
+  );
 
   if (!user) return <Navigate to="/" replace />;
 
@@ -234,6 +267,26 @@ const ProfilePage = () => {
               </p>
             ) : null}
           </div>
+          {profileJobBadges.length > 0 ? (
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: reduceMotion ? 0 : 0.08 }}
+              className="mt-4 flex max-w-2xl flex-wrap items-center justify-center gap-2"
+              aria-label="رتبك الوظيفية"
+            >
+              {profileJobBadges.map((badge) => (
+                <span
+                  key={badge.id}
+                  className="inline-flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-emerald-300/90 bg-gradient-to-l from-emerald-50 to-teal-50 px-3.5 py-1.5 text-sm font-semibold text-emerald-950 shadow-sm"
+                >
+                  <Briefcase className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden />
+                  <span>{badge.rankLabel}</span>
+                  <span className="text-[12px] font-normal text-emerald-800/85">· {badge.institutionLabel}</span>
+                </span>
+              ))}
+            </motion.div>
+          ) : null}
           {isDiscord ? (
             <Badge className="mt-3 border-[#5865F2]/40 bg-[#5865F2]/12 text-[#3c45a5] hover:bg-[#5865F2]/18">
               متصل بـ Discord — المعرّف مربوط بحسابك
@@ -249,17 +302,16 @@ const ProfilePage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl border border-amber-300/90 bg-gradient-to-l from-amber-50 to-orange-50/80 px-4 py-3.5 text-right shadow-sm sm:px-5"
           >
-            <p className="font-display text-sm font-bold text-amber-950">أكمل بيانات حسابك</p>
+            <p className="font-display text-sm font-bold text-amber-950">أكمل التقديم الإلكتروني</p>
             <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
-              من القسم أدناه أكمل <span className="font-semibold">اسمك داخل المدينة</span> على{" "}
-              <span className="font-semibold">جزئين بالعربي</span> و<span className="font-semibold">عمرك</span> ثم احفظ.
+              اسمك داخل المدينة (جزآن بالعربي) وعمرك يُسجَّلان تلقائياً عند إرسال{" "}
+              <Link to="/apply/citizen" className="font-semibold text-amber-950 underline underline-offset-2">
+                نموذج تقديم المواطن
+              </Link>
+              — لا يمكن تعديلهما من البروفايل.
               {!cityTicketsOk ? (
-                <>
-                  {" "}
-                  لا يُعرض تنبيه التكتات قبل الإكمال — بعد الحفظ الصحيح ستظهر لك رسالة أن التكتات أصبحت متاحة.
-                </>
-              ) : null}{" "}
-              الاسم على Discord والبريد ومعرّف Discord للعرض فقط — لتعديلها تواصل مع إدارة السيرفر.
+                <> بعد إرسال التقديم ببيانات صحيحة تُفتح لك التكتات.</>
+              ) : null}
             </p>
           </motion.div>
         ) : null}
@@ -339,9 +391,16 @@ const ProfilePage = () => {
                     myMembership.role === "member" ? "text-slate-700" : "text-white/85",
                   )}
                 >
-                  {myMembership.role === "leader" || myMembership.role === "deputy"
-                    ? `الرتبة: ${myMembership.rankLabel || "—"} • انتقل إلى لوحة قيادتك لإدارة الأعضاء`
-                    : `الرتبة: ${myMembership.rankLabel || "—"} • شاهد بطاقتك في طاقم المؤسسة`}
+                  {(() => {
+                    const rk = jobRoleKeyFromInstitutionBranch(myMembership.branchId);
+                    const rank =
+                      rk != null
+                        ? resolveProfileJobRankLabel(rk, myMembership.role, myMembership.rankLabel)
+                        : myMembership.rankLabel || "—";
+                    return myMembership.role === "leader" || myMembership.role === "deputy"
+                      ? `الرتبة: ${rank} • انتقل إلى لوحة قيادتك لإدارة الأعضاء`
+                      : `الرتبة: ${rank} • شاهد بطاقتك في طاقم المؤسسة`;
+                  })()}
                 </p>
               </div>
               <div className="relative flex shrink-0 items-center gap-2">
@@ -407,15 +466,20 @@ const ProfilePage = () => {
           transition={{ duration: 0.45, delay: reduceMotion ? 0 : 0.05 }}
           aria-label="اختصارات سريعة"
         >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+          <div
+            className={cn(
+              "flex w-full flex-col gap-4 sm:gap-5 md:flex-row md:flex-wrap md:items-stretch lg:flex-nowrap",
+              visibility.pages.streamers ? "lg:gap-3 xl:gap-4" : "lg:gap-5",
+            )}
+          >
             {citizenElectronicApplyDone ? (
-              <div className="relative flex items-center gap-4 overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-l from-emerald-50 via-white to-teal-50 px-5 py-5 text-right text-emerald-950 shadow-[0_18px_44px_-22px_rgba(16,185,129,0.35)] sm:px-6 sm:py-6">
-                <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 sm:h-16 sm:w-16">
-                  <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" />
+              <div className="relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-l from-emerald-50 via-white to-teal-50 px-4 py-4 text-right text-emerald-950 shadow-[0_18px_44px_-22px_rgba(16,185,129,0.35)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                  <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
                 </span>
                 <div className="relative min-w-0 flex-1">
                   <p className="font-display text-[10px] tracking-[0.32em] text-emerald-700/90">تم</p>
-                  <p className="mt-1 font-display text-xl font-bold leading-tight sm:text-2xl">دخول السيرفر مفعّل</p>
+                  <p className="mt-1 font-display text-lg font-bold leading-tight sm:text-xl lg:text-base xl:text-lg">دخول السيرفر مفعّل</p>
                   <p className="mt-1 line-clamp-3 text-[13px] leading-snug text-emerald-900/85 sm:text-sm">
                     تم قبول تقديمك أو تفعيل بياناتك على المدينة — لا حاجة لإعادة التقديم الإلكتروني. تابع من
                     التكت أو المتجر.
@@ -425,7 +489,7 @@ const ProfilePage = () => {
             ) : (
               <Link
                 to="/apply/citizen"
-                className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-emerald-300/70 bg-gradient-to-l from-emerald-500 via-teal-600 to-cyan-700 px-5 py-5 text-right text-white shadow-[0_24px_60px_-28px_rgba(16,185,129,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(16,185,129,0.65)] sm:px-6 sm:py-6"
+                className="group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-emerald-300/70 bg-gradient-to-l from-emerald-500 via-teal-600 to-cyan-700 px-4 py-4 text-right text-white shadow-[0_24px_60px_-28px_rgba(16,185,129,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(16,185,129,0.65)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5"
               >
                 <span
                   aria-hidden
@@ -435,8 +499,8 @@ const ProfilePage = () => {
                   aria-hidden
                   className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-cyan-400/30 blur-2xl"
                 />
-                <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-16 sm:w-16">
-                  <ClipboardList className="h-7 w-7 sm:h-8 sm:w-8" />
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                  <ClipboardList className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
                 </span>
                 <div className="relative min-w-0 flex-1">
                   <p className="font-display text-[10px] tracking-[0.32em] text-white/80">APPLY</p>
@@ -459,7 +523,7 @@ const ProfilePage = () => {
                   navigate("/profile");
                 }
               }}
-              className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-violet-200/90 bg-gradient-to-l from-violet-600 via-violet-700 to-fuchsia-700 px-5 py-5 text-right text-white shadow-[0_24px_60px_-28px_rgba(124,58,237,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(124,58,237,0.65)] sm:px-6 sm:py-6"
+              className="group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-violet-200/90 bg-gradient-to-l from-violet-600 via-violet-700 to-fuchsia-700 px-4 py-4 text-right text-white shadow-[0_24px_60px_-28px_rgba(124,58,237,0.55)] transition-all hover:-translate-y-0.5 hover:shadow-[0_28px_70px_-22px_rgba(124,58,237,0.65)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5"
             >
               <span
                 aria-hidden
@@ -469,8 +533,8 @@ const ProfilePage = () => {
                 aria-hidden
                 className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-fuchsia-400/25 blur-2xl"
               />
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-16 sm:w-16">
-                <MessageSquareMore className="h-7 w-7 sm:h-8 sm:w-8" />
+              <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                <MessageSquareMore className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
                 {unreadTicketsCount > 0 ? (
                   <span className="absolute -left-2 -top-2 inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow-[0_0_18px_rgba(244,63,94,0.7)] ring-2 ring-white/90">
                     {unreadTicketsCount}
@@ -479,7 +543,7 @@ const ProfilePage = () => {
               </span>
               <div className="relative min-w-0 flex-1">
                 <p className="font-display text-[10px] tracking-[0.32em] text-white/80">SUPPORT</p>
-                <p className="mt-1 font-display text-xl font-bold leading-tight sm:text-2xl">مركز التكت</p>
+                <p className="mt-1 font-display text-lg font-bold leading-tight sm:text-xl lg:text-base xl:text-lg">مركز التكت</p>
                 <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/85 sm:text-sm">
                   {unreadTicketsCount > 0
                     ? `لديك ${unreadTicketsCount} رد جديد من الإدارة بانتظار قراءتك`
@@ -490,7 +554,7 @@ const ProfilePage = () => {
 
             <Link
               to="/store"
-              className="group relative flex items-center gap-4 overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-l from-amber-50 via-orange-50 to-rose-50 px-5 py-5 text-right text-slate-900 shadow-[0_18px_44px_-22px_rgba(217,119,6,0.45)] transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_24px_60px_-22px_rgba(217,119,6,0.55)] sm:px-6 sm:py-6"
+              className="group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-amber-200 bg-gradient-to-l from-amber-50 via-orange-50 to-rose-50 px-4 py-4 text-right text-slate-900 shadow-[0_18px_44px_-22px_rgba(217,119,6,0.45)] transition-all hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_24px_60px_-22px_rgba(217,119,6,0.55)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5"
             >
               <span
                 aria-hidden
@@ -500,17 +564,68 @@ const ProfilePage = () => {
                 aria-hidden
                 className="pointer-events-none absolute -bottom-12 -left-10 h-44 w-44 rounded-full bg-rose-300/30 blur-2xl"
               />
-              <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md ring-1 ring-white/30 sm:h-16 sm:w-16">
-                <Store className="h-7 w-7 sm:h-8 sm:w-8" />
+              <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md ring-1 ring-white/30 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                <Store className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
               </span>
               <div className="relative min-w-0 flex-1">
                 <p className="font-display text-[10px] tracking-[0.32em] text-amber-700">STORE</p>
-                <p className="mt-1 font-display text-xl font-bold leading-tight text-slate-900 sm:text-2xl">المتجر</p>
+                <p className="mt-1 font-display text-lg font-bold leading-tight text-slate-900 sm:text-xl lg:text-base xl:text-lg">المتجر</p>
                 <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-slate-700 sm:text-sm">
                   سيارات VIP، البيوت، البكجات، وفرص الاستثمار داخل المدينة
                 </p>
               </div>
             </Link>
+
+            {visibility.pages.streamers ? (
+              streamerApplyApproved ? (
+                <div className="relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-fuchsia-200/90 bg-gradient-to-l from-fuchsia-50 via-white to-violet-50 px-4 py-4 text-right text-fuchsia-950 shadow-[0_18px_44px_-22px_rgba(192,38,211,0.3)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
+                  <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-100 text-fuchsia-700 ring-1 ring-fuchsia-200/80 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                    <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
+                  </span>
+                  <div className="relative min-w-0 flex-1">
+                    <p className="font-display text-[10px] tracking-[0.32em] text-fuchsia-700/90">STREAMER</p>
+                    <p className="mt-1 font-display text-lg font-bold leading-tight sm:text-xl lg:text-base xl:text-lg">
+                      {streamerCardTitle}
+                    </p>
+                    <p className="mt-1 line-clamp-3 text-[13px] leading-snug text-fuchsia-900/85 sm:text-sm">
+                      بطاقتك على صفحة صنّاع المحتوى — المسمى يحدّده ستريمر منجر.
+                    </p>
+                    <Link to="/streamers" className="mt-2 inline-block text-sm font-semibold text-fuchsia-800 underline">
+                      عرض الصفحة
+                    </Link>
+                  </div>
+                </div>
+              ) : streamerApplyPending ? (
+                <div className="relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-amber-200/90 bg-gradient-to-l from-amber-50 to-orange-50/80 px-4 py-4 text-right text-amber-950 sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
+                  <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                    <Video className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
+                  </span>
+                  <div className="relative min-w-0 flex-1">
+                    <p className="font-display text-[10px] tracking-[0.32em] text-amber-800/90">قيد المراجعة</p>
+                    <p className="mt-1 font-display text-xl font-bold leading-tight">طلب صانع المحتوى</p>
+                    <p className="mt-1 text-[13px] leading-snug text-amber-900/85 sm:text-sm">
+                      يراجعه ستريمر منجر — عند القبول تُضاف بطاقتك تلقائياً.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  to="/apply/streamers"
+                  className="group relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-fuchsia-400/60 bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 px-4 py-4 text-right text-white shadow-[0_24px_60px_-28px_rgba(192,38,211,0.45)] transition-all hover:-translate-y-0.5 sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5"
+                >
+                  <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                    <Video className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
+                  </span>
+                  <div className="relative min-w-0 flex-1">
+                    <p className="font-display text-[10px] tracking-[0.32em] text-white/80">STREAMER</p>
+                    <p className="mt-1 font-display text-lg font-bold leading-tight sm:text-xl lg:text-base xl:text-lg">التقديم كصانع محتوى</p>
+                    <p className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/85 sm:text-sm">
+                      لوجو ورابط البث (والنبذة اختيارية) — يُراجعها ستريمر منجر
+                    </p>
+                  </div>
+                </Link>
+              )
+            ) : null}
           </div>
         </motion.section>
 
@@ -524,9 +639,8 @@ const ProfilePage = () => {
             <CardHeader className="border-b border-violet-100/90 bg-gradient-to-l from-violet-50/90 to-white pb-6 text-right">
               <CardTitle className="font-display text-xl text-slate-900">معلومات الحساب</CardTitle>
               <CardDescription className="mt-1 text-pretty text-slate-600">
-                أكمل <span className="font-semibold">اسمك داخل المدينة</span> (جزآن بالعربي) و
-                <span className="font-semibold"> عمرك</span> في الحقول أدناه ثم احفظ — لا تُفتح التكتات إلا بعد الحفظ
-                عندما تكون البيانات صحيحة. الاسم على Discord والبريد وDiscord للعرض فقط — تعديلها من الإدارة.
+                الاسم داخل المدينة والعمر يُحفظان من <span className="font-semibold">التقديم الإلكتروني</span> عند
+                الإرسال — للعرض فقط هنا. الاسم على Discord والبريد وDiscord ID من الإدارة عند الحاجة.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 pt-6">
@@ -535,10 +649,11 @@ const ProfilePage = () => {
                   role="status"
                   className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-right text-sm leading-relaxed text-violet-950"
                 >
-                  <span className="font-semibold">مطلوب:</span> اكتب{" "}
-                  <span className="font-semibold">اسمك داخل المدينة</span> في الجزءين (عربي فقط)، و{" "}
-                  <span className="font-semibold">عمرك</span> (13 أو أكثر)، ثم اضغط «حفظ التغييرات». الحقول أدناه
-                  تبدأ فارغة حتى تكتب اسمك بنفسك — بعد الحفظ الصحيح تُفتح لك التكتات.
+                  <span className="font-semibold">مطلوب:</span> أكمِل{" "}
+                  <Link to="/apply/citizen" className="font-semibold underline underline-offset-2">
+                    التقديم الإلكتروني للمواطن
+                  </Link>{" "}
+                  (الاسم بالعربي جزئين + تاريخ الميلاد) — تُنسخ بياناتك إلى البروفايل تلقائياً وتُفتح التكتات بعد ذلك.
                 </div>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -567,30 +682,26 @@ const ProfilePage = () => {
                   </div>
                 </div>
                 <div className="space-y-2 text-right">
-                  <Label htmlFor="prof-city1" className="text-sm font-medium text-slate-800">
+                  <Label className="text-sm font-medium text-slate-800">
                     الاسم داخل المدينة — الجزء الأول <span className="text-xs font-normal text-slate-600">(عربي)</span>
                   </Label>
-                  <Input
-                    id="prof-city1"
-                    value={formCity1}
-                    onChange={(e) => setFormCity1(e.target.value)}
-                    placeholder=""
-                    aria-label="الاسم داخل المدينة — الجزء الأول"
-                    className="border-violet-200 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
-                  />
+                  <div
+                    dir="rtl"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 text-right text-sm font-medium text-slate-900"
+                  >
+                    {cityNameParts.first}
+                  </div>
                 </div>
                 <div className="space-y-2 text-right">
-                  <Label htmlFor="prof-city2" className="text-sm font-medium text-slate-800">
+                  <Label className="text-sm font-medium text-slate-800">
                     الاسم داخل المدينة — الجزء الثاني <span className="text-xs font-normal text-slate-600">(عربي)</span>
                   </Label>
-                  <Input
-                    id="prof-city2"
-                    value={formCity2}
-                    onChange={(e) => setFormCity2(e.target.value)}
-                    placeholder=""
-                    aria-label="الاسم داخل المدينة — الجزء الثاني"
-                    className="border-violet-200 bg-white text-right text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
-                  />
+                  <div
+                    dir="rtl"
+                    className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 text-right text-sm font-medium text-slate-900"
+                  >
+                    {cityNameParts.second}
+                  </div>
                 </div>
                 <div className="space-y-2 text-right">
                   <Label htmlFor="prof-email" className="text-sm font-medium text-slate-800">
@@ -617,34 +728,14 @@ const ProfilePage = () => {
                   </div>
                 </div>
                 <div className="space-y-2 text-right sm:col-span-2">
-                  <Label htmlFor="prof-age" className="text-sm font-medium text-slate-800">
-                    العمر
-                  </Label>
-                  <Input
-                    id="prof-age"
-                    type="number"
-                    inputMode="numeric"
-                    min={13}
-                    max={120}
-                    value={formAge}
-                    onChange={(e) => setFormAge(e.target.value)}
-                    placeholder="مثال: 17"
-                    className="border-violet-200 bg-white text-sm text-slate-900 placeholder:text-slate-400 focus-visible:ring-violet-400"
-                  />
+                  <Label className="text-sm font-medium text-slate-800">العمر</Label>
+                  <div className="min-h-10 rounded-lg border border-violet-200 bg-slate-50 px-3 py-2.5 text-right text-sm font-medium text-slate-900">
+                    {profile && profile.age > 0 ? `${profile.age} سنة` : "—"}
+                  </div>
                   <p className="text-[11px] text-slate-600">
-                    يُخزَّن محلياً مع حسابك ويُستخدم في الطلبات والتكتات حسب سياسة السيرفر.
+                    يُحسب من تاريخ الميلاد في التقديم الإلكتروني — للعرض فقط.
                   </p>
                 </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-violet-100 pt-4">
-                <Button
-                  type="button"
-                  disabled={savingProfile}
-                  className="bg-violet-600 font-display text-white hover:bg-violet-700"
-                  onClick={handleSaveProfile}
-                >
-                  {savingProfile ? "جاري الحفظ…" : "حفظ التعديلات"}
-                </Button>
               </div>
               <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-3 text-right">
                 <p className="text-[11px] font-medium text-violet-900">معاينة سريعة</p>
@@ -652,12 +743,14 @@ const ProfilePage = () => {
                   <span className="text-slate-600">
                     الاسم في المدينة:{" "}
                     <span className="font-semibold text-slate-900">
-                      {`${formCity1.trim()} ${formCity2.trim()}`.trim() || "—"}
+                      {profile?.cityName?.trim() || "—"}
                     </span>
                   </span>
                   <span className="text-slate-600">
                     العمر:{" "}
-                    <span className="font-semibold text-slate-900">{formAge ? `${formAge} سنة` : "—"}</span>
+                    <span className="font-semibold text-slate-900">
+                      {profile && profile.age > 0 ? `${profile.age} سنة` : "—"}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -707,22 +800,25 @@ const ProfilePage = () => {
                         التقديم الإلكتروني
                       </Link>
                     )}
-                    <Link
-                      to="/jobs"
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-violet-300 bg-white px-4 text-sm text-violet-800 shadow-sm transition-colors hover:bg-violet-50"
-                    >
-                      <Briefcase className="h-4 w-4" />
-                      التقديم لوظيفة
-                    </Link>
+                    {citizenElectronicApplyDone ? (
+                      <Link
+                        to="/jobs"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-violet-300 bg-white px-4 text-sm text-violet-800 shadow-sm transition-colors hover:bg-violet-50"
+                      >
+                        <Briefcase className="h-4 w-4" />
+                        التقديم لوظيفة
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] border-collapse text-right text-sm">
+                  <table className="w-full min-w-[720px] border-collapse text-right text-sm">
                     <thead>
                       <tr className="border-b border-violet-100 bg-violet-50/40 text-[12px] text-slate-600">
                         <th className="px-4 py-3 font-medium">النوع</th>
                         <th className="px-4 py-3 font-medium">المسار</th>
+                        <th className="px-4 py-3 font-medium">الرتبة</th>
                         <th className="px-4 py-3 font-medium">الحالة</th>
                         <th className="px-4 py-3 font-medium">تاريخ التقديم</th>
                         <th className="px-4 py-3 font-medium">ملاحظة الإدارة</th>
@@ -731,6 +827,7 @@ const ProfilePage = () => {
                     <tbody>
                       {myApplications.map((app) => {
                         const isJob = isJobApplicationRoleKey(app.roleKey);
+                        const approvedRank = rankLabelForApplication(app);
                         return (
                           <tr key={app.id} className="border-b border-violet-50 transition-colors hover:bg-violet-50/40">
                             <td className="px-4 py-3 align-top">
@@ -756,6 +853,17 @@ const ProfilePage = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3 align-top font-display text-slate-900">{app.targetTitle}</td>
+                            <td className="px-4 py-3 align-top text-slate-800">
+                              {approvedRank ? (
+                                <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                  {approvedRank}
+                                </span>
+                              ) : isJob && app.status === "pending" ? (
+                                <span className="text-xs text-slate-400">بعد القبول</span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
                             <td className="px-4 py-3 align-top">
                               {app.status === "approved" ? (
                                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">

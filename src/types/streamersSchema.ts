@@ -9,6 +9,8 @@ export type StreamerEntry = {
   image: string;
   /** مخفي من العرض في الموقع العام */
   hidden?: boolean;
+  /** ربط بحساب الموقع عند القبول التلقائي من طلب التقديم */
+  linkedUserId?: string;
 };
 
 export type StreamersPersisted = {

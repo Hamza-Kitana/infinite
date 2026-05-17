@@ -41,10 +41,14 @@ export type ApplicationFormSnapshot = {
   cityName?: string;
   /** نبذة شخصية مختصرة يكتبها المتقدم (للتقديم الاحترافي) */
   bio?: string;
-  /** صورة شخصية يرفعها المتقدم — Data URL */
+  /** صورة شخصية اختيارية يرفعها المتقدم — Data URL */
   avatarDataUrl?: string;
   /** Discord ID الخام كما هو من الحساب المتصل (مفيد للأدمن) */
   discordId?: string;
+  /** رابط البث (Kick / TikTok / Twitch…) — تقديم صنّاع المحتوى */
+  streamUrl?: string;
+  /** المسمى على البطاقة (مثال: ستريمر معتمد) */
+  streamerCardRole?: string;
 };
 
 export type ApplicationStatus = "pending" | "approved" | "rejected";

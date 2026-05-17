@@ -8,6 +8,11 @@ import {
   type ReactNode,
 } from "react";
 import { defaultStreamersPersisted } from "@/data/streamersDefaultState";
+import {
+  applicationToStreamerPayload,
+  type StreamerCardDraftOverrides,
+} from "@/lib/streamerApplication";
+import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 import type { StreamerEntry, StreamersPersisted } from "@/types/streamersSchema";
 
 const STORAGE_KEY = "ic_streamers_v1";
@@ -37,6 +42,12 @@ type StreamersContentValue = {
   add: (entry: Omit<StreamerEntry, "id">) => string;
   update: (id: string, patch: Partial<Omit<StreamerEntry, "id">>) => void;
   remove: (id: string) => void;
+  /** إضافة أو تحديث بطاقة من طلب مقبول — يمنع التكرار عبر linkedUserId */
+  upsertFromApplication: (
+    app: ApplicationRecord,
+    cardRole?: string,
+    draft?: StreamerCardDraftOverrides,
+  ) => string;
 };
 
 const StreamersContentContext = createContext<StreamersContentValue | null>(null);
@@ -102,6 +113,34 @@ export function StreamersContentProvider({ children }: { children: ReactNode }) 
     });
   }, []);
 
+  const upsertFromApplication = useCallback(
+    (app: ApplicationRecord, cardRole?: string, draft?: StreamerCardDraftOverrides) => {
+    const payload = applicationToStreamerPayload(app, { cardRole, draft });
+    const linkedId = payload.linkedUserId;
+    let resultId = "";
+    setPersisted((prev) => {
+      const existingIdx =
+        linkedId != null && linkedId.length > 0
+          ? prev.items.findIndex((x) => x.linkedUserId === linkedId)
+          : -1;
+      if (existingIdx >= 0) {
+        const id = prev.items[existingIdx]!.id;
+        resultId = id;
+        const items = prev.items.map((x, i) => (i === existingIdx ? { ...x, ...payload, id } : x));
+        const next = { ...prev, items };
+        savePersisted(next);
+        return next;
+      }
+      const id = crypto.randomUUID();
+      resultId = id;
+      const next = { ...prev, items: [...prev.items, { ...payload, id }] };
+      savePersisted(next);
+      return next;
+    });
+    return resultId;
+  },
+  []);
+
   const value = useMemo<StreamersContentValue>(
     () => ({
       items: persisted.items,
@@ -110,8 +149,9 @@ export function StreamersContentProvider({ children }: { children: ReactNode }) 
       add,
       update,
       remove,
+      upsertFromApplication,
     }),
-    [persisted.items, resetToDefaults, reorder, add, update, remove],
+    [persisted.items, resetToDefaults, reorder, add, update, remove, upsertFromApplication],
   );
 
   return (

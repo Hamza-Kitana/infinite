@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,7 +15,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, ImagePlus, Plus, Trash2, Video } from "lucide-react";
+import { GripVertical, Plus, Trash2, Video } from "lucide-react";
+import { StreamerCardEditFields } from "@/components/admin/StreamerCardEditFields";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,12 +39,14 @@ import {
 import {
   EditorDialogSection,
   editorDialogInputClass,
-  editorDialogMonoClass,
   editorDialogTextareaClass,
 } from "@/components/admin/EditorDialogSection";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  STREAMER_PLACEHOLDER_IMAGE,
+  type StreamerCardDraft,
+} from "@/lib/streamerApplication";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
 import { appendActivityLog } from "@/lib/activityLog";
@@ -51,17 +54,6 @@ import type { StreamerEntry } from "@/types/streamersSchema";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { setPageVisible, useSiteVisibility } from "@/lib/siteVisibility";
-
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error("read"));
-    r.readAsDataURL(file);
-  });
-}
 
 function SortableStreamerRow({
   entry,
@@ -146,7 +138,13 @@ const StreamersEditorPage = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [editing, setEditing] = useState<Omit<StreamerEntry, "id"> & { id?: string }>(emptyForm);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [cardDraft, setCardDraft] = useState<StreamerCardDraft>({
+    name: "",
+    role: "صانع محتوى معتمد",
+    bio: "",
+    streamUrl: "",
+    image: STREAMER_PLACEHOLDER_IMAGE,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -213,6 +211,13 @@ const StreamersEditorPage = () => {
 
   const openNew = () => {
     setEditing({ ...emptyForm });
+    setCardDraft({
+      name: "",
+      role: "صانع محتوى معتمد",
+      bio: "",
+      streamUrl: "",
+      image: STREAMER_PLACEHOLDER_IMAGE,
+    });
     setDialogOpen(true);
   };
 
@@ -226,40 +231,29 @@ const StreamersEditorPage = () => {
       image: s.image,
       hidden: !!s.hidden,
     });
+    setCardDraft({
+      name: s.name,
+      role: s.role,
+      bio: s.bio,
+      streamUrl: s.streamUrl,
+      image: s.image || STREAMER_PLACEHOLDER_IMAGE,
+    });
     setDialogOpen(true);
   };
 
-  const onPickFile = useCallback(
-    async (file: File | null) => {
-      if (!file || !file.type.startsWith("image/")) return;
-      if (file.size > MAX_IMAGE_BYTES) {
-        toast.error("حجم الصورة كبير جداً (الحد حوالي 2 ميجابايت). جرّب صورة أصغر.");
-        return;
-      }
-      try {
-        const dataUrl = await readFileAsDataUrl(file);
-        setEditing((prev) => ({ ...prev, image: dataUrl }));
-        toast.success("تم تحميل الصورة — احفظ لتطبيقها");
-      } catch {
-        toast.error("تعذر قراءة الملف");
-      }
-    },
-    [],
-  );
-
   const saveDialog = () => {
-    const name = editing.name.trim();
-    const streamUrl = editing.streamUrl.trim();
+    const name = cardDraft.name.trim();
+    const streamUrl = cardDraft.streamUrl.trim();
     if (!name || !streamUrl) {
       toast.error("الاسم ورابط البث مطلوبان");
       return;
     }
     const payload: Omit<StreamerEntry, "id"> = {
       name,
-      role: editing.role.trim() || "صانع محتوى معتمد",
-      bio: editing.bio.trim(),
+      role: cardDraft.role.trim() || "صانع محتوى معتمد",
+      bio: cardDraft.bio.trim(),
       streamUrl,
-      image: editing.image.trim() || "/placeholder.svg",
+      image: cardDraft.image.trim() || STREAMER_PLACEHOLDER_IMAGE,
       hidden: !!editing.hidden,
     };
     if (editing.id) {
@@ -395,102 +389,21 @@ const StreamersEditorPage = () => {
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-white px-6 py-5 dark:bg-slate-900 sm:px-8">
             <EditorDialogSection
-              title="البطاقة"
+              title="بيانات البطاقة"
               className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
             >
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">الاسم</Label>
-                <Input
-                  className={cn(
-                    editorDialogInputClass,
-                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
-                  )}
-                  value={editing.name}
-                  onChange={(e) => setEditing((p) => ({ ...p, name: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">الدور (على البطاقة)</Label>
-                <Input
-                  className={cn(
-                    editorDialogInputClass,
-                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
-                  )}
-                  value={editing.role}
-                  onChange={(e) => setEditing((p) => ({ ...p, role: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">نبذة</Label>
-                <Textarea
-                  className={cn(
-                    editorDialogTextareaClass,
-                    "mt-1.5 min-h-[88px] border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
-                  )}
-                  value={editing.bio}
-                  onChange={(e) => setEditing((p) => ({ ...p, bio: e.target.value }))}
-                />
-              </div>
-            </EditorDialogSection>
-
-            <EditorDialogSection
-              title="البث"
-              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
-            >
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">رابط البث (Kick أو TikTok أو غيره)</Label>
-                <Input
-                  className={cn(
-                    editorDialogMonoClass,
-                    "mt-1.5 border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
-                  )}
-                  dir="ltr"
-                  value={editing.streamUrl}
-                  onChange={(e) => setEditing((p) => ({ ...p, streamUrl: e.target.value }))}
-                />
-              </div>
-            </EditorDialogSection>
-
-            <EditorDialogSection
-              title="الصورة"
-              className="border-violet-200 bg-violet-50/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] [&>h3]:border-violet-200 [&>h3]:text-violet-700 dark:border-slate-600 dark:bg-slate-800/55 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] dark:[&>h3]:border-slate-600 dark:[&>h3]:text-violet-300"
-            >
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">رفع الصورة</Label>
-                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  يتم اعتماد الصورة من رفع الملف فقط (بدون روابط).
-                </p>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    onPickFile(e.target.files?.[0] ?? null);
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 rounded-lg border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200 dark:hover:bg-slate-700 dark:hover:text-violet-100"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <ImagePlus className="ms-2 h-4 w-4" />
-                  رفع صورة من الجهاز
-                </Button>
-                {editing.image.startsWith("data:") ? (
-                  <p className="text-xs text-violet-700 dark:text-violet-300">تم اختيار صورة مرفوعة — اضغط حفظ لتثبيتها.</p>
-                ) : null}
-              </div>
-              <div className="mt-3 flex justify-center rounded-lg border border-dashed border-slate-300 bg-white/70 p-3 dark:border-slate-600 dark:bg-slate-800/70">
-                <img
-                  src={editing.image || "/placeholder.svg"}
-                  alt=""
-                  className="max-h-40 max-w-full rounded-md border border-violet-200 object-contain dark:border-slate-600"
-                />
-              </div>
+              <StreamerCardEditFields
+                value={cardDraft}
+                onChange={setCardDraft}
+                inputClassName={cn(
+                  editorDialogInputClass,
+                  "border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                )}
+                textareaClassName={cn(
+                  editorDialogTextareaClass,
+                  "border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100",
+                )}
+              />
             </EditorDialogSection>
           </div>
 

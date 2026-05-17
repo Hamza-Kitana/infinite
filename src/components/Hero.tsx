@@ -23,7 +23,7 @@ const Hero = () => {
               src={getYoutubeEmbedUrl()}
               loading="eager"
               className="absolute left-1/2 top-1/2 h-[100svh] w-[177.78svh] min-h-full min-w-full -translate-x-1/2 -translate-y-1/2 pointer-events-none md:inset-0 md:h-full md:w-full md:translate-x-0 md:translate-y-0 md:scale-[1.28]"
-              allow="autoplay; encrypted-media; picture-in-picture"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               onLoad={onIframeLoad}

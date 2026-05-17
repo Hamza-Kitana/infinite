@@ -107,9 +107,8 @@ const StreamersPage = () => {
                 قدّم طلبك ليتم <span className="text-gradient-neon">المراجعة</span> من الإدارة
               </h2>
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                املأ النموذج الرسمي (الاسم، الديسكورد، الخبرة، والموافقة على القوانين). يصل الطلب إلى لوحة التحكم؛ من لديه
-                صلاحية «ستريمر منجر» يمكنه قبول الطلب أو رفضه، ثم إضافتك إلى قائمة صنّاع المحتوى من محرّر البطاقات عند
-                القبول.
+                املأ النموذج (الاسم، اللوجو، ورابط البث — والنبذة اختيارية). عند القبول من ستريمر منجر تُضاف بطاقتك تلقائياً
+                إلى هذه الصفحة.
               </p>
             </div>
             <div className="relative mt-6 flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center md:mt-0 md:flex-col">

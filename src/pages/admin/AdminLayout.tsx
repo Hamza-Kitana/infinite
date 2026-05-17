@@ -39,6 +39,12 @@ import {
   isInstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { cn } from "@/lib/utils";
+import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
+import {
+  countPendingJobApplicationsForStaff,
+  countPendingServerApplicationsForStaff,
+} from "@/lib/applicationReviewAccess";
+import { countPendingStreamerApplications } from "@/lib/streamerApplication";
 import { useTicketsCenter, type TicketTypeRole } from "@/lib/ticketsCenter";
 import { persistAdminDashboardTheme, readAdminDashboardTheme, type AdminDashboardTheme } from "@/lib/adminDashboardTheme";
 import "@/styles/admin-dashboard.css";
@@ -155,8 +161,8 @@ function adminRoleShell(role: StaffRole): { title: string; badge: string } {
         const id = branchIdFromInstitutionRosterStaffRole(role);
         if (id) {
           return {
-            title: `طاقم — ${INSTITUTION_BRANCH_META[id].labelAr}`,
-            badge: "Roster",
+            title: INSTITUTION_BRANCH_META[id].labelAr,
+            badge: "مؤسسة",
           };
         }
       }
@@ -202,6 +208,7 @@ const AdminLayout = () => {
     isInstitutionRosterManager,
     isApplicationReviewer,
   } = useAuth();
+  const { applications } = useApplicationsContent();
   const tickets = useTicketsCenter();
 
   const userRoles = user?.roles ?? [];
@@ -238,7 +245,31 @@ const AdminLayout = () => {
     }
     return n;
   }, [tickets, userRoles]);
-  const unreadByTicketPath = useMemo(() => {
+  const pendingApplicationsCount = useMemo(
+    () =>
+      countPendingServerApplicationsForStaff(applications, {
+        isSuperAdmin: !!isSuperAdmin,
+        isApplicationReviewer: !!isApplicationReviewer,
+        userRoles: userRoles,
+      }),
+    [applications, isSuperAdmin, isApplicationReviewer, userRoles],
+  );
+
+  const pendingStreamerApplicationsCount = useMemo(
+    () => countPendingStreamerApplications(applications),
+    [applications],
+  );
+
+  const pendingJobApplicationsCount = useMemo(
+    () =>
+      countPendingJobApplicationsForStaff(applications, {
+        isSuperAdmin: !!isSuperAdmin,
+        userRoles: userRoles,
+      }),
+    [applications, isSuperAdmin, userRoles],
+  );
+
+  const sidebarBadgeByPath = useMemo(() => {
     const map = new Map<string, number>();
     if (totalTicketUnread > 0) {
       map.set("/dashboard/tickets", totalTicketUnread);
@@ -246,8 +277,50 @@ const AdminLayout = () => {
     if (storeOrdersUnread > 0) {
       map.set("/dashboard/store-orders", storeOrdersUnread);
     }
+    if (pendingApplicationsCount > 0) {
+      map.set("/dashboard/applications", pendingApplicationsCount);
+    }
+    if (pendingJobApplicationsCount > 0) {
+      map.set("/dashboard/institution", pendingJobApplicationsCount);
+    }
+    if (pendingStreamerApplicationsCount > 0) {
+      map.set("/dashboard/streamers", pendingStreamerApplicationsCount);
+    }
     return map;
-  }, [totalTicketUnread, storeOrdersUnread]);
+  }, [totalTicketUnread, storeOrdersUnread, pendingApplicationsCount, pendingJobApplicationsCount, pendingStreamerApplicationsCount]);
+
+  const renderSidebarBadge = (path: string, count: number) => {
+    if (count <= 0) return null;
+    const tone =
+      path === "/dashboard/applications"
+        ? "bg-amber-500"
+        : path === "/dashboard/institution"
+          ? "bg-sky-500"
+          : path === "/dashboard/streamers"
+            ? "bg-fuchsia-500"
+            : "bg-rose-500";
+    const title =
+      path === "/dashboard/applications"
+        ? "طلبات تقديم بانتظار المراجعة"
+        : path === "/dashboard/institution"
+          ? "طلبات توظيف بانتظار المراجعة"
+          : path === "/dashboard/streamers"
+            ? "طلبات ستريمر بانتظار المراجعة"
+            : path === "/dashboard/store-orders"
+            ? "طلبات متجر جديدة"
+            : "تكتات بانتظار الرد";
+    return (
+      <span
+        className={cn(
+          "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold text-white shadow-sm",
+          tone,
+        )}
+        title={title}
+      >
+        {count}
+      </span>
+    );
+  };
 
   const sidebarNav = useMemo(() => {
     const filterNav = (arr: NavItem[]) => arr.filter((n) => n.roles.some((r) => userRoles.includes(r)));
@@ -255,24 +328,22 @@ const AdminLayout = () => {
     if (isSuperAdmin) {
       instNav.push({
         to: "/dashboard/institution",
-        label: "طواقم المؤسسات",
+        label: "المؤسسات",
         icon: Building2,
         roles: ["super_admin"],
         end: true,
       });
-    } else {
-      for (const id of INSTITUTION_BRANCH_IDS) {
-        const rr = institutionRosterStaffRoleForBranch(id);
-        if (userRoles.includes(rr)) {
-          instNav.push({
-            to: `/dashboard/institution/${id}`,
-            label: INSTITUTION_BRANCH_META[id].labelAr,
-            icon: Building2,
-            roles: [rr],
-            end: true,
-          });
-        }
-      }
+    } else if (userRoles.some((r) => isInstitutionRosterStaffRole(r))) {
+      const rosterRoles = userRoles.filter((r): r is (typeof INSTITUTION_ROSTER_STAFF_ROLES)[number] =>
+        isInstitutionRosterStaffRole(r),
+      );
+      instNav.push({
+        to: "/dashboard/institution",
+        label: "المؤسسات",
+        icon: Building2,
+        roles: rosterRoles,
+        end: true,
+      });
     }
 
     return {
@@ -286,7 +357,7 @@ const AdminLayout = () => {
     () => STORE_SIDEBAR_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)),
     [location.pathname],
   );
-  const [storeGroupOpen, setStoreGroupOpen] = useState(true);
+  const [storeGroupOpen, setStoreGroupOpen] = useState(false);
   useEffect(() => {
     if (storeSectionActive) setStoreGroupOpen(true);
   }, [storeSectionActive]);
@@ -330,13 +401,13 @@ const AdminLayout = () => {
                     : location.pathname.startsWith("/dashboard/tickets")
                       ? "التكت"
                   : location.pathname === "/dashboard/institution"
-                    ? "طواقم المؤسسات"
+                    ? "المؤسسات"
                     : location.pathname.startsWith("/dashboard/institution/")
                       ? (() => {
                           const seg = location.pathname.slice("/dashboard/institution/".length).split("/")[0];
                           return seg && isInstitutionBranchId(seg)
-                            ? `طاقم — ${INSTITUTION_BRANCH_META[seg].labelAr}`
-                            : "طاقم مؤسسة";
+                            ? INSTITUTION_BRANCH_META[seg].labelAr
+                            : "مؤسسة";
                         })()
                     : location.pathname.startsWith("/dashboard/applications")
                       ? "طلبات التقديم"
@@ -403,11 +474,7 @@ const AdminLayout = () => {
     >
       <item.icon className="h-4 w-4 shrink-0 opacity-90" />
       <span className="min-w-0 flex-1">{item.label}</span>
-      {(unreadByTicketPath.get(item.to) ?? 0) > 0 ? (
-        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white shadow-sm">
-          {unreadByTicketPath.get(item.to)}
-        </span>
-      ) : null}
+      {renderSidebarBadge(item.to, sidebarBadgeByPath.get(item.to) ?? 0)}
     </NavLink>
   );
 
@@ -475,6 +542,7 @@ const AdminLayout = () => {
                   >
                     المتجر
                   </span>
+                  {storeOrdersUnread > 0 ? renderSidebarBadge("/dashboard/store-orders", storeOrdersUnread) : null}
                   <ChevronDown
                     className={cn(
                       "h-4 w-4 shrink-0 transition-transform duration-200",
@@ -502,7 +570,7 @@ const AdminLayout = () => {
               {isStreamerManager ? (
                 <p className="px-3 text-[11px] leading-relaxed text-slate-400">
                   <Video className="me-1 inline h-3 w-3 text-violet-400" />
-                  البطاقات محلياً في المتصفح — طلبات التقديم كصانع محتوى من «طلبات التقديم» (قبول / رفض).
+                  البطاقات و«طلبات الستريمر» — عند القبول تُضاف البطاقة تلقائياً لصفحة صنّاع المحتوى.
                 </p>
               ) : null}
               {isGangManager ? (
@@ -521,8 +589,8 @@ const AdminLayout = () => {
                 <p className="px-3 text-[11px] leading-relaxed text-slate-400">
                   <Building2 className="me-1 inline h-3 w-3 text-violet-400" />
                   {userRoles.filter((r) => isInstitutionRosterStaffRole(r)).length > 1
-                    ? "لكل فرع صفحة منفصلة من القائمة أو من صفحة الطواقم."
-                    : "تعديل طاقم الفرع المرتبط بدورك فقط."}
+                    ? "اختر المؤسسة من الكروت لتحرير الطاقم؛ القوانين والأسئلة من داخل المحرر."
+                    : "تحرير الطاقم وطلبات التوظيف؛ القوانين والأسئلة من زر داخل المحرر."}
                 </p>
               ) : null}
               {isApplicationReviewer ? (

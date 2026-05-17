@@ -26,10 +26,16 @@ export type HeroBackgroundVideoContextValue = {
 
 const HeroBackgroundVideoContext = createContext<HeroBackgroundVideoContextValue | null>(null);
 
+/** تأخيرات إعادة طلب التشغيل — المشغّل قد لا يكون جاهزاً فور تحميل الـ iframe */
+const PLAY_RETRY_MS = [0, 200, 500, 900, 1600, 2800, 4500] as const;
+
 export function HeroBackgroundVideoProvider({ children }: { children: ReactNode }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const playRetryTimersRef = useRef<number[]>([]);
+  /** الصوت يُفعَّل فقط بعد تفاعل المستخدم (زر الصوت/المنزلق) — التشغيل الصامت فوراً */
+  const soundUnlockedRef = useRef(false);
   const [volume, setVolume] = useState(50);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
 
   const postPlayerCommand = useCallback((func: string, args?: unknown[]) => {
     if (!iframeRef.current?.contentWindow) return;
@@ -43,10 +49,15 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
     );
   }, []);
 
-  const applyPlayerState = useCallback(() => {
+  const clearPlayRetries = useCallback(() => {
+    for (const id of playRetryTimersRef.current) window.clearTimeout(id);
+    playRetryTimersRef.current = [];
+  }, []);
+
+  const pushAutoplay = useCallback(() => {
     postPlayerCommand("playVideo");
     postPlayerCommand("setVolume", [volume]);
-    if (muted || volume === 0) {
+    if (!soundUnlockedRef.current || muted || volume === 0) {
       postPlayerCommand("mute");
     } else {
       postPlayerCommand("unMute");
@@ -54,38 +65,21 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
     boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
   }, [muted, volume, postPlayerCommand]);
 
-  useEffect(() => {
-    const initTimer = window.setTimeout(applyPlayerState, 900);
-    const retryTimer = window.setTimeout(applyPlayerState, 1600);
-
-    return () => {
-      window.clearTimeout(initTimer);
-      window.clearTimeout(retryTimer);
-    };
-  }, [applyPlayerState]);
+  const scheduleAutoplay = useCallback(() => {
+    clearPlayRetries();
+    playRetryTimersRef.current = PLAY_RETRY_MS.map((ms) => window.setTimeout(pushAutoplay, ms));
+  }, [clearPlayRetries, pushAutoplay]);
 
   useEffect(() => {
-    const unlockSound = () => {
-      postPlayerCommand("playVideo");
-      postPlayerCommand("setVolume", [volume]);
-      if (!muted && volume > 0) {
-        postPlayerCommand("unMute");
-      }
-      boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
-    };
-
-    window.addEventListener("pointerdown", unlockSound, { once: true });
-    window.addEventListener("keydown", unlockSound, { once: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", unlockSound);
-      window.removeEventListener("keydown", unlockSound);
-    };
-  }, [muted, volume, postPlayerCommand]);
+    scheduleAutoplay();
+    return clearPlayRetries;
+  }, [scheduleAutoplay, clearPlayRetries]);
 
   const handleVolumeChange = useCallback(
     (nextVolume: number) => {
+      soundUnlockedRef.current = true;
       setVolume(nextVolume);
+      postPlayerCommand("playVideo");
       postPlayerCommand("setVolume", [nextVolume]);
 
       if (nextVolume === 0) {
@@ -101,25 +95,20 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
   );
 
   const handleMuteToggle = useCallback(() => {
+    soundUnlockedRef.current = true;
     setMuted((prev) => {
       const next = !prev;
+      postPlayerCommand("playVideo");
       postPlayerCommand(next ? "mute" : "unMute");
       return next;
     });
   }, [postPlayerCommand]);
 
   const onIframeLoad = useCallback(() => {
-    postPlayerCommand("playVideo");
-    postPlayerCommand("setVolume", [volume]);
-    if (!muted && volume > 0) {
-      postPlayerCommand("unMute");
-    } else {
-      postPlayerCommand("mute");
-    }
-    boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
+    scheduleAutoplay();
     window.setTimeout(() => boostYoutubePlayerQuality(iframeRef.current?.contentWindow), 800);
     window.setTimeout(() => boostYoutubePlayerQuality(iframeRef.current?.contentWindow), 2200);
-  }, [muted, volume, postPlayerCommand]);
+  }, [scheduleAutoplay]);
 
   const value = useMemo(
     () => ({

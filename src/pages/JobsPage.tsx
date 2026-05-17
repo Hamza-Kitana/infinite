@@ -1,10 +1,15 @@
 import { Link, Navigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { Briefcase, ClipboardList, Lock, Sparkles } from "lucide-react";
+import { Briefcase, ClipboardList, Lock, ShieldAlert, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
+import {
+  canApplyForPublicJobs,
+  hasPendingCitizenApplication,
+  MSG_JOBS_NEED_SERVER_ACTIVATION,
+} from "@/lib/publicProfileEligibility";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import {
   branchIdFromApplicationRoleKey,
@@ -35,12 +40,16 @@ function statusLabel(status: "pending" | "approved" | "rejected") {
 
 const JobsPage = () => {
   const reduceMotion = useReducedMotion();
-  const { user } = usePublicUser();
+  const { user, getProfile } = usePublicUser();
   const { applications } = useApplicationsContent();
   const visibility = useSiteVisibility();
   const closure = useApplicationsClosure();
 
   if (!user) return <Navigate to="/" replace />;
+
+  const profile = user.authProvider === "discord" ? getProfile() : null;
+  const jobApplyUnlocked = canApplyForPublicJobs(profile, applications);
+  const citizenApplyPending = hasPendingCitizenApplication(profile, applications);
 
   const visibleJobs = JOBS.filter((j) => j.visible(visibility));
   const isJobClosed = (roleKey: string): boolean => {
@@ -82,6 +91,44 @@ const JobsPage = () => {
       </div>
 
       <main className="relative z-10 mx-auto max-w-6xl space-y-10 px-4 pb-20 md:px-8">
+        {!jobApplyUnlocked ? (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-amber-300/90 bg-gradient-to-l from-amber-50 to-orange-50/80 px-4 py-4 text-right shadow-sm sm:px-5"
+          >
+            <div className="flex flex-wrap items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <ShieldAlert className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="font-display text-sm font-bold text-amber-950">التقديم على الوظائف غير متاح بعد</p>
+                <p className="text-sm leading-relaxed text-amber-900/90">{MSG_JOBS_NEED_SERVER_ACTIVATION}</p>
+                {citizenApplyPending ? (
+                  <p className="text-sm text-amber-800">
+                    لديك طلب مواطن <span className="font-semibold">قيد المراجعة</span> — انتظر قرار الإدارة ثم عُد لهذه الصفحة.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {!citizenApplyPending ? (
+                    <Button asChild size="sm" className="rounded-full bg-violet-600 text-white hover:bg-violet-700">
+                      <Link to="/apply/citizen">التقديم الإلكتروني للمواطن</Link>
+                    </Button>
+                  ) : null}
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full border-amber-300 bg-white text-amber-950 hover:bg-amber-50"
+                  >
+                    <Link to="/profile">متابعة من البروفايل</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+
         <motion.section initial={reduceMotion ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, delay: 0.05 }}>
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display text-lg font-bold text-slate-900">
@@ -93,6 +140,7 @@ const JobsPage = () => {
           <div className="grid gap-4 md:grid-cols-2">
             {visibleJobs.map((job, i) => {
               const closed = isJobClosed(job.role);
+              const applyBlocked = closed || !jobApplyUnlocked;
               return (
               <motion.div
                 key={job.role}
@@ -104,12 +152,18 @@ const JobsPage = () => {
                   className={cn(
                     "group relative h-full overflow-hidden border-violet-200/90 bg-white/95 shadow-md transition-all hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-lg",
                     closed && "border-rose-200/90 bg-rose-50/40 hover:border-rose-300 hover:translate-y-0",
+                    !jobApplyUnlocked && !closed && "border-amber-200/90 bg-amber-50/30 hover:translate-y-0",
                   )}
                 >
                   {closed ? (
                     <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-rose-300 bg-white px-2.5 py-0.5 text-[10px] font-semibold text-rose-700 shadow-sm">
                       <Lock className="h-3 w-3" />
                       التقديم مغلق
+                    </span>
+                  ) : !jobApplyUnlocked ? (
+                    <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-2.5 py-0.5 text-[10px] font-semibold text-amber-800 shadow-sm">
+                      <ShieldAlert className="h-3 w-3" />
+                      يتطلب تفعيلاً
                     </span>
                   ) : null}
                   <CardContent className="flex h-full flex-col p-5">
@@ -124,13 +178,18 @@ const JobsPage = () => {
                       >
                         {closed ? <Lock className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
                       </div>
-                      {closed ? (
+                      {applyBlocked ? (
                         <Button
                           size="sm"
                           disabled
-                          className="cursor-not-allowed rounded-full bg-rose-200/70 px-4 text-rose-800 shadow-none opacity-90"
+                          className={cn(
+                            "cursor-not-allowed rounded-full px-4 shadow-none opacity-90",
+                            closed
+                              ? "bg-rose-200/70 text-rose-800"
+                              : "bg-amber-200/70 text-amber-900",
+                          )}
                         >
-                          مغلق حالياً
+                          {closed ? "مغلق حالياً" : "غير متاح"}
                         </Button>
                       ) : (
                         <Button asChild size="sm" className="rounded-full bg-gradient-to-l from-violet-700 to-violet-600 px-4 text-white shadow-md opacity-90 transition-opacity group-hover:opacity-100">

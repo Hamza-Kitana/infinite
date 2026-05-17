@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BadgeCheck,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ImagePlus,
   Lock,
+  Scale,
   ScrollText,
   ShieldAlert,
   ShieldCheck,
@@ -16,14 +17,15 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DiscordIcon } from "@/components/DiscordIcon";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
-import { JOB_ROLE_LAWS, type JobRoleKey } from "@/data/jobRoleLaws";
+import type { JobRoleKey } from "@/data/jobRoleLaws";
+import { JOB_ROLE_LAWS } from "@/data/jobRoleLaws";
+import { useJobRoleLawSet } from "@/lib/jobRoleLawsContent";
 import { LawsQuizDialog } from "@/components/LawsQuizDialog";
 import type { LawsQuizResult } from "@/data/publicApplicationTypes";
 import { useQuizQuestions, type QuizContextKey } from "@/lib/lawsQuizContent";
@@ -31,6 +33,11 @@ import {
   branchIdFromApplicationRoleKey,
   useApplicationsClosure,
 } from "@/lib/applicationsClosure";
+import {
+  canApplyForPublicJobs,
+  hasPendingCitizenApplication,
+  MSG_JOBS_NEED_SERVER_ACTIVATION,
+} from "@/lib/publicProfileEligibility";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -51,9 +58,8 @@ const JobsApplicationFormPage = () => {
   const navigate = useNavigate();
   const publicUser = usePublicUser();
   const { user, getProfile, logout } = publicUser;
-  const { submitApplication } = useApplicationsContent();
+  const { submitApplication, applications } = useApplicationsContent();
 
-  const [cityName, setCityName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [openLaws, setOpenLaws] = useState(false);
@@ -67,7 +73,8 @@ const JobsApplicationFormPage = () => {
   const roleKey = (role in JOB_ROLE_LAWS ? role : "") as JobRoleKey | "";
   const quizContextKey = (roleKey || "citizen") as QuizContextKey;
   const quizQuestions = useQuizQuestions(quizContextKey);
-  const lawSet = roleKey ? JOB_ROLE_LAWS[roleKey] : null;
+  const lawSetFromStore = useJobRoleLawSet(roleKey);
+  const lawSet = roleKey ? lawSetFromStore ?? JOB_ROLE_LAWS[roleKey] : null;
   const closure = useApplicationsClosure();
   const closureBranchId = roleKey ? branchIdFromApplicationRoleKey(roleKey) : null;
   const isClosed = closureBranchId ? closure.closed[closureBranchId] === true : false;
@@ -75,6 +82,7 @@ const JobsApplicationFormPage = () => {
 
   /** بيانات Discord الكاملة للمستخدم — تُستخرج مرة واحدة */
   const profile = useMemo(() => (user ? getProfile() : null), [user, getProfile]);
+  const cityNameFromProfile = profile?.cityName?.trim() ?? "";
   const isDiscordUser = user?.authProvider === "discord";
 
   const onPickImage = useCallback(async (file: File | null | undefined) => {
@@ -99,6 +107,9 @@ const JobsApplicationFormPage = () => {
   if (!user) return <Navigate to="/" replace />;
   if (!lawSet) return <Navigate to="/jobs" replace />;
 
+  const jobApplyUnlocked = canApplyForPublicJobs(profile, applications);
+  const citizenApplyPending = hasPendingCitizenApplication(profile, applications);
+
   const titleShort = lawSet.title.replace("قوانين ", "").replace("قانون ", "");
 
   const submit = () => {
@@ -106,21 +117,24 @@ const JobsApplicationFormPage = () => {
       toast.error("التقديم متاح فقط للحسابات المسجّلة عبر Discord");
       return;
     }
+    if (!jobApplyUnlocked) {
+      toast.error(MSG_JOBS_NEED_SERVER_ACTIVATION);
+      return;
+    }
     if (isClosed) {
       toast.error("التقديم مغلق حالياً لهذه الجهة");
       return;
     }
-    const cityNameTrim = cityName.trim();
+    const cityNameTrim = cityNameFromProfile;
     if (cityNameTrim.length < 3) {
-      toast.error("اكتب اسم شخصيتك في المدينة (3 أحرف على الأقل)");
+      toast.error("اسمك داخل المدينة غير مسجّل — راجع بياناتك في البروفايل أو التقديم الإلكتروني للمواطن");
       return;
     }
+    const nameParts = cityNameTrim.split(/\s+/).filter(Boolean);
+    const firstNamePart = nameParts[0] ?? cityNameTrim;
+    const lastNamePart = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
     if (bio.trim().length < 20) {
       toast.error("اكتب نبذة أوضح عن نفسك (20 حرف على الأقل)");
-      return;
-    }
-    if (!avatarDataUrl) {
-      toast.error("الرجاء رفع صورة شخصية للتقديم");
       return;
     }
     if (!acceptedLaws) {
@@ -139,8 +153,8 @@ const JobsApplicationFormPage = () => {
       applicantUsername: user.username,
       applicantDisplayName: user.displayName,
       snapshot: {
-        firstName: cityNameTrim,
-        lastName: "",
+        firstName: firstNamePart,
+        lastName: lastNamePart,
         gender: "male",
         birthSummaryLine: "—",
         ageSummaryLine: "—",
@@ -152,7 +166,7 @@ const JobsApplicationFormPage = () => {
         lawsQuizResult: quizResult ?? undefined,
         cityName: cityNameTrim,
         bio: bio.trim(),
-        avatarDataUrl,
+        ...(avatarDataUrl ? { avatarDataUrl } : {}),
         discordId: discordId || undefined,
       },
     });
@@ -168,6 +182,47 @@ const JobsApplicationFormPage = () => {
     toast.success("تم إرسال طلب التوظيف بنجاح");
     navigate("/jobs");
   };
+
+  if (isDiscordUser && !jobApplyUnlocked) {
+    return (
+      <div dir="rtl" className="min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
+        <Navbar />
+        <main className="relative z-10 mx-auto flex min-h-[calc(100vh-200px)] max-w-3xl flex-col items-center justify-center px-4 py-24 md:px-8">
+          <div className="w-full overflow-hidden rounded-3xl border border-amber-300/90 bg-gradient-to-l from-amber-50 via-white to-orange-50/60 p-8 text-right shadow-[0_28px_70px_-30px_rgba(245,158,11,0.35)] md:p-10">
+            <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-start sm:text-right">
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                <ShieldAlert className="h-8 w-8" />
+              </span>
+              <div className="flex-1 space-y-2">
+                <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-amber-800/90">غير مفعّل</p>
+                <h1 className="font-display text-2xl font-bold text-slate-900 md:text-3xl">التقديم على الوظائف غير متاح</h1>
+                <p className="text-sm leading-relaxed text-slate-700">{MSG_JOBS_NEED_SERVER_ACTIVATION}</p>
+                {citizenApplyPending ? (
+                  <p className="text-sm text-amber-900">
+                    طلب المواطن الخاص بك <span className="font-semibold">قيد المراجعة</span> — انتظر قبول الإدارة.
+                  </p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  {!citizenApplyPending ? (
+                    <Button asChild className="bg-violet-600 text-white hover:bg-violet-700">
+                      <Link to="/apply/citizen">التقديم الإلكتروني للمواطن</Link>
+                    </Button>
+                  ) : null}
+                  <Button asChild variant="outline" className="border-violet-300 bg-white">
+                    <Link to="/jobs">العودة للوظائف</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="border-violet-300 bg-white">
+                    <Link to="/profile">البروفايل</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer forceLight />
+      </div>
+    );
+  }
 
   /** صفحة بديلة للمستخدمين الذين سجّلوا عبر حساب محلي — يجب عليهم التحوّل إلى Discord */
   if (!isDiscordUser) {
@@ -223,12 +278,10 @@ const JobsApplicationFormPage = () => {
     );
   }
 
-  const stepCity = cityName.trim().length >= 3;
   const stepBio = bio.trim().length >= 20;
-  const stepImg = !!avatarDataUrl;
   const stepLaws = acceptedLaws;
-  const completedSteps = [stepCity, stepBio, stepImg, stepLaws].filter(Boolean).length;
-  const progressPct = Math.round((completedSteps / 4) * 100);
+  const completedSteps = [stepBio, stepLaws].filter(Boolean).length;
+  const progressPct = Math.round((completedSteps / 2) * 100);
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f4f0fb] text-slate-900 antialiased">
@@ -376,30 +429,27 @@ const JobsApplicationFormPage = () => {
                 </div>
               </section>
 
-              {/* اسم الشخصية في المدينة */}
+              {/* اسم الشخصية في المدينة — من التقديم الإلكتروني */}
               <section className="space-y-2 rounded-2xl border border-violet-200/80 bg-gradient-to-l from-violet-50/40 to-white p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="city-name" className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <Label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                     <User2 className="h-4 w-4 text-violet-700" />
                     اسمك داخل المدينة
                   </Label>
-                  {stepCity ? (
+                  {cityNameFromProfile.length >= 3 ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-display font-semibold text-emerald-700 ring-1 ring-emerald-200">
-                      <CheckCircle2 className="h-3 w-3" /> مكتمل
+                      <CheckCircle2 className="h-3 w-3" /> من التقديم الإلكتروني
                     </span>
                   ) : null}
                 </div>
-                <Input
-                  id="city-name"
-                  value={cityName}
-                  onChange={(e) => setCityName(e.target.value)}
-                  placeholder="مثال: الضابط آدم سيف"
-                  className="rounded-xl border-violet-200 bg-white text-base text-slate-900"
-                  maxLength={80}
-                  disabled={isClosed}
-                />
+                <div
+                  className="min-h-11 rounded-xl border border-violet-200 bg-white px-3 py-2.5 text-right text-base font-medium text-slate-900"
+                  dir="rtl"
+                >
+                  {cityNameFromProfile || "—"}
+                </div>
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  هذا الاسم سيظهر للأدمن مع طلبك ويُستخدم تلقائياً عند تعيينك في الطاقم.
+                  يُؤخذ تلقائياً من التقديم الإلكتروني للمواطن — للعرض فقط ولا يمكن تعديله هنا.
                 </p>
               </section>
 
@@ -435,8 +485,9 @@ const JobsApplicationFormPage = () => {
                   <Label className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                     <ImagePlus className="h-4 w-4 text-violet-700" />
                     صورة شخصية
+                    <span className="text-xs font-normal text-slate-500">(اختياري)</span>
                   </Label>
-                  {stepImg ? (
+                  {avatarDataUrl ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-display font-semibold text-emerald-700 ring-1 ring-emerald-200">
                       <CheckCircle2 className="h-3 w-3" /> مرفوعة
                     </span>
@@ -459,8 +510,8 @@ const JobsApplicationFormPage = () => {
                   </div>
                   <div className="flex flex-col gap-2">
                     <p className="text-[12px] leading-relaxed text-slate-600">
-                      اختر صورة واضحة لك (PNG / JPG / WEBP) بحجم أقصى 2 ميجابايت. ستظهر للأدمن مع الطلب
-                      ويمكن استخدامها في طاقم المؤسسة.
+                      يمكنك التقديم بدون صورة. إن رغبت، ارفع صورة واضحة (PNG / JPG / WEBP) بحجم أقصى 2 ميجابايت —
+                      يمكن للإدارة إضافة صورة لاحقاً عند القبول.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -571,33 +622,66 @@ const JobsApplicationFormPage = () => {
       </main>
 
       <Dialog open={openLaws} onOpenChange={setOpenLaws}>
-        <DialogContent dir="rtl" className="max-h-[85vh] max-w-2xl overflow-y-auto border-violet-200 bg-white text-slate-900 shadow-2xl">
-          <DialogHeader className="text-right">
-            <DialogTitle className="font-display text-lg">{lawSet.title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 text-right">
+        <DialogContent
+          dir="rtl"
+          className="flex max-h-[min(88dvh,720px)] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border border-violet-200/90 bg-white p-0 text-slate-900 shadow-2xl sm:w-full"
+        >
+          <div className="shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-l from-violet-600 via-violet-700 to-indigo-800 px-5 pb-5 pt-12 text-white sm:px-6 sm:pt-14">
+            <DialogHeader className="space-y-2 text-right">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
+                  <Scale className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <DialogTitle className="font-display text-xl font-bold leading-snug">{lawSet.title}</DialogTitle>
+                  {lawSet.subtitle?.trim() ? (
+                    <DialogDescription className="mt-1.5 text-sm leading-relaxed text-violet-100/95">
+                      {lawSet.subtitle}
+                    </DialogDescription>
+                  ) : null}
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-slate-50/60 px-5 py-4 text-right sm:px-6">
             {lawSet.rules.map((rule, idx) => (
-              <div key={idx} className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 text-sm leading-relaxed text-slate-800">
-                <span className="font-semibold text-violet-700">{idx + 1}.</span> {rule}
+              <div
+                key={idx}
+                className="relative overflow-hidden rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
+              >
+                <div className="absolute inset-y-0 right-0 w-1 bg-gradient-to-b from-violet-500 to-fuchsia-500" />
+                <div className="flex gap-3 pr-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 font-display text-sm font-bold text-violet-800">
+                    {idx + 1}
+                  </span>
+                  <p className="text-sm leading-relaxed text-slate-800">{rule}</p>
+                </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-right text-sm leading-relaxed text-amber-900">
-            بعد الضغط على «متابعة وأسئلة الإقرار» سيُعرض عليك اختبار قصير (
-            {quizQuestions.length} أسئلة) للتحقق من قراءتك. لن يُعتمد إقرارك إلا
-            بالإجابة الصحيحة على الأسئلة جميعها.
-          </div>
-          <div className="mt-4 flex justify-end border-t border-violet-100 pt-4">
-            <Button
-              type="button"
-              className="rounded-xl bg-violet-600 text-white hover:bg-violet-700"
-              onClick={() => {
-                setOpenLaws(false);
-                setQuizOpen(true);
-              }}
-            >
-              متابعة وأسئلة الإقرار
-            </Button>
+
+          <div className="shrink-0 space-y-3 border-t border-violet-100 bg-white px-5 py-4 sm:px-6">
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/90 bg-gradient-to-l from-amber-50 to-orange-50/50 p-3.5 text-right">
+              <ScrollText className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <p className="text-sm leading-relaxed text-amber-950/90">
+                بعد «متابعة وأسئلة الإقرار» يُعرض اختبار من{" "}
+                <span className="font-semibold">{quizQuestions.length}</span> أسئلة. لن يُعتمد إقرارك إلا بالإجابة
+                الصحيحة على الكل.
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 px-6 text-white shadow-md hover:from-violet-800 hover:to-violet-700"
+                onClick={() => {
+                  setOpenLaws(false);
+                  setQuizOpen(true);
+                }}
+              >
+                متابعة وأسئلة الإقرار
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

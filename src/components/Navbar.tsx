@@ -27,7 +27,11 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 import { isDiscordOAuthConfigured, startDiscordLogin } from "@/lib/discordOAuth";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import { useTicketsCenter } from "@/lib/ticketsCenter";
-import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE, isCitizenElectronicApplyComplete } from "@/lib/publicProfileEligibility";
+import {
+  isPublicTicketsUnlocked,
+  MSG_TICKETS_NEED_CITY_PROFILE,
+  isCitizenApplyFormBlocked,
+} from "@/lib/publicProfileEligibility";
 import { NotificationsBell } from "@/components/NotificationsBell";
 
 const institutionLinks = [
@@ -80,11 +84,11 @@ const Navbar = () => {
   const discordPublicProfile =
     publicUser.user?.authProvider === "discord" ? publicUser.getProfile() : null;
   const hideCitizenApplyForOnboardedUser =
-    !!discordPublicProfile && isCitizenElectronicApplyComplete(discordPublicProfile, applications);
+    !!discordPublicProfile && isCitizenApplyFormBlocked(discordPublicProfile, applications);
   const showPublicApplyButton = !hideApplyNowForPublicProfile && !hideCitizenApplyForOnboardedUser;
   /** صفحات بخلفية فاتحة بنفسجية — يتغيّر معها لون شريط التنقّل عند التمرير */
   const isLightSurface = (() => {
-    const lightPaths = ["/profile", "/tickets", "/jobs"];
+    const lightPaths = ["/profile", "/tickets", "/jobs", "/apply/streamers"];
     return lightPaths.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`));
   })();
   /** نوحّد لون علامة INFINITE مع لون السطح حتى تظل واضحة فوق الخلفيات الفاتحة */

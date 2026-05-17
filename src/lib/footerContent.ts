@@ -1,4 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { DISCORD_INVITE_URL } from "@/config/communityLinks";
+
+const LEGACY_DISCORD_URLS = new Set([
+  "https://discord.gg/infinitecity",
+  "https://discord.gg/REPLACE_WITH_INVITE",
+]);
+
+function resolveDiscordUrl(stored: string | undefined): string {
+  const t = stored?.trim() ?? "";
+  if (!t || LEGACY_DISCORD_URLS.has(t)) return DISCORD_INVITE_URL;
+  return t;
+}
 
 const STORAGE_KEY = "ic_footer_content_v1";
 const EVENT_NAME = "ic-footer-content";
@@ -45,7 +57,7 @@ export function defaultFooterContent(): FooterContent {
     contactTitle: "تواصل",
     contactBody: "انضم لسيرفر الديسكورد للمقابلات، الدعم، وآخر الأخبار.",
     discordLabel: "ديسكورد",
-    discordUrl: "https://discord.gg/infinitecity",
+    discordUrl: DISCORD_INVITE_URL,
     rightsText: "جميع الحقوق محفوظة",
     madeWithText: "صُنع بعناية لمجتمع إنفينيتي سيتي",
     developerLabel: "المبرمج",
@@ -75,7 +87,7 @@ function normalize(raw: unknown): FooterContent {
     contactTitle: typeof p.contactTitle === "string" ? p.contactTitle : base.contactTitle,
     contactBody: typeof p.contactBody === "string" ? p.contactBody : base.contactBody,
     discordLabel: typeof p.discordLabel === "string" ? p.discordLabel : base.discordLabel,
-    discordUrl: typeof p.discordUrl === "string" ? p.discordUrl : base.discordUrl,
+    discordUrl: resolveDiscordUrl(typeof p.discordUrl === "string" ? p.discordUrl : undefined),
     rightsText: typeof p.rightsText === "string" ? p.rightsText : base.rightsText,
     madeWithText: typeof p.madeWithText === "string" ? p.madeWithText : base.madeWithText,
     developerLabel: typeof p.developerLabel === "string" ? p.developerLabel : base.developerLabel,

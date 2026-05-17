@@ -47,6 +47,7 @@ function loadPersisted(): InstitutionRostersPersisted {
 
 function savePersisted(data: InstitutionRostersPersisted) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.dispatchEvent(new CustomEvent("ic-institution-rosters-changed"));
 }
 
 /** نوع رتبة الفرد داخل طاقم المؤسسة */
@@ -101,7 +102,7 @@ type InstitutionRostersContentValue = {
    */
   assignFromApplication: (
     input: AssignFromApplicationInput,
-  ) => "ok" | "leader_conflict" | "deputy_conflict";
+  ) => "ok" | "leader_conflict" | "deputy_conflict" | "not_found";
   /** تحديث رتبة عضو موجود (يمكن تحريك القائد ↔ النائب ↔ عضو) */
   promoteMember: (
     branchId: InstitutionBranchId,
@@ -231,9 +232,9 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
   }, []);
 
   const assignFromApplication = useCallback(
-    (input: AssignFromApplicationInput): "ok" | "leader_conflict" | "deputy_conflict" => {
+    (input: AssignFromApplicationInput): "ok" | "leader_conflict" | "deputy_conflict" | "not_found" => {
       const current = persisted.rosters[input.branchId];
-      if (!current) return "ok";
+      if (!current) return "not_found";
 
       if (input.role === "leader" && isSlotOccupied(current.leader)) {
         return "leader_conflict";
@@ -292,7 +293,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
                   updated[existingIdx] = { ...updated[existingIdx], ...memberPayload };
                   return { ...current, members: updated };
                 }
-                return { ...current, members: [memberPayload, ...current.members] };
+                return { ...current, members: [...current.members, memberPayload] };
               })();
 
       setPersisted((prev) => {

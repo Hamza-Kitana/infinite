@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, HelpCircle, Plus, Save, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, HelpCircle, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,136 +33,142 @@ import {
   LAWS_QUIZ_STORAGE_KEY,
   type QuizContextKey,
 } from "@/lib/lawsQuizContent";
+import {
+  cleanQuestions,
+  cleanSingleQuestion,
+  cloneQuizQuestion,
+  cloneQuizQuestions,
+  makeQuizQuestion,
+  QUIZ_OPTION_IDS,
+} from "@/lib/quizQuestionUtils";
 import { cn } from "@/lib/utils";
 
-const OPTION_IDS = ["a", "b", "c", "d", "e", "f"] as const;
-
-function makeQuestion(): QuizQuestion {
-  return {
-    id: crypto.randomUUID(),
-    question: "",
-    options: [
-      { id: "a", label: "" },
-      { id: "b", label: "" },
-    ],
-    correctOptionId: "a",
-  };
-}
-
-function cleanQuestions(questions: QuizQuestion[]): QuizQuestion[] | null {
-  const cleaned = questions.map((q) => {
-    const options = q.options
-      .map((opt, idx) => ({
-        id: opt.id.trim() || OPTION_IDS[idx] || crypto.randomUUID(),
-        label: opt.label.trim(),
-      }))
-      .filter((opt) => opt.label.length > 0);
-    const correctOptionId = options.some((opt) => opt.id === q.correctOptionId)
-      ? q.correctOptionId
-      : (options[0]?.id ?? "");
-    return {
-      ...q,
-      id: q.id || crypto.randomUUID(),
-      question: q.question.trim(),
-      options,
-      correctOptionId,
-      explanation: q.explanation?.trim() || undefined,
-    };
-  });
-
-  if (cleaned.some((q) => q.question.length < 5)) {
-    toast.error("كل سؤال يجب أن يحتوي نصاً واضحاً");
-    return null;
-  }
-  if (cleaned.some((q) => q.options.length < 2)) {
-    toast.error("كل سؤال يحتاج خيارين على الأقل");
-    return null;
-  }
-  if (cleaned.some((q) => !q.correctOptionId || !q.options.some((opt) => opt.id === q.correctOptionId))) {
-    toast.error("حدد الإجابة الصحيحة لكل سؤال");
-    return null;
-  }
-  return cleaned;
-}
-
-function cloneQuizQuestions(list: QuizQuestion[]): QuizQuestion[] {
-  return list.map((q) => ({
-    ...q,
-    options: q.options.map((opt) => ({ ...opt })),
-  }));
-}
+type QuestionDialogState = {
+  mode: "add" | "edit";
+  draft: QuizQuestion;
+};
 
 const QuizManagerPage = () => {
   const { user } = useAuth();
   const [activeKey, setActiveKey] = useState<QuizContextKey>("citizen");
   const [draft, setDraft] = useState<QuizQuestion[]>(() => cloneQuizQuestions(loadQuizQuestions("citizen")));
+  const [questionDialog, setQuestionDialog] = useState<QuestionDialogState | null>(null);
+  /** يمنع إعادة تحميل المسودة من التخزين فور حفظنا — كان يمحو السؤال الجديد قبل ظهوره */
+  const skipHydrateRef = useRef(false);
+
+  const hydrateFromStorage = useCallback(() => {
+    setDraft(cloneQuizQuestions(loadQuizQuestions(activeKey)));
+  }, [activeKey]);
 
   useEffect(() => {
-    const hydrate = () => {
-      setDraft(cloneQuizQuestions(loadQuizQuestions(activeKey)));
+    hydrateFromStorage();
+  }, [hydrateFromStorage]);
+
+  useEffect(() => {
+    const onQuizContentChanged = () => {
+      if (skipHydrateRef.current) {
+        skipHydrateRef.current = false;
+        return;
+      }
+      hydrateFromStorage();
     };
-    hydrate();
-    window.addEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, hydrate);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === LAWS_QUIZ_STORAGE_KEY) hydrate();
+      if (e.key === LAWS_QUIZ_STORAGE_KEY) onQuizContentChanged();
     };
+    window.addEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, onQuizContentChanged);
     window.addEventListener("storage", onStorage);
     return () => {
-      window.removeEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, hydrate);
+      window.removeEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, onQuizContentChanged);
       window.removeEventListener("storage", onStorage);
     };
-  }, [activeKey]);
+  }, [hydrateFromStorage]);
 
   const activeMeta = useMemo(
     () => QUIZ_CONTEXTS.find((ctx) => ctx.key === activeKey) ?? QUIZ_CONTEXTS[0],
     [activeKey],
   );
 
-  const updateQuestion = (id: string, patch: Partial<QuizQuestion>) => {
-    setDraft((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+  const openAddDialog = () => {
+    setQuestionDialog({ mode: "add", draft: makeQuizQuestion() });
   };
 
-  const updateOption = (questionId: string, optionId: string, label: string) => {
-    setDraft((prev) =>
-      prev.map((q) =>
-        q.id === questionId
-          ? { ...q, options: q.options.map((opt) => (opt.id === optionId ? { ...opt, label } : opt)) }
-          : q,
-      ),
-    );
+  const openEditDialog = (q: QuizQuestion) => {
+    setQuestionDialog({ mode: "edit", draft: cloneQuizQuestion(q) });
   };
 
-  const addOption = (questionId: string) => {
-    setDraft((prev) =>
-      prev.map((q) => {
-        if (q.id !== questionId || q.options.length >= OPTION_IDS.length) return q;
-        const nextId = OPTION_IDS.find((id) => !q.options.some((opt) => opt.id === id)) ?? crypto.randomUUID();
-        return { ...q, options: [...q.options, { id: nextId, label: "" }] };
-      }),
-    );
+  const persistDraftNow = useCallback((next: QuizQuestion[]) => {
+    skipHydrateRef.current = true;
+    saveQuizQuestions(activeKey, next);
+    return true;
+  }, [activeKey]);
+
+  const patchDialogQuestion = (patch: Partial<QuizQuestion>) => {
+    setQuestionDialog((prev) => (prev ? { ...prev, draft: { ...prev.draft, ...patch } } : null));
   };
 
-  const removeOption = (questionId: string, optionId: string) => {
-    setDraft((prev) =>
-      prev.map((q) => {
-        if (q.id !== questionId || q.options.length <= 2) return q;
-        const options = q.options.filter((opt) => opt.id !== optionId);
-        return {
-          ...q,
-          options,
-          correctOptionId: q.correctOptionId === optionId ? options[0]!.id : q.correctOptionId,
-        };
-      }),
-    );
+  const patchDialogOption = (optionId: string, label: string) => {
+    setQuestionDialog((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        draft: {
+          ...prev.draft,
+          options: prev.draft.options.map((opt) => (opt.id === optionId ? { ...opt, label } : opt)),
+        },
+      };
+    });
+  };
+
+  const addDialogOption = () => {
+    setQuestionDialog((prev) => {
+      if (!prev || prev.draft.options.length >= QUIZ_OPTION_IDS.length) return prev;
+      const nextId =
+        QUIZ_OPTION_IDS.find((id) => !prev.draft.options.some((opt) => opt.id === id)) ?? crypto.randomUUID();
+      return {
+        ...prev,
+        draft: { ...prev.draft, options: [...prev.draft.options, { id: nextId, label: "" }] },
+      };
+    });
+  };
+
+  const removeDialogOption = (optionId: string) => {
+    setQuestionDialog((prev) => {
+      if (!prev || prev.draft.options.length <= 2) return prev;
+      const options = prev.draft.options.filter((opt) => opt.id !== optionId);
+      const correctOptionId =
+        prev.draft.correctOptionId === optionId ? options[0]!.id : prev.draft.correctOptionId;
+      return { ...prev, draft: { ...prev.draft, options, correctOptionId } };
+    });
+  };
+
+  const confirmQuestionDialog = () => {
+    if (!questionDialog) return;
+    const current = questionDialog;
+    const cleaned = cleanSingleQuestion(current.draft);
+    if (!cleaned) return;
+
+    setDraft((prev) => {
+      const next =
+        current.mode === "add"
+          ? [...prev, cleaned]
+          : prev.map((q) => (q.id === cleaned.id ? cleaned : q));
+      persistDraftNow(next);
+      toast.success(current.mode === "add" ? "تم إضافة السؤال وحفظه" : "تم تحديث السؤال وحفظه");
+      return next;
+    });
+    setQuestionDialog(null);
   };
 
   const save = () => {
     const cleaned = cleanQuestions(draft);
     if (!cleaned) return;
+    skipHydrateRef.current = true;
     saveQuizQuestions(activeKey, cleaned);
     appendActivityLog(user?.username ?? "admin", "تعديل أسئلة الاختبار", `${activeMeta.label} — ${cleaned.length} سؤال`);
     toast.success("تم حفظ الأسئلة");
   };
+
+  const dialogDraft = questionDialog?.draft;
 
   return (
     <div dir="rtl" className="space-y-6 text-slate-900 dark:text-slate-100">
@@ -169,13 +183,17 @@ const QuizManagerPage = () => {
                 إدارة أسئلة التقديم الإلكتروني
               </CardTitle>
               <CardDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                أضف الأسئلة والخيارات وحدد الإجابة الصحيحة لكل اختبار. هذه الأسئلة تظهر للمستخدم عند الإقرار بالقوانين.
+                أضف الأسئلة عبر النافذة، حدّد الخيارات والإجابة الصحيحة، ثم احفظ التغييرات لتظهر في اختبار القوانين.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={save} className="gap-2 bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500">
+              <Button
+                type="button"
+                onClick={save}
+                className="gap-2 bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
+              >
                 <Save className="h-4 w-4" />
-                حفظ
+                حفظ الكل
               </Button>
             </div>
           </div>
@@ -201,134 +219,219 @@ const QuizManagerPage = () => {
       <div className="flex justify-end">
         <Button
           type="button"
-          variant="outline"
-          onClick={() => {
-            setDraft((prev) => [...prev, makeQuestion()]);
-            toast.success("تم إضافة سؤال");
-          }}
-          className="gap-2 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+          onClick={openAddDialog}
+          className="gap-2 bg-violet-600 text-white hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500"
         >
           <Plus className="h-4 w-4" />
           إضافة سؤال
         </Button>
       </div>
 
-      <div className="space-y-4">
-        {draft.map((q, index) => (
-          <Card key={q.id} className="border-slate-200 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/95 dark:shadow-none">
-            <CardHeader className="text-right">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
+      <div className="space-y-3">
+        {draft.length === 0 ? (
+          <Card className="border-dashed border-slate-300 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-900/50">
+            <CardContent className="py-10 text-center text-sm text-slate-600 dark:text-slate-400">
+              لا توجد أسئلة بعد. اضغط «إضافة سؤال» لفتح النافذة وإنشاء أول سؤال.
+            </CardContent>
+          </Card>
+        ) : null}
+        {draft.map((q, index) => {
+          const correctLabel = q.options.find((opt) => opt.id === q.correctOptionId)?.label;
+          return (
+            <Card
+              key={q.id}
+              className="border-slate-200 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/95 dark:shadow-none"
+            >
+              <CardContent className="flex flex-wrap items-start justify-between gap-4 p-5 text-right">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-950/55 dark:text-violet-300">
                     <HelpCircle className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
-                    <CardTitle className="font-display text-lg text-slate-900 dark:text-slate-50">السؤال {index + 1}</CardTitle>
-                    <CardDescription className="text-slate-600 dark:text-slate-400">
-                      اختر الخيار الصحيح من القائمة أسفل الخيارات.
-                    </CardDescription>
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-display text-sm font-semibold text-violet-700 dark:text-violet-300">
+                      السؤال {index + 1}
+                    </p>
+                    <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-100">
+                      {q.question.trim() || "— بدون نص —"}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {q.options.length} خيارات
+                      {correctLabel ? (
+                        <>
+                          {" "}
+                          · الإجابة الصحيحة:{" "}
+                          <span className="font-medium text-emerald-700 dark:text-emerald-300">{correctLabel}</span>
+                        </>
+                      ) : null}
+                    </p>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={draft.length <= 1}
-                  onClick={() => setDraft((prev) => prev.filter((item) => item.id !== q.id))}
-                  className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/45 dark:text-rose-200 dark:hover:bg-rose-950/70"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-5">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openEditDialog(q)}
+                    className="gap-1.5 border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    تعديل
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={draft.length <= 1}
+                    onClick={() => {
+                      setDraft((prev) => {
+                        const next = prev.filter((item) => item.id !== q.id);
+                        persistDraftNow(next);
+                        toast.success("تم حذف السؤال وحفظ التغيير");
+                        return next;
+                      });
+                    }}
+                    className="border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/45 dark:text-rose-200 dark:hover:bg-rose-950/70"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Dialog
+        open={questionDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setQuestionDialog(null);
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="flex max-h-[min(90dvh,90svh)] w-[calc(100%-1rem)] max-w-2xl flex-col gap-0 overflow-hidden rounded-2xl border border-slate-200/95 bg-white p-0 text-right text-slate-900 shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50 sm:w-full"
+        >
+          <div className="shrink-0 border-b border-violet-200 bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.18),transparent_58%)] px-5 pb-4 pt-12 dark:border-slate-700 dark:bg-[radial-gradient(ellipse_100%_120%_at_50%_0%,rgba(139,92,246,0.1),transparent_55%)] sm:px-6 sm:pt-14">
+            <DialogHeader className="space-y-1.5 text-right sm:text-right">
+              <DialogTitle className="font-display text-xl font-bold text-slate-900 dark:text-slate-50 sm:text-2xl">
+                {questionDialog?.mode === "edit" ? "تعديل السؤال" : "إضافة سؤال جديد"}
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                اكتب نص السؤال، أضف الخيارات، ثم اضغط «صحيح» بجانب الإجابة الصحيحة.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {dialogDraft ? (
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-white px-5 py-5 dark:bg-slate-900 sm:px-6">
               <div className="space-y-2 text-right">
                 <Label className="text-slate-800 dark:text-slate-200">نص السؤال</Label>
                 <Textarea
-                  value={q.question}
-                  onChange={(e) => updateQuestion(q.id, { question: e.target.value })}
-                  className="min-h-24 bg-white text-right dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  value={dialogDraft.question}
+                  onChange={(e) => patchDialogQuestion({ question: e.target.value })}
+                  className="min-h-24 border-slate-200 bg-white text-right text-slate-900 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                   placeholder="اكتب السؤال هنا..."
                 />
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                {q.options.map((opt, optIdx) => {
-                  const isCorrect = q.correctOptionId === opt.id;
-                  return (
-                    <div
-                      key={opt.id}
-                      className={cn(
-                        "rounded-2xl border p-3",
-                        isCorrect
-                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
-                          : "border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-800/80",
-                      )}
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="font-display text-sm text-slate-600 dark:text-slate-300">
-                          خيار {String.fromCharCode(65 + optIdx)}
+              <div className="space-y-3 text-right">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-slate-800 dark:text-slate-200">الخيارات والإجابة الصحيحة</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addDialogOption}
+                    disabled={dialogDraft.options.length >= QUIZ_OPTION_IDS.length}
+                    className="h-8 gap-1 border-slate-300 bg-white text-xs text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    خيار
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  اضغط «صحيح» بجانب الإجابة الصحيحة — يُظلَّل الخيار بالأخضر.
+                </p>
+                <div className="space-y-2">
+                  {dialogDraft.options.map((opt, optIdx) => {
+                    const isCorrect = dialogDraft.correctOptionId === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        className={cn(
+                          "flex flex-wrap items-center gap-2 rounded-xl border p-2.5",
+                          isCorrect
+                            ? "border-emerald-300 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
+                            : "border-slate-200 bg-slate-50 dark:border-slate-600 dark:bg-slate-900/80",
+                        )}
+                      >
+                        <span className="w-8 shrink-0 text-center font-display text-sm font-semibold text-slate-500 dark:text-slate-400">
+                          {String.fromCharCode(65 + optIdx)}
                         </span>
-                        {isCorrect ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            صحيح
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="flex gap-2">
                         <Input
                           value={opt.label}
-                          onChange={(e) => updateOption(q.id, opt.id, e.target.value)}
-                          className="bg-white text-right dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
-                          placeholder="نص الخيار"
+                          onChange={(e) => patchDialogOption(opt.id, e.target.value)}
+                          className="min-w-0 flex-1 border-slate-200 bg-white text-right text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                          placeholder={`نص الخيار ${String.fromCharCode(65 + optIdx)}`}
                         />
+                        <Button
+                          type="button"
+                          variant={isCorrect ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => patchDialogQuestion({ correctOptionId: opt.id })}
+                          className={cn(
+                            "shrink-0 gap-1",
+                            isCorrect
+                              ? "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                              : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
+                          )}
+                        >
+                          {isCorrect ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                          صحيح
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"
                           size="icon"
-                          disabled={q.options.length <= 2}
-                          onClick={() => removeOption(q.id, opt.id)}
-                          className="shrink-0 border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
+                          disabled={dialogDraft.options.length <= 2}
+                          onClick={() => removeDialogOption(opt.id)}
+                          className="shrink-0 border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-700">
-                <div className="min-w-60 space-y-2 text-right">
-                  <Label className="text-slate-800 dark:text-slate-200">الإجابة الصحيحة</Label>
-                  <Select value={q.correctOptionId} onValueChange={(v) => updateQuestion(q.id, { correctOptionId: v })}>
-                    <SelectTrigger className="bg-white text-right dark:bg-slate-950 dark:text-slate-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent dir="rtl">
-                      {q.options.map((opt, optIdx) => (
-                        <SelectItem key={opt.id} value={opt.id}>
-                          خيار {String.fromCharCode(65 + optIdx)} — {opt.label || "بدون نص"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addOption(q.id)}
-                  disabled={q.options.length >= OPTION_IDS.length}
-                  className="border-slate-300 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                >
-                  إضافة خيار
-                </Button>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-800 dark:text-slate-200">شرح (اختياري)</Label>
+                <Textarea
+                  value={dialogDraft.explanation ?? ""}
+                  onChange={(e) => patchDialogQuestion({ explanation: e.target.value })}
+                  className="min-h-16 border-slate-200 bg-white text-right text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  placeholder="يظهر للمستخدم بعد إجابة خاطئة..."
+                />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="shrink-0 flex-row-reverse gap-2 border-t border-slate-200 bg-slate-50/90 px-5 py-4 dark:border-slate-700 dark:bg-slate-900/95 sm:justify-start sm:px-6">
+            <Button type="button" onClick={confirmQuestionDialog} className="bg-violet-600 text-white hover:bg-violet-700">
+              {questionDialog?.mode === "edit" ? "حفظ التعديل" : "إضافة السؤال"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQuestionDialog(null)}
+              className="border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+            >
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

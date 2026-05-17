@@ -62,6 +62,11 @@ import {
 } from "@/staff/staffDirectory";
 import { appendActivityLog } from "@/lib/activityLog";
 import { purgeArtifactsForDeletedPublicUser } from "@/lib/purgeDeletedPublicUser";
+import {
+  assertSuperAdminCanDeleteUsers,
+  canDeleteManagedStaffTarget,
+  SUPER_ADMIN_DELETE_ONLY_MESSAGE,
+} from "@/lib/staffUserDeletePolicy";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -377,10 +382,37 @@ const StaffUsersPage = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const deleteActorOptions = { actorIsSuperAdmin: true as const };
+
+  const guardSuperAdminDelete = (): boolean => {
+    if (!assertSuperAdminCanDeleteUsers(user)) {
+      toast.error(SUPER_ADMIN_DELETE_ONLY_MESSAGE);
+      return false;
+    }
+    return true;
+  };
+
   const handleRemove = (id: string, uname: string) => {
+    if (!guardSuperAdminDelete()) return;
+    const target = users.find((u) => u.id === id);
+    if (target) {
+      const guard = canDeleteManagedStaffTarget(target);
+      if (!guard.ok) {
+        toast.error(guard.message ?? "لا يمكن حذف هذا الحساب.");
+        return;
+      }
+    }
     try {
-      removeManagedUser(id);
-    } catch {
+      removeManagedUser(id, deleteActorOptions);
+    } catch (err) {
+      if (err instanceof Error && err.message === "FORBIDDEN_DELETE_MANAGED_USER") {
+        toast.error(SUPER_ADMIN_DELETE_ONLY_MESSAGE);
+        return;
+      }
+      if (err instanceof Error && err.message === "PROTECTED_MANAGED_USER") {
+        toast.error("لا يمكن حذف هذا الحساب.");
+        return;
+      }
       toast.error("تعذر حذف المستخدم من التخزين المحلي.");
       return;
     }
@@ -693,15 +725,29 @@ const StaffUsersPage = () => {
   };
 
   const handleDeletePublicUser = (id: string) => {
+    if (!guardSuperAdminDelete()) return;
     const target = publicUsers.find((u) => u.id === id);
     if (!target) return;
     /** نزيل أيضاً أي ملف موظف مرتبط بهذا المواطن */
     const linked = findManagedUserByPublicId(target.id);
     if (linked) {
+      const linkedGuard = canDeleteManagedStaffTarget(linked);
+      if (!linkedGuard.ok) {
+        toast.error(linkedGuard.message ?? "لا يمكن حذف حساب الموظف المرتبط.");
+        return;
+      }
       try {
-        removeManagedUser(linked.id);
-      } catch {
-        /* ignore */
+        removeManagedUser(linked.id, deleteActorOptions);
+      } catch (err) {
+        if (err instanceof Error && err.message === "FORBIDDEN_DELETE_MANAGED_USER") {
+          toast.error(SUPER_ADMIN_DELETE_ONLY_MESSAGE);
+          return;
+        }
+        if (err instanceof Error && err.message === "PROTECTED_MANAGED_USER") {
+          toast.error("لا يمكن حذف حساب الموظف المرتبط.");
+          return;
+        }
+        /* ignore other storage errors for linked row — still delete public user */
       }
     }
     purgeArtifactsForDeletedPublicUser({
@@ -864,9 +910,23 @@ const StaffUsersPage = () => {
 
   const handleRevokePromotion = () => {
     if (!promote?.existingManaged) return;
+    if (!guardSuperAdminDelete()) return;
+    const guard = canDeleteManagedStaffTarget(promote.existingManaged);
+    if (!guard.ok) {
+      toast.error(guard.message ?? "لا يمكن إلغاء ترقية هذا الحساب.");
+      return;
+    }
     try {
-      removeManagedUser(promote.existingManaged.id);
-    } catch {
+      removeManagedUser(promote.existingManaged.id, deleteActorOptions);
+    } catch (err) {
+      if (err instanceof Error && err.message === "FORBIDDEN_DELETE_MANAGED_USER") {
+        toast.error(SUPER_ADMIN_DELETE_ONLY_MESSAGE);
+        return;
+      }
+      if (err instanceof Error && err.message === "PROTECTED_MANAGED_USER") {
+        toast.error("لا يمكن إلغاء ترقية هذا الحساب.");
+        return;
+      }
       toast.error("تعذر إلغاء الترقية");
       return;
     }
@@ -1216,16 +1276,18 @@ const StaffUsersPage = () => {
                     >
                       {u.isActive === false ? "تفعيل" : "إيقاف"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/65"
-                      onClick={() => handleRemove(u.id, u.username)}
-                    >
-                      <Trash2 className="h-4 w-4 ms-1 shrink-0 text-current" />
-                      حذف
-                    </Button>
+                    {isSuperAdmin ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/65"
+                        onClick={() => handleRemove(u.id, u.username)}
+                      >
+                        <Trash2 className="h-4 w-4 ms-1 shrink-0 text-current" />
+                        حذف
+                      </Button>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -1731,16 +1793,18 @@ const StaffUsersPage = () => {
                         إلغاء التقديم
                       </Button>
                     ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/65"
-                      onClick={() => handleDeletePublicUser(u.id)}
-                    >
-                      <Trash2 className="h-4 w-4 ms-1 shrink-0 text-current" />
-                      حذف
-                    </Button>
+                    {isSuperAdmin ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/65"
+                        onClick={() => handleDeletePublicUser(u.id)}
+                      >
+                        <Trash2 className="h-4 w-4 ms-1 shrink-0 text-current" />
+                        حذف
+                      </Button>
+                    ) : null}
                     </div>
                   </div>
                 </li>

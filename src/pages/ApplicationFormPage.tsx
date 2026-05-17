@@ -33,9 +33,12 @@ import {
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import {
   hasApprovedApplicationForRole,
-  isCitizenElectronicApplyComplete,
+  hasApprovedCitizenApplication,
+  hasPendingCitizenApplication,
+  isCitizenApplyFormBlocked,
 } from "@/lib/publicProfileEligibility";
 import { BadgeCheck, IdCard, Lock, ShieldAlert } from "lucide-react";
+import { OptionalNarrativeField } from "@/components/apply/OptionalNarrativeField";
 
 const TOTAL_STEPS = 10;
 /** نص جاهز للمستخدمين بدون سجل سابق أو بدون نبذة */
@@ -179,10 +182,18 @@ const ApplicationFormPage = () => {
     () => (publicUser.user ? publicUser.getProfile() : null),
     [publicUser],
   );
+  const citizenApplyApproved = useMemo(
+    () => !!profile && hasApprovedCitizenApplication(profile, applications),
+    [profile, applications],
+  );
+  const citizenApplyPending = useMemo(
+    () => !!profile && hasPendingCitizenApplication(profile, applications),
+    [profile, applications],
+  );
   const electronicApplyBlocked = useMemo(() => {
     if (!profile || !isDiscordUser) return false;
     if (effectiveRoleKey === "citizen") {
-      return isCitizenElectronicApplyComplete(profile, applications);
+      return isCitizenApplyFormBlocked(profile, applications);
     }
     return hasApprovedApplicationForRole(profile, applications, effectiveRoleKey);
   }, [profile, isDiscordUser, effectiveRoleKey, applications]);
@@ -210,11 +221,13 @@ const ApplicationFormPage = () => {
   }, [profile]);
   /** مدن أو سيرفرات RP لعب بها المستخدم سابقًا */
   const [previousCities, setPreviousCities] = useState("");
+  const [noPreviousCities, setNoPreviousCities] = useState(false);
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("");
   const [birthDay, setBirthDay] = useState("");
   const [country, setCountry] = useState(DEFAULT_ARAB_COUNTRY_CODE);
   const [experience, setExperience] = useState("");
+  const [noExperience, setNoExperience] = useState(false);
   const [lawsAccepted, setLawsAccepted] = useState(false);
   const [lawsDialogOpen, setLawsDialogOpen] = useState(false);
   /** نتيجة اختبار قراءة قوانين المدينة — تُرفق بالطلب وتظهر للأدمن */
@@ -335,29 +348,44 @@ const ApplicationFormPage = () => {
       toast.error("أدخل معرف الديسكورد");
       return false;
     }
-    if (!previousCities.trim()) {
-      toast.error("اذكر مدن أو سيرفرات سبق لك اللعب فيها، أو اكتب «لا يوجد»");
-      return false;
+    if (!noPreviousCities) {
+      if (!previousCities.trim()) {
+        toast.error("اختر «لدي سجل سابق» واذكر المدن أو السيرفرات، أو «لم يسبق لي ذلك»");
+        return false;
+      }
+      if (previousCities.trim().length < 3) {
+        toast.error("أضف تفاصيل أكثر عن تجاربك السابقة");
+        return false;
+      }
     }
-    if (previousCities.trim().length < 3) {
-      toast.error("أضف تفاصيل أكثر عن تجاربك السابقة");
-      return false;
-    }
-    if (!experience.trim()) {
-      toast.error("اكتب نبذة عن خبرتك ودوافع الانضمام، أو اضغط «لا يوجد»");
-      return false;
-    }
-    const exp = experience.trim();
-    if (exp !== NONE_PLACEHOLDER && exp.length < 20) {
-      toast.error("اجعل النبذة أوضح (20 حرفًا على الأقل)، أو اضغط «لا يوجد»");
-      return false;
+    if (!noExperience) {
+      if (!experience.trim()) {
+        toast.error("اكتب نبذة عن خبرتك ودوافع الانضمام، أو اختر «لا توجد خبرة سابقة»");
+        return false;
+      }
+      if (experience.trim().length < 20) {
+        toast.error("اجعل النبذة أوضح (20 حرفًا على الأقل)");
+        return false;
+      }
     }
     if (!lawsAccepted) {
       toast.error("يجب فتح «قراءة القوانين» والإقرار بالاطلاع قبل الإرسال");
       return false;
     }
     return true;
-  }, [firstName, lastName, gender, validateBirthComplete, country, discord, previousCities, experience, lawsAccepted]);
+  }, [
+    firstName,
+    lastName,
+    gender,
+    validateBirthComplete,
+    country,
+    discord,
+    noPreviousCities,
+    previousCities,
+    noExperience,
+    experience,
+    lawsAccepted,
+  ]);
 
   const validateStep = useCallback(
     (step: number) => {
@@ -395,8 +423,9 @@ const ApplicationFormPage = () => {
           }
           return true;
         case 7:
+          if (noPreviousCities) return true;
           if (!previousCities.trim()) {
-            toast.error("اذكر مدن أو سيرفرات لعبت بها، أو «لا يوجد»");
+            toast.error("اذكر مدن أو سيرفرات لعبت بها، أو اختر «لم يسبق لي ذلك»");
             return false;
           }
           if (previousCities.trim().length < 3) {
@@ -405,13 +434,13 @@ const ApplicationFormPage = () => {
           }
           return true;
         case 8: {
+          if (noExperience) return true;
           if (!experience.trim()) {
-            toast.error("اكتب نبذة عن خبرتك ودوافع الانضمام، أو اضغط «لا يوجد»");
+            toast.error("اكتب نبذة عن خبرتك ودوافع الانضمام، أو اختر «لا توجد خبرة سابقة»");
             return false;
           }
-          const exp = experience.trim();
-          if (exp !== NONE_PLACEHOLDER && exp.length < 20) {
-            toast.error("اجعل النبذة أوضح (20 حرفًا على الأقل)، أو اضغط «لا يوجد»");
+          if (experience.trim().length < 20) {
+            toast.error("اجعل النبذة أوضح (20 حرفًا على الأقل)");
             return false;
           }
           return true;
@@ -435,7 +464,9 @@ const ApplicationFormPage = () => {
       validateBirthComplete,
       country,
       discord,
+      noPreviousCities,
       previousCities,
+      noExperience,
       experience,
       lawsAccepted,
       validateAllFields,
@@ -451,8 +482,12 @@ const ApplicationFormPage = () => {
     const roleKey = targets[role] ? role : "citizen";
     if (profile && isDiscordUser) {
       if (roleKey === "citizen") {
-        if (isCitizenElectronicApplyComplete(profile, applications)) {
-          toast.error("تم قبولك أو تفعيل حسابك مسبقاً — لا حاجة لإرسال طلب جديد من هنا");
+        if (isCitizenApplyFormBlocked(profile, applications)) {
+          toast.error(
+            hasApprovedCitizenApplication(profile, applications)
+              ? "تم قبول تقديمك مسبقاً — لا حاجة لإرسال طلب جديد من هنا"
+              : "لديك طلب مواطن قيد المراجعة — انتظر قرار الإدارة",
+          );
           return;
         }
       } else if (hasApprovedApplicationForRole(profile, applications, roleKey)) {
@@ -464,6 +499,10 @@ const ApplicationFormPage = () => {
     finalSubmitStarted.current = true;
     setIsSubmitting(true);
     try {
+      const cityNameForProfile = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const birthForAge = parseBirthDateParts(birthYear, birthMonth, birthDay);
+      const ageYearsForProfile = birthForAge ? getFullYearsSinceBirth(birthForAge) : 0;
+
       const result = submitApplication({
         roleKey,
         targetTitle: target.title,
@@ -478,13 +517,17 @@ const ApplicationFormPage = () => {
           ageSummaryLine,
           countryCode: country,
           discord: discord.trim(),
-          previousCities: previousCities.trim(),
-          experience: experience.trim(),
+          previousCities: noPreviousCities ? NONE_PLACEHOLDER : previousCities.trim(),
+          experience: noExperience ? NONE_PLACEHOLDER : experience.trim(),
           lawsAccepted,
           lawsQuizResult: lawsQuizResult ?? undefined,
+          cityName: cityNameForProfile || undefined,
         },
       });
       if (result === "ok") {
+        if (cityNameForProfile && ageYearsForProfile >= 13) {
+          publicUser.updateProfile({ cityName: cityNameForProfile, age: ageYearsForProfile });
+        }
         setSubmitSuccess(true);
       } else {
         finalSubmitStarted.current = false;
@@ -518,7 +561,9 @@ const ApplicationFormPage = () => {
     ageSummaryLine,
     country,
     discord,
+    noPreviousCities,
     previousCities,
+    noExperience,
     experience,
     lawsAccepted,
     lawsQuizResult,
@@ -526,9 +571,10 @@ const ApplicationFormPage = () => {
     profile,
     isDiscordUser,
     applications,
-    publicUser.user?.id,
-    publicUser.user?.username,
-    publicUser.user?.displayName,
+    birthYear,
+    birthMonth,
+    birthDay,
+    publicUser,
   ]);
 
   const stepIntro = (n: number, title: string, hint: string) => (
@@ -544,6 +590,11 @@ const ApplicationFormPage = () => {
   const fieldWrap = (children: ReactNode) => (
     <div className="mx-auto w-full max-w-lg py-2">{children}</div>
   );
+
+  const previousCitiesReview = noPreviousCities
+    ? "لم يسبق لي اللعب في مدن أو سيرفرات أخرى"
+    : previousCities.trim() || "—";
+  const experienceReview = noExperience ? "لا توجد خبرة سابقة في الرول بلاي" : experience.trim() || "—";
 
   if (!roleVisible) {
     return <Navigate to="/" replace />;
@@ -664,14 +715,15 @@ const ApplicationFormPage = () => {
               </div>
               <div className="flex-1 space-y-2">
                 <p className="font-display text-[11px] font-semibold tracking-[0.32em] text-emerald-800/90">
-                  أنت مفعّل بالفعل
+                  {citizenApplyApproved ? "أنت مفعّل بالفعل" : "طلبك قيد المراجعة"}
                 </p>
                 <h1 className="font-display text-2xl font-bold text-emerald-950 md:text-3xl">
-                  لا حاجة لإعادة التقديم الإلكتروني
+                  {citizenApplyApproved ? "لا حاجة لإعادة التقديم الإلكتروني" : "تقديمك بانتظار الإدارة"}
                 </h1>
                 <p className="text-sm leading-relaxed text-emerald-900/85">
-                  تم قبول تقديمك لهذا المسار أو تفعيل حسابك على المدينة. استخدم البروفايل والتكت للمتابعة مع
-                  الإدارة.
+                  {citizenApplyApproved
+                    ? "تم قبول تقديمك كمواطن. استخدم البروفايل والتكت للمتابعة مع الإدارة."
+                    : "لديك طلب مواطن قيد المراجعة. بعد قرار الإدارة يمكنك المتابعة من البروفايل."}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2 sm:justify-start">
                   <Button
@@ -1072,37 +1124,23 @@ const ApplicationFormPage = () => {
               {stepIntro(
                 7,
                 "مدن أو سيرفرات سبق لك اللعب فيها",
-                "اذكر أسماء مدن أو سيرفرات الرول بلاي التي جربتها. إن لم يسبق لك، اكتب «لا يوجد».",
+                "اختر إن كان لديك سجل سابق في رول بلاي، أو أن هذه تجربتك الأولى.",
               )}
               {fieldWrap(
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Label htmlFor="previousCities" className="font-display text-xs text-primary">
-                      السجل السابق
-                    </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 shrink-0 border-primary/35 font-display text-xs"
-                      onClick={() => setPreviousCities(NONE_PLACEHOLDER)}
-                    >
-                      لا يوجد
-                    </Button>
-                  </div>
-                  <textarea
-                    id="previousCities"
-                    value={previousCities}
-                    onChange={(e) => setPreviousCities(e.target.value)}
-                    rows={5}
-                    placeholder="مثال: Infinite City، مدينة كذا، سيرفر كذا… أو: لا يوجد"
-                    className={cn(
-                      "mt-3 w-full resize-none border border-primary/30 bg-input px-3 py-3 text-sm text-foreground",
-                      "rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40",
-                    )}
-                    dir="rtl"
-                  />
-                </>,
+                <OptionalNarrativeField
+                  id="previousCities"
+                  fieldLabel="السجل السابق"
+                  value={previousCities}
+                  onChange={setPreviousCities}
+                  noneSelected={noPreviousCities}
+                  onNoneSelectedChange={setNoPreviousCities}
+                  fillOptionLabel="لدي سجل سابق"
+                  noneOptionLabel="لم يسبق لي ذلك"
+                  noneTitle="تجربتي الأولى في الرول بلاي"
+                  noneDescription="سجّلنا أنك لم تلعب في مدن أو سيرفرات أخرى من قبل — لا حاجة لكتابة أي شيء."
+                  placeholder="مثال: Infinite City، مدينة كذا، سيرفر كذا…"
+                  rows={5}
+                />,
               )}
             </Step>
 
@@ -1110,36 +1148,23 @@ const ApplicationFormPage = () => {
               {stepIntro(
                 8,
                 "نبذة عن الخبرة",
-                "لماذا تريد الانضمام؟ ما خلفيتك في الرول بلاي؟ يمكنك تعبئة النص أو الضغط على «لا يوجد» إن لم تكن لديك خبرة بعد.",
+                "شاركنا دوافع انضمامك وخلفيتك في الرول بلاي، أو اختر أنك مبتدئ بدون خبرة سابقة.",
               )}
               {fieldWrap(
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Label htmlFor="experience" className="font-display text-xs text-primary">
-                      النبذة
-                    </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 shrink-0 border-primary/35 font-display text-xs"
-                      onClick={() => setExperience(NONE_PLACEHOLDER)}
-                    >
-                      لا يوجد
-                    </Button>
-                  </div>
-                  <textarea
-                    id="experience"
-                    value={experience}
-                    onChange={(e) => setExperience(e.target.value)}
-                    rows={6}
-                    placeholder="اكتب نبذة مختصرة عن خبرتك ولماذا تريد الانضمام..."
-                    className={cn(
-                      "mt-3 w-full resize-none border border-primary/30 bg-input px-3 py-3 text-sm text-foreground",
-                      "rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40",
-                    )}
-                  />
-                </>,
+                <OptionalNarrativeField
+                  id="experience"
+                  fieldLabel="النبذة"
+                  value={experience}
+                  onChange={setExperience}
+                  noneSelected={noExperience}
+                  onNoneSelectedChange={setNoExperience}
+                  fillOptionLabel="أريد كتابة نبذة"
+                  noneOptionLabel="لا توجد خبرة سابقة"
+                  noneTitle="لا توجد خبرة سابقة بعد"
+                  noneDescription="سجّلنا أنك مبتدئ في الرول بلاي — يمكنك المتابعة دون كتابة نبذة."
+                  placeholder="لماذا تريد الانضمام؟ ما أدوارك أو تجاربك السابقة في الرول بلاي؟"
+                  rows={6}
+                />,
               )}
             </Step>
 
@@ -1193,11 +1218,11 @@ const ApplicationFormPage = () => {
               </div>
               <div className="mt-4 rounded-lg border border-primary/25 bg-background/50 p-4 text-right">
                 <span className="font-display text-[11px] tracking-wide text-primary">مدن / سيرفرات لعبت بها سابقًا</span>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{previousCities || "—"}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{previousCitiesReview}</p>
               </div>
               <div className="mt-4 rounded-lg border border-primary/25 bg-background/50 p-4 text-right">
                 <span className="font-display text-[11px] tracking-wide text-primary">نبذة الخبرة</span>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{experience || "—"}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{experienceReview}</p>
               </div>
               </Step>
             </Stepper>

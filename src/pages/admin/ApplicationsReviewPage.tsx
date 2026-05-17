@@ -21,8 +21,9 @@ import type {
   ApplicationStatus,
   LawsQuizResult,
 } from "@/data/publicApplicationTypes";
-import { institutionRosterStaffRoleForBranch } from "@/data/institutionBranches";
 import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
+import { canStaffReviewApplication } from "@/lib/applicationReviewAccess";
+import { STREAMER_APPLICATION_ROLE } from "@/lib/streamerApplication";
 import { getArabCountryLabel, isArabCountryCode } from "@/data/arabCountries";
 import { appendActivityLog } from "@/lib/activityLog";
 import { cn } from "@/lib/utils";
@@ -64,30 +65,25 @@ const ApplicationsReviewPage = () => {
   const [decisionNote, setDecisionNote] = useState("");
   const [search, setSearch] = useState("");
 
-  const canReviewApplication = (app: ApplicationRecord): boolean => {
-    if (isSuperAdmin || isApplicationReviewer) return true;
-    const roles = new Set(user?.roles ?? []);
-    if (app.roleKey === "ems") return roles.has(institutionRosterStaffRoleForBranch("health"));
-    if (app.roleKey === "police") return roles.has(institutionRosterStaffRoleForBranch("interior_police"));
-    if (app.roleKey === "interior_sheriff") return roles.has(institutionRosterStaffRoleForBranch("interior_sheriff"));
-    if (app.roleKey === "interior_cia") return roles.has(institutionRosterStaffRoleForBranch("interior_cia"));
-    if (app.roleKey === "interior_marines") return roles.has(institutionRosterStaffRoleForBranch("interior_marines"));
-    if (app.roleKey === "oversight") return roles.has(institutionRosterStaffRoleForBranch("oversight"));
-    if (app.roleKey === "lawyer" || app.roleKey === "justice") {
-      return roles.has(institutionRosterStaffRoleForBranch("justice_lawyers"));
-    }
-    if (app.roleKey === "developer") return roles.has(institutionRosterStaffRoleForBranch("developer"));
-    if (app.roleKey === "streamers") return roles.has("streamer_manager");
-    return false;
-  };
+  const reviewAccess = useMemo(
+    () => ({
+      isSuperAdmin: !!isSuperAdmin,
+      isApplicationReviewer: !!isApplicationReviewer,
+      userRoles: user?.roles ?? [],
+    }),
+    [isSuperAdmin, isApplicationReviewer, user?.roles],
+  );
+
+  const canReviewApplication = (app: ApplicationRecord): boolean =>
+    canStaffReviewApplication(app, reviewAccess);
 
   const sorted = useMemo(
     () =>
       [...applications]
-        .filter((a) => !isJobApplicationRoleKey(a.roleKey))
+        .filter((a) => !isJobApplicationRoleKey(a.roleKey) && a.roleKey !== STREAMER_APPLICATION_ROLE)
         .filter(canReviewApplication)
         .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
-    [applications, user?.roles, isSuperAdmin, isApplicationReviewer],
+    [applications, reviewAccess],
   );
 
   const filtered = useMemo(() => {
@@ -127,8 +123,8 @@ const ApplicationsReviewPage = () => {
           طلبات التقديم من الموقع
         </h1>
         <p className={adminPageDesc}>
-          طلبات نماذج الدخول للسيرفر (/apply) بما فيها تقديم صنّاع المحتوى — يراجعها «ستريمر منجر» أو المراجع العام.
-          طلبات التوظيف (/jobs) تظهر في صفحة طاقم كل مؤسسة من «طواقم المؤسسات».
+          طلبات دخول السيرفر (/apply) — تقديم صنّاع المحتوى من «ستريمر منجر → طلبات الستريمر».
+          طلبات التوظيف (/jobs) تظهر في طاقم كل مؤسسة.
         </p>
       </div>
 

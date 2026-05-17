@@ -26,6 +26,8 @@ import LawsEditorPage from "./pages/admin/LawsEditorPage.tsx";
 import StaffUsersPage from "./pages/admin/StaffUsersPage.tsx";
 import RoleGroupsPage from "./pages/admin/RoleGroupsPage.tsx";
 import StreamersEditorPage from "./pages/admin/StreamersEditorPage.tsx";
+import StreamersAdminShell from "./pages/admin/StreamersAdminShell.tsx";
+import StreamerApplicationsPage from "./pages/admin/StreamerApplicationsPage.tsx";
 import VipCarsEditorPage from "./pages/admin/VipCarsEditorPage.tsx";
 import HousesEditorPage from "./pages/admin/HousesEditorPage.tsx";
 import PackagesEditorPage from "./pages/admin/PackagesEditorPage.tsx";
@@ -40,6 +42,7 @@ import TicketsManagerPage from "./pages/admin/TicketsManagerPage.tsx";
 import FooterManagerPage from "./pages/admin/FooterManagerPage.tsx";
 import Index from "./pages/Index.tsx";
 import ApplicationFormPage from "./pages/ApplicationFormPage.tsx";
+import StreamerApplyPage from "./pages/StreamerApplyPage.tsx";
 import StreamersPage from "./pages/StreamersPage.tsx";
 import HealthPage from "./pages/HealthPage.tsx";
 import InteriorDepartmentPage from "./pages/InteriorDepartmentPage.tsx";
@@ -93,6 +96,7 @@ const AppRoutes = () => {
       </AnimatePresence>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/apply/streamers" element={<StreamerApplyPage />} />
         <Route path="/apply/:role" element={<ApplicationFormPage />} />
         <Route path="/streamers" element={<StreamersPage />} />
         <Route path="/health" element={<HealthPage />} />
@@ -147,7 +151,14 @@ const AppRoutes = () => {
           }
         >
           <Route index element={<DashboardGate />} />
-          <Route path="users" element={<StaffUsersPage />} />
+          <Route
+            path="users"
+            element={
+              <RequireStaffAuth allowRoles={["super_admin"]}>
+                <StaffUsersPage />
+              </RequireStaffAuth>
+            }
+          />
           <Route
             path="role-groups"
             element={
@@ -176,10 +187,13 @@ const AppRoutes = () => {
             path="streamers"
             element={
               <RequireStaffAuth allowRoles={["super_admin", "streamer_manager"]}>
-                <StreamersEditorPage />
+                <StreamersAdminShell />
               </RequireStaffAuth>
             }
-          />
+          >
+            <Route index element={<StreamersEditorPage />} />
+            <Route path="applications" element={<StreamerApplicationsPage />} />
+          </Route>
           <Route
             path="gangs"
             element={

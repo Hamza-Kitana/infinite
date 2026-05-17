@@ -9,6 +9,12 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { evictSecondaryLocalData, isLocalStorageQuotaError } from "@/lib/localStorageQuota";
+import { canDeleteManagedStaffTarget } from "@/lib/staffUserDeletePolicy";
+
+export type RemoveManagedUserOptions = {
+  /** يجب أن يكون المُنفِّذ سوبر أدمن — يُفرض على مستوى التخزين */
+  actorIsSuperAdmin: boolean;
+};
 
 export type BaseManagedStaffRole =
   | "laws_editor"
@@ -182,9 +188,19 @@ export function addManagedUser(input: Omit<ManagedUser, "id">): ManagedUser {
   return next;
 }
 
-export function removeManagedUser(id: string) {
-  const users = loadManagedUsers().filter((u) => u.id !== id);
-  saveManagedUsers(users);
+export function removeManagedUser(id: string, options: RemoveManagedUserOptions) {
+  if (!options.actorIsSuperAdmin) {
+    throw new Error("FORBIDDEN_DELETE_MANAGED_USER");
+  }
+  const users = loadManagedUsers();
+  const target = users.find((u) => u.id === id);
+  if (target) {
+    const guard = canDeleteManagedStaffTarget(target);
+    if (!guard.ok) {
+      throw new Error("PROTECTED_MANAGED_USER");
+    }
+  }
+  saveManagedUsers(users.filter((u) => u.id !== id));
 }
 
 export function updateManagedUser(id: string, patch: Partial<Pick<ManagedUser, "username" | "password" | "roles" | "isActive">>) {

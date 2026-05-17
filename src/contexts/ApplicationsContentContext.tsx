@@ -97,12 +97,17 @@ function clampSnapshot(s: ApplicationFormSnapshot): ApplicationFormSnapshot {
       ? clampText(s.avatarDataUrl, MAX_AVATAR_DATA_URL_LEN)
       : undefined,
     discordId: s.discordId ? clampText(s.discordId, 64) : undefined,
+    streamUrl: s.streamUrl ? clampText(s.streamUrl, 500) : undefined,
+    streamerCardRole: s.streamerCardRole ? clampText(s.streamerCardRole, 120) : undefined,
   };
 }
+
+export const PUBLIC_APPLICATIONS_CHANGED_EVENT = "ic-public-applications-changed";
 
 function writeApplicationsOrThrow(list: ApplicationRecord[]) {
   const data: Persisted = { v: 1, applications: list };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.dispatchEvent(new CustomEvent(PUBLIC_APPLICATIONS_CHANGED_EVENT));
 }
 
 function isQuotaError(e: unknown): boolean {

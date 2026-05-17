@@ -67,7 +67,29 @@ export function hasApprovedCitizenApplication(
   );
 }
 
-/** تم قبول تقديم دخول السيرفر كمواطن أو اكتمال تفعيل بيانات المدينة — لا حاجة لإعادة نموذج المواطن */
+/** طلب مواطن قيد المراجعة لنفس الحساب */
+export function hasPendingCitizenApplication(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): boolean {
+  if (!profile) return false;
+  return applications.some(
+    (a) => a.status === "pending" && a.roleKey === "citizen" && applicationMatchesPublicUser(a, profile),
+  );
+}
+
+/**
+ * يُمنع فتح نموذج تقديم المواطن (ديسكورد) — طلب مقبول أو قيد المراجعة فقط.
+ * إكمال البروفايل وحده لا يكفي؛ بعد «إلغاء التقديم» من الإدارة يعود النموذج واختبار القوانين.
+ */
+export function isCitizenApplyFormBlocked(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): boolean {
+  return hasApprovedCitizenApplication(profile, applications) || hasPendingCitizenApplication(profile, applications);
+}
+
+/** تم قبول تقديم دخول السيرفر كمواطن أو اكتمال تفعيل بيانات المدينة — للتكتات واختصارات البروفايل */
 export function isCitizenElectronicApplyComplete(
   profile: PublicUserProfile | null,
   applications: ApplicationRecord[],
@@ -94,4 +116,17 @@ export function isPublicTicketsUnlocked(
   applications: ApplicationRecord[],
 ): boolean {
   return isPublicCityProfileActivated(profile) || hasApprovedCitizenApplication(profile, applications);
+}
+
+/** يُعرض عند منع التقديم على الوظائف قبل تفعيل دخول السيرفر */
+export const MSG_JOBS_NEED_SERVER_ACTIVATION =
+  "التقديم على الوظائف متاح فقط بعد تفعيل دخول السيرفر — أكمل التقديم الإلكتروني للمواطن وانتظر قبول الإدارة.";
+
+/** هل يحق للمستخدم التقديم على الوظائف (تقديم مواطن مقبول لنفس الحساب) */
+export function canApplyForPublicJobs(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): boolean {
+  if (!profile || profile.authProvider !== "discord") return false;
+  return hasApprovedCitizenApplication(profile, applications);
 }
