@@ -45,8 +45,8 @@ import {
 import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import {
-  hasApprovedStreamerApplication,
-  hasPendingStreamerApplication,
+  getLatestStreamerApplicationForProfile,
+  getStreamerApplicationUiStatus,
   STREAMER_MANAGER_DEFAULT_ROLE,
 } from "@/lib/streamerApplication";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
@@ -106,8 +106,8 @@ const ProfilePage = () => {
   const citizenElectronicApplyDone =
     profile?.authProvider === "discord" && hasApprovedCitizenApplication(profile, applications);
 
-  const streamerApplyApproved = hasApprovedStreamerApplication(profile, applications);
-  const streamerApplyPending = hasPendingStreamerApplication(profile, applications);
+  const streamerUiStatus = getStreamerApplicationUiStatus(profile, applications);
+  const latestStreamerApplication = getLatestStreamerApplicationForProfile(profile, applications);
   const myStreamerCard = useMemo(() => {
     if (!user?.id) return null;
     return streamerCards.find((c) => c.linkedUserId === user.id && !c.hidden) ?? null;
@@ -577,7 +577,7 @@ const ProfilePage = () => {
             </Link>
 
             {visibility.pages.streamers ? (
-              streamerApplyApproved ? (
+              streamerUiStatus === "approved" ? (
                 <div className="relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-fuchsia-200/90 bg-gradient-to-l from-fuchsia-50 via-white to-violet-50 px-4 py-4 text-right text-fuchsia-950 shadow-[0_18px_44px_-22px_rgba(192,38,211,0.3)] sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
                   <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-100 text-fuchsia-700 ring-1 ring-fuchsia-200/80 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
                     <CheckCircle2 className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
@@ -595,18 +595,43 @@ const ProfilePage = () => {
                     </Link>
                   </div>
                 </div>
-              ) : streamerApplyPending ? (
+              ) : streamerUiStatus === "pending" ? (
                 <div className="relative flex min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-3xl border border-amber-200/90 bg-gradient-to-l from-amber-50 to-orange-50/80 px-4 py-4 text-right text-amber-950 sm:gap-4 sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
                   <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
                     <Video className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
                   </span>
                   <div className="relative min-w-0 flex-1">
-                    <p className="font-display text-[10px] tracking-[0.32em] text-amber-800/90">قيد المراجعة</p>
+                    <p className="font-display text-[10px] tracking-[0.32em] text-amber-800/90">STREAMER · قيد المراجعة</p>
                     <p className="mt-1 font-display text-xl font-bold leading-tight">طلب صانع المحتوى</p>
                     <p className="mt-1 text-[13px] leading-snug text-amber-900/85 sm:text-sm">
-                      يراجعه ستريمر منجر — عند القبول تُضاف بطاقتك تلقائياً.
+                      يراجعه ستريمر منجر — عند القبول تظهر بطاقتك هنا وعلى صفحة صنّاع المحتوى.
                     </p>
                   </div>
+                </div>
+              ) : streamerUiStatus === "rejected" ? (
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 overflow-hidden rounded-3xl border border-rose-200/90 bg-gradient-to-l from-rose-50 via-white to-orange-50/60 px-4 py-4 text-right text-rose-950 shadow-[0_18px_44px_-22px_rgba(244,63,94,0.25)] sm:px-5 sm:py-5 md:min-w-[calc(50%-0.625rem)] lg:min-w-0 lg:px-4 lg:py-4 xl:px-5 xl:py-5">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200/80 sm:h-14 sm:w-14 lg:h-12 lg:w-12 xl:h-14 xl:w-14">
+                      <XCircle className="h-6 w-6 sm:h-7 sm:w-7 xl:h-8 xl:w-8" />
+                    </span>
+                    <div className="relative min-w-0 flex-1">
+                      <p className="font-display text-[10px] tracking-[0.32em] text-rose-700/90">STREAMER · مرفوض</p>
+                      <p className="mt-1 font-display text-lg font-bold leading-tight sm:text-xl lg:text-base xl:text-lg">
+                        لم يُقبل طلبك
+                      </p>
+                      <p className="mt-1 text-[13px] leading-snug text-rose-900/85 sm:text-sm">
+                        {latestStreamerApplication?.note?.trim()
+                          ? latestStreamerApplication.note.trim()
+                          : "يمكنك تقديم طلب جديد بعد مراجعة المتطلبات."}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/apply/streamers"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 px-4 text-sm font-semibold text-white shadow-md transition-all hover:brightness-110 sm:w-auto sm:min-w-[12rem] sm:self-end"
+                  >
+                    التقديم مرة أخرى
+                  </Link>
                 </div>
               ) : (
                 <Link

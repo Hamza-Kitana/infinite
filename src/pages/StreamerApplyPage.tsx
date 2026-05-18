@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { CheckCircle2, ImagePlus, Radio, Video } from "lucide-react";
+import { CheckCircle2, ImagePlus, Radio, Video, XCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,8 @@ import { DiscordIcon } from "@/components/DiscordIcon";
 import { usePublicUser } from "@/contexts/PublicUserContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import {
-  hasApprovedStreamerApplication,
-  hasPendingStreamerApplication,
+  getLatestStreamerApplicationForProfile,
+  getStreamerApplicationUiStatus,
   isStreamerApplyFormBlocked,
   isValidStreamUrl,
   normalizeStreamUrl,
@@ -56,9 +56,12 @@ const StreamerApplyPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const streamerUiStatus = getStreamerApplicationUiStatus(profile, applications);
+  const latestStreamerApplication = getLatestStreamerApplicationForProfile(profile, applications);
   const applyBlocked = isStreamerApplyFormBlocked(profile, applications);
-  const applyPending = hasPendingStreamerApplication(profile, applications);
-  const applyApproved = hasApprovedStreamerApplication(profile, applications);
+  const applyPending = streamerUiStatus === "pending";
+  const applyApproved = streamerUiStatus === "approved";
+  const applyRejected = streamerUiStatus === "rejected";
 
   const onPickLogo = useCallback(async (file: File | null | undefined) => {
     if (!file) return;
@@ -260,11 +263,39 @@ const StreamerApplyPage = () => {
               </motion.div>
             </motion.div>
           ) : (
-            <Card className="overflow-hidden border-violet-200/90 bg-white/95 text-slate-900 shadow-[0_24px_60px_-28px_rgba(54,22,79,0.35)] backdrop-blur-sm">
+            <>
+              {applyRejected ? (
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="overflow-hidden rounded-3xl border border-rose-200/90 bg-gradient-to-l from-rose-50 via-white to-orange-50/70 px-5 py-5 text-right shadow-[0_18px_44px_-22px_rgba(244,63,94,0.28)] sm:px-6"
+                >
+                  <div className="flex items-start justify-end gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-[10px] tracking-[0.32em] text-rose-700/90">
+                        {"\u0637\u0644\u0628 \u0633\u0627\u0628\u0642 \u0645\u0631\u0641\u0648\u0636"}
+                      </p>
+                      <p className="mt-1 flex items-center justify-end gap-2 font-display text-xl font-bold text-rose-950">
+                        <XCircle className="h-5 w-5 shrink-0" />
+                        {"\u0644\u0645 \u064a\u064f\u0642\u0628\u0644 \u0637\u0644\u0628\u0643"}
+                      </p>
+                      <p className="mt-2 text-sm leading-relaxed text-rose-900/85">
+                        {latestStreamerApplication?.note?.trim()
+                          ? latestStreamerApplication.note.trim()
+                          : "\u064a\u0645\u0643\u0646\u0643 \u0625\u0631\u0633\u0627\u0644 \u0637\u0644\u0628 \u062c\u062f\u064a\u062f \u0623\u062f\u0646\u0627\u0647 \u0628\u0639\u062f \u0645\u0631\u0627\u062c\u0639\u0629 \u0627\u0644\u0645\u062a\u0637\u0644\u0628\u0627\u062a."}
+                      </p>
+                    </div>
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200/80">
+                      <XCircle className="h-7 w-7" />
+                    </span>
+                  </div>
+                </motion.div>
+              ) : null}
+              <Card className="overflow-hidden border-violet-200/90 bg-white/95 text-slate-900 shadow-[0_24px_60px_-28px_rgba(54,22,79,0.35)] backdrop-blur-sm">
               <CardHeader className="border-b border-violet-100/90 bg-gradient-to-l from-violet-50/90 to-white pb-6 text-right">
                 <CardTitle className="flex items-center justify-end gap-2 font-display text-xl text-slate-900">
                   <Video className="h-5 w-5 text-violet-600" />
-                  {"\u0646\u0645\u0648\u0630\u062c \u0627\u0644\u062a\u0642\u062f\u064a\u0645"}
+                  {applyRejected ? "\u062a\u0642\u062f\u064a\u0645 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649" : "\u0646\u0645\u0648\u0630\u062c \u0627\u0644\u062a\u0642\u062f\u064a\u0645"}
                 </CardTitle>
                 <CardDescription className="mt-1 text-pretty text-slate-600">
                   {"\u0627\u0633\u062a\u062e\u062f\u0645 \u00ab\u0627\u0633\u0645 \u0627\u0644\u0639\u0631\u0636 \u0639\u0644\u0649 \u0627\u0644\u0628\u0637\u0627\u0642\u0629\u00bb \u0648\u0644\u064a\u0633 "}
@@ -378,6 +409,7 @@ const StreamerApplyPage = () => {
                 </Button>
               </CardContent>
             </Card>
+            </>
           )}
         </main>
         <Footer forceLight />

@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   Menu,
   X,
@@ -60,6 +60,8 @@ const Navbar = () => {
   const [staffUser, setStaffUser] = useState("");
   const [staffPass, setStaffPass] = useState("");
   const [staffLoginVisible, setStaffLoginVisible] = useState(false);
+  const staffUserRef = useRef<HTMLInputElement>(null);
+  const staffPassRef = useRef<HTMLInputElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [institutionsOpen, setInstitutionsOpen] = useState(false);
@@ -695,8 +697,16 @@ const Navbar = () => {
             <Button
               type="button"
               variant="outline"
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border-violet-300 bg-white text-sm font-semibold text-violet-900 shadow-sm hover:bg-violet-50"
-              onClick={() => setStaffLoginVisible((v) => !v)}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border-violet-300 bg-white text-sm font-semibold text-violet-900 shadow-sm hover:border-violet-400 hover:bg-violet-100 hover:text-violet-950 focus-visible:ring-violet-300"
+              onClick={() => {
+                setStaffLoginVisible((v) => {
+                  const next = !v;
+                  if (next) {
+                    requestAnimationFrame(() => staffUserRef.current?.focus());
+                  }
+                  return next;
+                });
+              }}
               aria-expanded={staffLoginVisible}
             >
               <Shield className="h-4 w-4 shrink-0 opacity-90" />
@@ -704,11 +714,12 @@ const Navbar = () => {
               <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${staffLoginVisible ? "rotate-180" : ""}`} />
             </Button>
 
-            {staffLoginVisible ? (
-              <form
-                noValidate
-                className="space-y-4 border-t border-violet-200/90 pt-4"
-                onSubmit={(e: FormEvent) => {
+            <form
+              noValidate
+              hidden={!staffLoginVisible}
+              aria-hidden={!staffLoginVisible}
+              className="space-y-4 border-t border-violet-200/90 pt-4"
+              onSubmit={(e: FormEvent) => {
                   e.preventDefault();
                   try {
                     const session = login(staffUser, staffPass);
@@ -738,10 +749,19 @@ const Navbar = () => {
                     اسم المستخدم
                   </Label>
                   <Input
+                    ref={staffUserRef}
                     id="staff-user"
+                    name="username"
                     autoComplete="username"
+                    tabIndex={staffLoginVisible ? 0 : -1}
                     value={staffUser}
                     onChange={(ev) => setStaffUser(ev.target.value)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Tab" && !ev.shiftKey) {
+                        ev.preventDefault();
+                        staffPassRef.current?.focus();
+                      }
+                    }}
                     placeholder="اسم المستخدم"
                     className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
                   />
@@ -751,11 +771,20 @@ const Navbar = () => {
                     كلمة المرور
                   </Label>
                   <Input
+                    ref={staffPassRef}
                     id="staff-pass"
+                    name="password"
                     type="password"
                     autoComplete="current-password"
+                    tabIndex={staffLoginVisible ? 0 : -1}
                     value={staffPass}
                     onChange={(ev) => setStaffPass(ev.target.value)}
+                    onKeyDown={(ev) => {
+                      if (ev.key === "Tab" && ev.shiftKey) {
+                        ev.preventDefault();
+                        staffUserRef.current?.focus();
+                      }
+                    }}
                     placeholder="كلمة المرور"
                     className="h-11 rounded-xl border-violet-200 bg-white text-right text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus-visible:border-violet-400 focus-visible:ring-violet-200"
                   />
@@ -769,7 +798,6 @@ const Navbar = () => {
                 </Button>
                 <p className="text-center text-[11px] text-slate-500">لا يُستخدم هذا القسم لتسجيل اللاعبين.</p>
               </form>
-            ) : null}
           </div>
         </DialogContent>
       </Dialog>

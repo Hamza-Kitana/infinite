@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, HelpCircle, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -14,24 +14,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import type { QuizQuestion } from "@/data/lawsQuiz";
 import { appendActivityLog } from "@/lib/activityLog";
 import {
-  QUIZ_CONTEXTS,
   saveQuizQuestions,
   loadQuizQuestions,
   LAWS_QUIZ_CONTENT_CHANGED_EVENT,
   LAWS_QUIZ_STORAGE_KEY,
-  type QuizContextKey,
 } from "@/lib/lawsQuizContent";
 import {
   cleanQuestions,
@@ -48,17 +39,21 @@ type QuestionDialogState = {
   draft: QuizQuestion;
 };
 
+/** أسئلة تقديم المواطن فقط — اختبارات الوظائف تُدار من محرر كل مؤسسة */
+const CITIZEN_QUIZ_KEY = "citizen" as const;
+
 const QuizManagerPage = () => {
   const { user } = useAuth();
-  const [activeKey, setActiveKey] = useState<QuizContextKey>("citizen");
-  const [draft, setDraft] = useState<QuizQuestion[]>(() => cloneQuizQuestions(loadQuizQuestions("citizen")));
+  const [draft, setDraft] = useState<QuizQuestion[]>(() =>
+    cloneQuizQuestions(loadQuizQuestions(CITIZEN_QUIZ_KEY)),
+  );
   const [questionDialog, setQuestionDialog] = useState<QuestionDialogState | null>(null);
   /** يمنع إعادة تحميل المسودة من التخزين فور حفظنا — كان يمحو السؤال الجديد قبل ظهوره */
   const skipHydrateRef = useRef(false);
 
   const hydrateFromStorage = useCallback(() => {
-    setDraft(cloneQuizQuestions(loadQuizQuestions(activeKey)));
-  }, [activeKey]);
+    setDraft(cloneQuizQuestions(loadQuizQuestions(CITIZEN_QUIZ_KEY)));
+  }, []);
 
   useEffect(() => {
     hydrateFromStorage();
@@ -83,11 +78,6 @@ const QuizManagerPage = () => {
     };
   }, [hydrateFromStorage]);
 
-  const activeMeta = useMemo(
-    () => QUIZ_CONTEXTS.find((ctx) => ctx.key === activeKey) ?? QUIZ_CONTEXTS[0],
-    [activeKey],
-  );
-
   const openAddDialog = () => {
     setQuestionDialog({ mode: "add", draft: makeQuizQuestion() });
   };
@@ -98,9 +88,9 @@ const QuizManagerPage = () => {
 
   const persistDraftNow = useCallback((next: QuizQuestion[]) => {
     skipHydrateRef.current = true;
-    saveQuizQuestions(activeKey, next);
+    saveQuizQuestions(CITIZEN_QUIZ_KEY, next);
     return true;
-  }, [activeKey]);
+  }, []);
 
   const patchDialogQuestion = (patch: Partial<QuizQuestion>) => {
     setQuestionDialog((prev) => (prev ? { ...prev, draft: { ...prev.draft, ...patch } } : null));
@@ -163,8 +153,12 @@ const QuizManagerPage = () => {
     const cleaned = cleanQuestions(draft);
     if (!cleaned) return;
     skipHydrateRef.current = true;
-    saveQuizQuestions(activeKey, cleaned);
-    appendActivityLog(user?.username ?? "admin", "تعديل أسئلة الاختبار", `${activeMeta.label} — ${cleaned.length} سؤال`);
+    saveQuizQuestions(CITIZEN_QUIZ_KEY, cleaned);
+    appendActivityLog(
+      user?.username ?? "admin",
+      "تعديل أسئلة الاختبار",
+      `تقديم المواطن — ${cleaned.length} سؤال`,
+    );
     toast.success("تم حفظ الأسئلة");
   };
 
@@ -183,7 +177,8 @@ const QuizManagerPage = () => {
                 إدارة أسئلة التقديم الإلكتروني
               </CardTitle>
               <CardDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                أضف الأسئلة عبر النافذة، حدّد الخيارات والإجابة الصحيحة، ثم احفظ التغييرات لتظهر في اختبار القوانين.
+                أسئلة اختبار قوانين المدينة في نموذج تقديم المواطن (/apply/citizen). اختبارات التوظيف لكل مؤسسة
+                تُعدّل من محرر المؤسسة → إدارة القوانين والأسئلة.
               </CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -198,22 +193,6 @@ const QuizManagerPage = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Label className="mb-2 block text-right text-slate-800 dark:text-slate-200">اختبار الجهة</Label>
-          <Select value={activeKey} onValueChange={(v) => setActiveKey(v as QuizContextKey)}>
-            <SelectTrigger className="max-w-xl bg-white text-right dark:bg-slate-950 dark:text-slate-100">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent dir="rtl" className="max-h-80">
-              {QUIZ_CONTEXTS.map((ctx) => (
-                <SelectItem key={ctx.key} value={ctx.key}>
-                  {ctx.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="mt-2 text-right text-xs text-slate-500 dark:text-slate-400">{activeMeta.description}</p>
-        </CardContent>
       </Card>
 
       <div className="flex justify-end">

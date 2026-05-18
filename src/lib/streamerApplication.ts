@@ -25,40 +25,67 @@ export function isStreamerApplication(app: ApplicationRecord): boolean {
   return app.roleKey === STREAMER_APPLICATION_ROLE;
 }
 
+/** طلبات صانع المحتوى لهذا الحساب — الأحدث أولاً */
+export function streamerApplicationsForProfile(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): ApplicationRecord[] {
+  if (!profile) return [];
+  return applications
+    .filter((a) => isStreamerApplication(a) && applicationBelongsToPublicProfile(a, profile))
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+}
+
+/** آخر طلب صانع محتوى — يحدّد ما يظهر في البروفايل */
+export function getLatestStreamerApplicationForProfile(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): ApplicationRecord | null {
+  return streamerApplicationsForProfile(profile, applications)[0] ?? null;
+}
+
+export type StreamerApplicationUiStatus = "none" | "pending" | "approved" | "rejected";
+
+/** حالة واجهة البروفايل حسب آخر طلب (وليس أي طلب قديم) */
+export function getStreamerApplicationUiStatus(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): StreamerApplicationUiStatus {
+  const latest = getLatestStreamerApplicationForProfile(profile, applications);
+  if (!latest) return "none";
+  if (latest.status === "pending") return "pending";
+  if (latest.status === "approved") return "approved";
+  if (latest.status === "rejected") return "rejected";
+  return "none";
+}
+
 export function hasPendingStreamerApplication(
   profile: PublicUserProfile | null,
   applications: ApplicationRecord[],
 ): boolean {
-  if (!profile) return false;
-  return applications.some(
-    (a) =>
-      a.status === "pending" &&
-      isStreamerApplication(a) &&
-      applicationBelongsToPublicProfile(a, profile),
-  );
+  return getStreamerApplicationUiStatus(profile, applications) === "pending";
 }
 
 export function hasApprovedStreamerApplication(
   profile: PublicUserProfile | null,
   applications: ApplicationRecord[],
 ): boolean {
-  if (!profile) return false;
-  return applications.some(
-    (a) =>
-      a.status === "approved" &&
-      isStreamerApplication(a) &&
-      applicationBelongsToPublicProfile(a, profile),
-  );
+  return getStreamerApplicationUiStatus(profile, applications) === "approved";
+}
+
+export function hasRejectedStreamerApplication(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): boolean {
+  return getStreamerApplicationUiStatus(profile, applications) === "rejected";
 }
 
 export function isStreamerApplyFormBlocked(
   profile: PublicUserProfile | null,
   applications: ApplicationRecord[],
 ): boolean {
-  return (
-    hasApprovedStreamerApplication(profile, applications) ||
-    hasPendingStreamerApplication(profile, applications)
-  );
+  const status = getStreamerApplicationUiStatus(profile, applications);
+  return status === "pending" || status === "approved";
 }
 
 export function countPendingStreamerApplications(applications: ApplicationRecord[]): number {
