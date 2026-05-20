@@ -178,6 +178,68 @@ export const ciaDepartmentRoster: InstitutionRosterData = {
   ],
 };
 
+/** قيادة وزارة الداخلية — صفحة المركز /interior */
+export const interiorMinistryHubRoster: InstitutionRosterData = {
+  leader: {
+    name: "الوزير كايدن",
+    title: "وزير الداخلية",
+    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=500&q=80",
+    tagline: "الإشراف على أذرع الوزارة: الشرطة، الشيرف، الاستخبارات، المارينز، وFPI.",
+    bio: "يمثل القيادة السياسية والتنظيمية لوزارة الداخلية، ويوجّه التوازن بين الأجهزة الأمنية ويُقرّر فتح الملفات الحساسة بين الفروع.",
+    highlights: [
+      "اعتماد السياسات العامة وتنسيق الأزمات الكبرى بين الأذرع.",
+      "متابعة التعيينات القيادية ومعايير الانضباط المؤسسي.",
+    ],
+  },
+  deputy: {
+    name: "نائب الوزير لينا",
+    title: "نائب وزير الداخلية",
+    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=500&q=80",
+    tagline: "تنسيق العمليات المشتركة وغرف التنسيق بين LSPD والشيرف وFPI.",
+    bio: "تدير اجتماعات القيادة الأسبوعية، وتتابع تنفيذ قرارات الوزير، وتضمن تواصل الأذرع الخمسة في الملفات العابرة للحدود.",
+    highlights: [
+      "ربط غرف العمليات بين الشرطة وFPI في التحقيقات المعقّدة.",
+      "متابعة مؤشرات الأداء والبلاغات الحرجة على مستوى الوزارة.",
+    ],
+  },
+  members: [
+    { image: face(40), title: "مستشار أمني", subtitle: "تنسيق سياسات — داخلي", borderColor: "#38BDF8", gradient: g("#1E3A8A")(170) },
+    { image: face(48), title: "منسق أزمات", subtitle: "غرفة تنسيق وزارية", borderColor: "#67E8F9", gradient: g("#0C4A6E")(160) },
+  ],
+};
+
+/** فرع FPI — التحقيق الفدرالي / الوحدة التحقيقية */
+export const fpiDepartmentRoster: InstitutionRosterData = {
+  leader: {
+    name: "العميد فانكس",
+    title: "قائد FPI",
+    image: "https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=500&q=80",
+    tagline: "التحقيقات الفدرالية، الملفات المعقّدة، والتنسيق مع الادعاء والشرطة.",
+    bio: "يقود وحدة FPI في متابعة الجرائم المنظمة، الاحتيال، والقضايا العابرة للأجهزة، مع صلاحيات تحقيق موسّعة ضمن إطار الوزارة.",
+    highlights: [
+      "اعتماد بروتوكولات التحقيق والأدلة الجنائية.",
+      "التنسيق مع LSPD والشيرف في القضايا المشتركة.",
+      "إدارة فرق الاختصاص والتحليل الجنائي.",
+    ],
+  },
+  deputy: {
+    name: "الرائد ساين",
+    title: "نائب قائد FPI",
+    image: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=500&q=80",
+    tagline: "غرفة التحقيقات، إدارة الوكلاء الميدانيين، ومتابعة الملفات المفتوحة.",
+    bio: "يدعم القائد في توزيع القضايا، مراجعة التقارير الاستخباراتية، وضمان التزام الفرق بمعايير السرية والإجراء.",
+    highlights: [
+      "متابعة سلسلة الحراسة للأدلة والشهود.",
+      "تفعيل فرق الاستجابة السريعة للتحقيق.",
+    ],
+  },
+  members: [
+    { image: face(22), title: "الوكيل فولت", subtitle: "تحقيق ميداني — قضايا كبرى", borderColor: "#A78BFA", gradient: g("#5B21B6")(175) },
+    { image: face(33), title: "المحققة نوفا", subtitle: "تحليل أدلة وجنائي", borderColor: "#C4B5FD", gradient: g("#6D28D9")(165) },
+    { image: face(44), title: "الوكيل غراي", subtitle: "تنسيق مع الادعاء", borderColor: "#8B5CF6", gradient: g("#4C1D95")(155) },
+  ],
+};
+
 /** فرع المارينز */
 export const marinesDepartmentRoster: InstitutionRosterData = {
   leader: {

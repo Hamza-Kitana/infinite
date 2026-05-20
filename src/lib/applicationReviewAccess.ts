@@ -26,6 +26,7 @@ export function canStaffReviewApplication(
   if (app.roleKey === "interior_sheriff") return roles.has(institutionRosterStaffRoleForBranch("interior_sheriff"));
   if (app.roleKey === "interior_cia") return roles.has(institutionRosterStaffRoleForBranch("interior_cia"));
   if (app.roleKey === "interior_marines") return roles.has(institutionRosterStaffRoleForBranch("interior_marines"));
+  if (app.roleKey === "interior_fpi") return roles.has(institutionRosterStaffRoleForBranch("interior_fpi"));
   if (app.roleKey === "oversight") return roles.has(institutionRosterStaffRoleForBranch("oversight"));
   if (app.roleKey === "lawyer" || app.roleKey === "justice") {
     return roles.has(institutionRosterStaffRoleForBranch("justice_lawyers"));

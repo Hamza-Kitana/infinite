@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   DndContext,
@@ -44,7 +44,11 @@ import {
   type AboutPageContent,
   type AboutPillar,
 } from "@/lib/aboutPageContent";
+import { listenStorageSync } from "@/lib/storageSync";
 import { adminInput } from "@/lib/adminUi";
+
+const ABOUT_PAGE_STORAGE_KEY = "ic_about_page_content_v1";
+const ABOUT_PAGE_CHANGED_EVENT = "ic-about-page-content";
 
 const inputClassName = adminInput;
 const textareaClassName = cn(adminInput, "min-h-[96px]");
@@ -140,6 +144,18 @@ const AboutManagerPage = () => {
   );
 
   const isDirty = JSON.stringify(draft) !== JSON.stringify(savedSnapshot);
+
+  useEffect(() => {
+    return listenStorageSync(
+      ABOUT_PAGE_STORAGE_KEY,
+      () => {
+        const fresh = loadAboutPageContent();
+        setDraft(fresh);
+        setSavedSnapshot(fresh);
+      },
+      [ABOUT_PAGE_CHANGED_EVENT],
+    );
+  }, []);
 
   const setField = <K extends keyof AboutPageContent>(key: K, value: AboutPageContent[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));

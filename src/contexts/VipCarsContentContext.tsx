@@ -9,6 +9,7 @@ import {
 } from "react";
 import { defaultVipCarsPersisted, type VipCarsPersisted } from "@/data/vipCarsDefaultState";
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const STORAGE_KEY = "ic_vip_cars_v1";
 
@@ -27,7 +28,7 @@ function loadPersisted(): VipCarsPersisted {
 }
 
 function savePersisted(data: VipCarsPersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data));
 }
 
 type VipCarsContentValue = {
@@ -45,17 +46,7 @@ export function VipCarsContentProvider({ children }: { children: ReactNode }) {
   const [persisted, setPersisted] = useState<VipCarsPersisted>(() => loadPersisted());
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        const p = JSON.parse(e.newValue) as VipCarsPersisted;
-        if (p.v === 1 && Array.isArray(p.cars)) setPersisted(p);
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return listenStorageSync(STORAGE_KEY, () => setPersisted(loadPersisted()));
   }, []);
 
   const resetToDefaults = useCallback(() => {

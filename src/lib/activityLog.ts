@@ -1,6 +1,7 @@
 /** سجل نشاط للعرض من السوبر أدمِن — تخزين محلي (تجريبي) */
 
 import { useEffect, useState } from "react";
+import { emitStorageSync } from "@/lib/storageSync";
 
 export type ActivityLogEntry = {
   id: string;
@@ -37,6 +38,7 @@ function saveRaw(entries: ActivityLogEntry[]) {
     const data: Persisted = { v: 1, entries: entries.slice(0, cap) };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      emitStorageSync(STORAGE_KEY);
       return;
     } catch (e) {
       if (!isQuota(e)) throw e;

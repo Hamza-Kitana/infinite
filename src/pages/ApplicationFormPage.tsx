@@ -96,6 +96,13 @@ const targets: Record<string, ApplicationTarget> = {
     heroEyebrow: "MINISTRY OF INTERIOR — MARINES",
     heroTitleParts: ["تقديم", "المارينز"],
   },
+  interior_fpi: {
+    title: "تقديم الداخلية — FPI",
+    subtitle: "تسجيل بيانات المرشح لوحدة FPI ضمن وزارة الداخلية.",
+    dashboardPath: "/interior/fpi",
+    heroEyebrow: "MINISTRY OF INTERIOR — FPI",
+    heroTitleParts: ["تقديم", "FPI"],
+  },
   ems: {
     title: "تقديم وزارة الصحة",
     subtitle: "تسجيل بيانات مرشحي الطاقم الطبي والإسعافي.",
@@ -252,6 +259,7 @@ const ApplicationFormPage = () => {
     if (role === "interior_sheriff") return visibility.institutions.interior_sheriff;
     if (role === "interior_cia") return visibility.institutions.interior_cia;
     if (role === "interior_marines") return visibility.institutions.interior_marines;
+    if (role === "interior_fpi") return visibility.institutions.interior_fpi;
     return true;
   }, [role, visibility]);
 

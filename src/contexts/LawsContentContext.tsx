@@ -9,6 +9,7 @@ import {
 } from "react";
 import { defaultLawsPersisted } from "@/data/lawsDefaultState";
 import { schedulePersistSuccessToast } from "@/lib/persistSuccessToast";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import type {
   LawRuleItem,
   LawTabSection,
@@ -38,7 +39,7 @@ function loadPersisted(): LawsPersisted {
 const LAWS_SAVE_TOAST_ID = "ic-laws-autosave";
 
 function savePersisted(data: LawsPersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data));
   schedulePersistSuccessToast("تم حفظ القوانين", LAWS_SAVE_TOAST_ID, 750);
 }
 
@@ -93,19 +94,7 @@ export function LawsContentProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        const p = JSON.parse(e.newValue) as LawsPersisted;
-        if (p.v === 1 && Array.isArray(p.sections)) {
-          setPersisted(p);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return listenStorageSync(STORAGE_KEY, () => setPersisted(loadPersisted()));
   }, []);
 
   const resetToDefaults = useCallback(() => {

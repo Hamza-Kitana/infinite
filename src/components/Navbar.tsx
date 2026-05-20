@@ -73,7 +73,8 @@ const Navbar = () => {
     visibility.institutions.interior_police ||
     visibility.institutions.interior_sheriff ||
     visibility.institutions.interior_cia ||
-    visibility.institutions.interior_marines;
+    visibility.institutions.interior_marines ||
+    visibility.institutions.interior_fpi;
   const visibleInstitutionLinks = institutionLinks.filter((item) => {
     if (item.to === "/health") return visibility.institutions.health;
     if (item.to === "/interior") return canShowInterior;

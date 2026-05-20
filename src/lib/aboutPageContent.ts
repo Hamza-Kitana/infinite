@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const STORAGE_KEY = "ic_about_page_content_v1";
 const EVENT_NAME = "ic-about-page-content";
@@ -146,21 +147,14 @@ export function loadAboutPageContent(): AboutPageContent {
 export function saveAboutPageContent(content: AboutPageContent) {
   if (typeof window === "undefined") return;
   const payload: AboutPagePersisted = { v: 1, content };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(payload), [EVENT_NAME]);
 }
 
 export function useAboutPageContent() {
   const [content, setContent] = useState<AboutPageContent>(() => loadAboutPageContent());
 
   useEffect(() => {
-    const sync = () => setContent(loadAboutPageContent());
-    window.addEventListener("storage", sync);
-    window.addEventListener(EVENT_NAME, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(EVENT_NAME, sync as EventListener);
-    };
+    return listenStorageSync(STORAGE_KEY, () => setContent(loadAboutPageContent()), [EVENT_NAME]);
   }, []);
 
   return useMemo(() => content, [content]);

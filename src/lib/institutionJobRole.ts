@@ -10,6 +10,7 @@ export function jobRoleKeyFromInstitutionBranch(branchId: InstitutionBranchId): 
     interior_sheriff: "interior_sheriff",
     interior_cia: "interior_cia",
     interior_marines: "interior_marines",
+    interior_fpi: "interior_fpi",
     oversight: "oversight",
     justice_lawyers: "lawyer",
     developer: "developer",

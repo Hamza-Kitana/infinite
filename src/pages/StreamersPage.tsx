@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { ChevronLeft, Radio, Sparkles } from "lucide-react";
+import { Radio } from "lucide-react";
+import { StreamerLawsApplyBlock } from "@/components/streamers/StreamerLawsApplyBlock";
 import ReflectiveCard from "@/components/ReflectiveCard";
-import { Button } from "@/components/ui/button";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 import { useStreamersKickLive } from "@/hooks/useStreamersKickLive";
@@ -94,40 +94,7 @@ const StreamersPage = () => {
           </div>
         </section>
 
-        <section className="w-full px-4 md:px-8 xl:px-12 mt-10">
-          <div className="relative overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-card/95 via-primary/[0.07] to-secondary/[0.08] p-6 shadow-[0_24px_60px_-28px_rgba(54,22,79,0.35)] md:flex md:items-center md:justify-between md:gap-10 md:p-9">
-            <div className="pointer-events-none absolute -start-24 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-primary/20 blur-3xl" />
-            <div className="pointer-events-none absolute -end-16 -bottom-20 h-40 w-40 rounded-full bg-secondary/15 blur-3xl" />
-            <div className="relative text-right">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/50 px-3 py-1 font-display text-[11px] font-semibold text-primary">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                التقديم كصانع محتوى
-              </div>
-              <h2 className="mt-4 font-display text-2xl font-bold md:text-3xl">
-                قدّم طلبك ليتم <span className="text-gradient-neon">المراجعة</span> من الإدارة
-              </h2>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                املأ النموذج (الاسم، اللوجو، ورابط البث — والنبذة اختيارية). عند القبول من ستريمر منجر تُضاف بطاقتك تلقائياً
-                إلى هذه الصفحة.
-              </p>
-            </div>
-            <div className="relative mt-6 flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center md:mt-0 md:flex-col">
-              <Button
-                asChild
-                size="lg"
-                className="h-12 rounded-2xl bg-gradient-neon px-8 font-display text-base tracking-wide text-primary-foreground shadow-[0_0_28px_hsl(var(--primary)/0.35)]"
-              >
-                <Link to="/apply/streamers" className="inline-flex items-center justify-center gap-2">
-                  ابدأ التقديم
-                  <ChevronLeft className="h-5 w-5 opacity-90" aria-hidden />
-                </Link>
-              </Button>
-              <p className="text-center text-[11px] text-muted-foreground md:text-right">
-                نفس خطوات تقديم المواطن — مخصّصة لمسار صنّاع المحتوى.
-              </p>
-            </div>
-          </div>
-        </section>
+        <StreamerLawsApplyBlock />
       </main>
       <Footer />
     </div>

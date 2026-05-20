@@ -8,6 +8,7 @@ export const JOB_ROLE_DEFAULT_MEMBER_RANK_AR: Record<JobRoleKey, string> = {
   interior_sheriff: "شرطي شريف",
   interior_cia: "عميل CIA",
   interior_marines: "مارين",
+  interior_fpi: "وكيل FPI",
   oversight: "مراقب",
   lawyer: "محامٍ",
   developer: "مطوّر",

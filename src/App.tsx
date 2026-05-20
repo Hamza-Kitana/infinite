@@ -18,9 +18,11 @@ import { InstitutionRostersContentProvider } from "@/contexts/InstitutionRosters
 import { ApplicationsContentProvider } from "@/contexts/ApplicationsContentContext";
 import { RoleGroupsProvider } from "@/contexts/RoleGroupsContext";
 import { RequireStaffAuth } from "@/components/RequireStaffAuth";
+import { ALL_TICKET_STAFF_ROLES, DASHBOARD_TICKET_STAFF_ROLES } from "@/lib/ticketTypesConfig";
 import { PublicStaffLinkSync } from "@/components/PublicStaffLinkSync";
 import AdminLayout from "./pages/admin/AdminLayout.tsx";
 import DashboardGate from "./pages/admin/DashboardGate.tsx";
+import GangsAdminShell from "./pages/admin/GangsAdminShell.tsx";
 import GangsEditorPage from "./pages/admin/GangsEditorPage.tsx";
 import LawsEditorPage from "./pages/admin/LawsEditorPage.tsx";
 import StaffUsersPage from "./pages/admin/StaffUsersPage.tsx";
@@ -39,13 +41,13 @@ import ApplicationsReviewPage from "./pages/admin/ApplicationsReviewPage.tsx";
 import ActivityLogPage from "./pages/admin/ActivityLogPage.tsx";
 import AboutManagerPage from "./pages/admin/AboutManagerPage.tsx";
 import TicketsManagerPage from "./pages/admin/TicketsManagerPage.tsx";
-import FooterManagerPage from "./pages/admin/FooterManagerPage.tsx";
 import Index from "./pages/Index.tsx";
 import ApplicationFormPage from "./pages/ApplicationFormPage.tsx";
 import StreamerApplyPage from "./pages/StreamerApplyPage.tsx";
 import StreamersPage from "./pages/StreamersPage.tsx";
 import HealthPage from "./pages/HealthPage.tsx";
 import InteriorDepartmentPage from "./pages/InteriorDepartmentPage.tsx";
+import InteriorHubPage from "./pages/InteriorHubPage.tsx";
 import OversightPage from "./pages/OversightPage.tsx";
 import GangHubPage from "./pages/GangHubPage.tsx";
 import GangsPage from "./pages/GangsPage.tsx";
@@ -101,7 +103,7 @@ const AppRoutes = () => {
         <Route path="/streamers" element={<StreamersPage />} />
         <Route path="/health" element={<HealthPage />} />
         <Route path="/ems" element={<Navigate to="/health" replace />} />
-        <Route path="/interior" element={<Navigate to="/interior/police" replace />} />
+        <Route path="/interior" element={<InteriorHubPage />} />
         <Route path="/interior/:dept" element={<InteriorDepartmentPage />} />
         <Route path="/police" element={<Navigate to="/interior/police" replace />} />
         <Route path="/oversight" element={<OversightPage />} />
@@ -134,14 +136,8 @@ const AppRoutes = () => {
                 "investments_manager",
                 "quiz_manager",
                 "about_manager",
-                "ticket_support_manager",
-                "ticket_admin_inquiry_manager",
-                "ticket_player_complaint_manager",
-                "ticket_compensation_manager",
-                "ticket_store_manager",
-                "ticket_general_manager",
+                ...ALL_TICKET_STAFF_ROLES,
                 "store_orders_manager",
-                "footer_manager",
                 ...INSTITUTION_ROSTER_STAFF_ROLES,
                 "application_reviewer",
               ]}
@@ -198,10 +194,14 @@ const AppRoutes = () => {
             path="gangs"
             element={
               <RequireStaffAuth allowRoles={["super_admin", "gang_manager"]}>
-                <GangsEditorPage />
+                <GangsAdminShell />
               </RequireStaffAuth>
             }
-          />
+          >
+            <Route index element={<GangsEditorPage />} />
+            <Route path="open-requests" element={<TicketsManagerPage embeddedGangSlug="gang-open" />} />
+            <Route path="join-requests" element={<Navigate to="/dashboard/gangs/open-requests" replace />} />
+          </Route>
           <Route
             path="vip-cars"
             element={
@@ -271,27 +271,9 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="footer"
-            element={
-              <RequireStaffAuth allowRoles={["super_admin", "footer_manager"]}>
-                <FooterManagerPage />
-              </RequireStaffAuth>
-            }
-          />
-          <Route
             path="tickets"
             element={
-              <RequireStaffAuth
-                allowRoles={[
-                  "super_admin",
-                  "ticket_support_manager",
-                  "ticket_admin_inquiry_manager",
-                  "ticket_player_complaint_manager",
-                  "ticket_compensation_manager",
-                  "ticket_store_manager",
-                  "ticket_general_manager",
-                ]}
-              >
+              <RequireStaffAuth allowRoles={["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES]}>
                 <TicketsManagerPage />
               </RequireStaffAuth>
             }
@@ -299,7 +281,7 @@ const AppRoutes = () => {
           <Route
             path="store-orders"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "store_orders_manager"]}>
+              <RequireStaffAuth allowRoles={["super_admin", "store_orders_manager", "ticket_store_manager"]}>
                 <TicketsManagerPage storeOrdersOnly />
               </RequireStaffAuth>
             }
@@ -307,17 +289,7 @@ const AppRoutes = () => {
           <Route
             path="tickets/:ticketType"
             element={
-              <RequireStaffAuth
-                allowRoles={[
-                  "super_admin",
-                  "ticket_support_manager",
-                  "ticket_admin_inquiry_manager",
-                  "ticket_player_complaint_manager",
-                  "ticket_compensation_manager",
-                  "ticket_store_manager",
-                  "ticket_general_manager",
-                ]}
-              >
+              <RequireStaffAuth allowRoles={["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES]}>
                 <TicketsManagerPage />
               </RequireStaffAuth>
             }

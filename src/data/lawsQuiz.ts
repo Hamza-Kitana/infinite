@@ -213,6 +213,32 @@ export const JOB_ROLE_LAWS_QUIZ: Record<JobRoleKey, QuizQuestion[]> = {
       explanation: "العتاد المتخصص يُستخدم فقط في المهام المعتمدة من القيادة.",
     },
   ],
+  interior_fpi: [
+    {
+      id: "fpi-secrecy",
+      question: "ما حكم تسريب معلومات ملف تحقيقي؟",
+      options: [
+        { id: "a", label: "مسموح بين زملاء FPI فقط" },
+        { id: "b", label: "ممنوع خارج الإطار الرسمي" },
+        { id: "c", label: "مسموح بعد إغلاق الملف" },
+        { id: "d", label: "مسموح إذا لم يضر بالتحقيق" },
+      ],
+      correctOptionId: "b",
+      explanation: "سرية الملفات والأدلة جزء أساسي من عمل FPI.",
+    },
+    {
+      id: "fpi-procedure",
+      question: "كيف تُجرى التحقيقات في FPI؟",
+      options: [
+        { id: "a", label: "بشكل فردي دون إجراءات" },
+        { id: "b", label: "وفق الإجراءات المعتمدة مع تنسيق الوزارة" },
+        { id: "c", label: "حسب رغبة المتقدم" },
+        { id: "d", label: "فقط عبر الديسكورد" },
+      ],
+      correctOptionId: "b",
+      explanation: "التحقيق يتم ضمن إجراءات معتمدة وتنسيق مع أذرع الوزارة عند الحاجة.",
+    },
+  ],
   oversight: [
     {
       id: "oversight-neutrality",

@@ -286,6 +286,8 @@ function roleKeysForBranch(branchId: InstitutionBranchId): string[] {
   if (branchId === "interior_sheriff") return ["interior_sheriff"];
   if (branchId === "interior_cia") return ["interior_cia"];
   if (branchId === "interior_marines") return ["interior_marines"];
+  if (branchId === "interior_fpi") return ["interior_fpi"];
+  if (branchId === "interior_hub") return [];
   if (branchId === "oversight") return ["oversight"];
   if (branchId === "justice_lawyers") return ["lawyer", "justice"];
   if (branchId === "developer") return ["developer"];

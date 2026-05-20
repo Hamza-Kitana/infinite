@@ -102,7 +102,7 @@ const GangHub = () => {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Button asChild className="bg-gradient-neon text-primary-foreground font-display tracking-widest">
-              <Link to="/apply/gang">تقديم فتح عصابة</Link>
+              <Link to="/gangs#gang-apply">تقديم فتح عصابة</Link>
             </Button>
             <Button asChild variant="outline" className="border-primary/40 bg-primary/5">
               <Link to="/apply/vip">طلب باقة VIP</Link>

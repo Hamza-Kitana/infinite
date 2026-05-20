@@ -9,6 +9,8 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { evictSecondaryLocalData, isLocalStorageQuotaError } from "@/lib/localStorageQuota";
+import { writeSyncedLocalStorage } from "@/lib/storageSync";
+import { migrateStaffTicketRole } from "@/lib/ticketTypesConfig";
 import { canDeleteManagedStaffTarget } from "@/lib/staffUserDeletePolicy";
 
 export type RemoveManagedUserOptions = {
@@ -28,13 +30,17 @@ export type BaseManagedStaffRole =
   | "application_reviewer"
   | "about_manager"
   | "store_orders_manager"
-  | "ticket_support_manager"
-  | "ticket_admin_inquiry_manager"
-  | "ticket_player_complaint_manager"
-  | "ticket_compensation_manager"
-  | "ticket_store_manager"
-  | "ticket_general_manager"
-  | "footer_manager";
+  | "ticket_sector_complaint_manager"
+  | "ticket_gang_complaint_manager"
+  | "ticket_rp_complaint_manager"
+  | "ticket_high_admin_compensation_manager"
+  | "ticket_sheriff_manager"
+  | "ticket_interior_ministry_manager"
+  | "ticket_health_ministry_manager"
+  | "ticket_justice_ministry_manager"
+  | "ticket_federal_police_manager"
+  | "ticket_gang_open_manager"
+  | "ticket_store_manager";
 
 export type ManagedStaffRole = BaseManagedStaffRole | InstitutionRosterStaffRole;
 
@@ -50,13 +56,17 @@ const BASE_MANAGED: readonly BaseManagedStaffRole[] = [
   "application_reviewer",
   "about_manager",
   "store_orders_manager",
-  "ticket_support_manager",
-  "ticket_admin_inquiry_manager",
-  "ticket_player_complaint_manager",
-  "ticket_compensation_manager",
+  "ticket_sector_complaint_manager",
+  "ticket_gang_complaint_manager",
+  "ticket_rp_complaint_manager",
+  "ticket_high_admin_compensation_manager",
+  "ticket_sheriff_manager",
+  "ticket_interior_ministry_manager",
+  "ticket_health_ministry_manager",
+  "ticket_justice_ministry_manager",
+  "ticket_federal_police_manager",
+  "ticket_gang_open_manager",
   "ticket_store_manager",
-  "ticket_general_manager",
-  "footer_manager",
 ];
 
 function isBaseManagedStaffRole(v: unknown): v is BaseManagedStaffRole {
@@ -95,13 +105,15 @@ function migrateLegacyRoles(rawRoles: unknown[], institutionBranchId: unknown): 
   const rolesIn = rawRoles.filter((x): x is string => typeof x === "string");
   const out = new Set<ManagedStaffRole>();
   for (const r of rolesIn) {
+    if (r === "footer_manager") continue;
     if (r === "institution_manager") {
       if (typeof institutionBranchId === "string" && isInstitutionBranchId(institutionBranchId)) {
         out.add(institutionRosterStaffRoleForBranch(institutionBranchId));
       }
       continue;
     }
-    if (isManagedStaffRoleString(r)) out.add(r);
+    const migrated = migrateStaffTicketRole(r);
+    if (isManagedStaffRoleString(migrated)) out.add(migrated);
   }
   return [...out];
 }
@@ -165,16 +177,14 @@ export function saveManagedUsers(users: ManagedUser[]) {
   const payload = JSON.stringify(users);
   for (let step = 0; step < 10; step++) {
     try {
-      localStorage.setItem(STORAGE_KEY, payload);
-      window.dispatchEvent(new CustomEvent(EVENT_NAME));
+      writeSyncedLocalStorage(STORAGE_KEY, payload, [EVENT_NAME]);
       return;
     } catch (e) {
       if (!isLocalStorageQuotaError(e)) throw e;
       evictSecondaryLocalData(step);
     }
   }
-  localStorage.setItem(STORAGE_KEY, payload);
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  writeSyncedLocalStorage(STORAGE_KEY, payload, [EVENT_NAME]);
 }
 
 export function addManagedUser(input: Omit<ManagedUser, "id">): ManagedUser {

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { defaultHousesPersisted, type HousesPersisted } from "@/data/housesDefaultState";
 import type { HouseCatalogItem } from "@/data/housesCatalog";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const STORAGE_KEY = "ic_houses_v1";
 
@@ -25,7 +26,7 @@ function loadPersisted(): HousesPersisted {
 }
 
 function savePersisted(data: HousesPersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data));
 }
 
 type HousesContentValue = {
@@ -43,17 +44,7 @@ export function HousesContentProvider({ children }: { children: ReactNode }) {
   const [persisted, setPersisted] = useState<HousesPersisted>(() => loadPersisted());
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        const p = JSON.parse(e.newValue) as HousesPersisted;
-        if (p.v === 1 && Array.isArray(p.houses)) setPersisted(p);
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return listenStorageSync(STORAGE_KEY, () => setPersisted(loadPersisted()));
   }, []);
 
   const resetToDefaults = useCallback(() => {

@@ -4,13 +4,17 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   BellRing,
   Building2,
-  Coins,
-  Headphones,
+  Crown,
+  HeartPulse,
+  Landmark,
   MessageSquare,
+  Scale,
+  ScrollText,
   Send,
-  ShoppingBag,
+  Shield,
+  ShieldCheck,
   TicketPlus,
-  UserRoundX,
+  Users,
   Clock,
   Inbox,
   Sparkles,
@@ -42,17 +46,29 @@ import {
   type TicketStatus,
   type TicketTypeRole,
 } from "@/lib/ticketsCenter";
+import { PUBLIC_TICKET_TYPE_DEFINITIONS } from "@/lib/ticketTypesConfig";
 import { isPublicTicketsUnlocked, MSG_TICKETS_NEED_CITY_PROFILE } from "@/lib/publicProfileEligibility";
 import { revokePendingTicketAttachment } from "@/lib/ticketAttachmentRead";
 
-const TICKET_TYPES: { label: string; role: TicketTypeRole; icon: LucideIcon; hint: string }[] = [
-  { label: "دعم فني", role: "ticket_support_manager", icon: Headphones, hint: "مشاكل تقنية أو الدخول" },
-  { label: "استفسار إداري", role: "ticket_admin_inquiry_manager", icon: Building2, hint: "أسئلة للإدارة" },
-  { label: "شكوى لاعب", role: "ticket_player_complaint_manager", icon: UserRoundX, hint: "بلاغ عن لاعب" },
-  { label: "طلب تعويض", role: "ticket_compensation_manager", icon: Coins, hint: "تعويض عن خطأ" },
-  { label: "طلب متجر", role: "ticket_store_manager", icon: ShoppingBag, hint: "مشتريات أو متجر" },
-  { label: "تكت عام", role: "ticket_general_manager", icon: MessageSquare, hint: "أي موضوع آخر" },
-];
+const TICKET_ICON_BY_SLUG: Record<string, LucideIcon> = {
+  "sector-complaint": Building2,
+  "gang-complaint": Users,
+  "rp-complaint": ScrollText,
+  "high-admin": Crown,
+  sheriff: Shield,
+  interior: Landmark,
+  health: HeartPulse,
+  justice: Scale,
+  "federal-police": ShieldCheck,
+};
+
+const TICKET_TYPES: { label: string; role: TicketTypeRole; icon: LucideIcon; hint: string }[] =
+  PUBLIC_TICKET_TYPE_DEFINITIONS.map((d) => ({
+    label: d.label,
+    role: d.role,
+    hint: d.hint,
+    icon: TICKET_ICON_BY_SLUG[d.slug] ?? MessageSquare,
+  }));
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   in_review: "قيد المراجعة",

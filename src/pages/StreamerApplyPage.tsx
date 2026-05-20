@@ -21,7 +21,13 @@ import {
   normalizeStreamUrl,
   STREAMER_APPLICATION_ROLE,
 } from "@/lib/streamerApplication";
+import {
+  hasPendingCitizenApplication,
+  isPostCitizenApplyUnlocked,
+  MSG_POST_CITIZEN_APPROVED_NEEDED,
+} from "@/lib/publicProfileEligibility";
 import { useSiteVisibility } from "@/lib/siteVisibility";
+import { PostCitizenApplyGate } from "@/components/PostCitizenApplyGate";
 import { toast } from "sonner";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -84,7 +90,13 @@ const StreamerApplyPage = () => {
   if (!user) return <Navigate to="/" replace />;
   if (!visibility.pages.streamers) return <Navigate to="/" replace />;
 
+  const postCitizenUnlocked = isPostCitizenApplyUnlocked(profile, applications);
+
   const submit = () => {
+    if (!postCitizenUnlocked) {
+      toast.message(MSG_POST_CITIZEN_APPROVED_NEEDED);
+      return;
+    }
     if (!isDiscordUser) {
       toast.error("\u0627\u0644\u062a\u0642\u062f\u064a\u0645 \u0645\u062a\u0627\u062d \u0641\u0642\u0637 \u0644\u062d\u0633\u0627\u0628\u0627\u062a Discord");
       return;
@@ -195,7 +207,9 @@ const StreamerApplyPage = () => {
         </motion.div>
 
         <main className="relative z-10 mx-auto w-full max-w-2xl space-y-6 px-4 pb-20 sm:px-6 md:px-8">
-          {submitted || applyPending ? (
+          {!postCitizenUnlocked ? (
+            <PostCitizenApplyGate profile={profile} applications={applications} />
+          ) : submitted || applyPending ? (
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}

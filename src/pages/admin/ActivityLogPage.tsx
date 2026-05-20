@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import {
   CalendarRange,
@@ -112,64 +113,6 @@ function dtLocalToMs(s: string): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
-/** حقل CSV وفق RFC 4180 — مُشار دائماً لاستقرار العربية و Excel */
-function csvCell(value: string): string {
-  const s = String(value ?? "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n");
-  return `"${s.replace(/"/g, '""')}"`;
-}
-
-/** صف بستة أعمدة لمحاذاة أوضح في Excel */
-function csvRow6(a: string, b: string, c = "", d = "", e = "", f = ""): string {
-  return [csvCell(a), csvCell(b), csvCell(c), csvCell(d), csvCell(e), csvCell(f)].join(",");
-}
-
-type ActivityLogCsvMeta = {
-  exportedAtLabel: string;
-  displayedCount: number;
-  totalInStore: number;
-  rangeLabel: string;
-  activeFiltersCount: number;
-};
-
-/** ملف UTF-8 مع BOM + سطر sep=, ليعرّف Excel الفاصل بشكل صحيح */
-function buildActivityLogCsv(rows: ActivityLogEntry[], meta: ActivityLogCsvMeta): string {
-  const lines: string[] = [];
-  lines.push("sep=,");
-  lines.push(csvRow6("سجل النشاط — Infinite City Hub (تصدير من لوحة التحكم)", "", "", "", "", ""));
-  lines.push(csvRow6("تاريخ التصدير", meta.exportedAtLabel, "", "", "", ""));
-  lines.push(
-    csvRow6(
-      "عدد السجلات في الملف",
-      String(meta.displayedCount),
-      "من أصل",
-      String(meta.totalInStore),
-      "فلاتر نشطة",
-      String(meta.activeFiltersCount),
-    ),
-  );
-  lines.push(csvRow6("نطاق الوقت (حسب الفلتر)", meta.rangeLabel, "", "", "", ""));
-  lines.push(csvRow6("—", "—", "—", "—", "—", "—"));
-  lines.push(csvRow6("م", "التاريخ والوقت (محلي)", "الوقت (ISO)", "الحساب", "الفعل / النشاط", "التفاصيل"));
-
-  rows.forEach((e, idx) => {
-    const detail = (e.detail ?? "").replace(/[\r\n]+/g, " ").trim();
-    lines.push(
-      csvRow6(
-        String(idx + 1),
-        formatLogDateTime(e.at),
-        e.at,
-        e.actor,
-        e.action,
-        detail || "—",
-      ),
-    );
-  });
-
-  return lines.join("\r\n");
-}
-
 function formatExportFilenameStamp(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
@@ -190,6 +133,7 @@ const ActivityLogPage = () => {
   const [ticketFilter, setTicketFilter] = useState("");
   const [onlyTicketLogs, setOnlyTicketLogs] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [exportingWord, setExportingWord] = useState(false);
 
   const refresh = useCallback(() => setEntries(loadActivityLog()), []);
 
@@ -321,24 +265,27 @@ const ActivityLogPage = () => {
     return opt.label;
   }, [rangePreset, customFrom, customTo]);
 
-  const handleExportCsv = () => {
-    const csv = buildActivityLogCsv(filteredEntries, {
-      exportedAtLabel: formatLogDateTime(new Date().toISOString()),
-      displayedCount: filteredEntries.length,
-      totalInStore: entries.length,
-      rangeLabel: rangeLabelText,
-      activeFiltersCount,
-    });
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = formatExportFilenameStamp();
-    a.href = url;
-    a.download = `infinite-city-activity-log-${stamp}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleExportWord = async () => {
+    setExportingWord(true);
+    try {
+      const { buildActivityLogWordDocument, downloadActivityLogWord } = await import(
+        "@/lib/activityLogWordExport"
+      );
+      const blob = await buildActivityLogWordDocument(filteredEntries, {
+        exportedAtLabel: formatLogDateTime(new Date().toISOString()),
+        displayedCount: filteredEntries.length,
+        totalInStore: entries.length,
+        rangeLabel: rangeLabelText,
+        activeFiltersCount,
+      });
+      const stamp = formatExportFilenameStamp();
+      downloadActivityLogWord(blob, `infinite-city-activity-log-${stamp}.docx`);
+      toast.success("تم تنزيل سجل النشاط بصيغة Word");
+    } catch {
+      toast.error("تعذّر إنشاء ملف Word — جرّب مرة أخرى");
+    } finally {
+      setExportingWord(false);
+    }
   };
 
   if (!isSuperAdmin) {
@@ -428,12 +375,12 @@ const ActivityLogPage = () => {
               className="h-9 gap-1.5 border-violet-200 bg-white text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-violet-950/50"
               onClick={(ev) => {
                 ev.stopPropagation();
-                handleExportCsv();
+                void handleExportWord();
               }}
-              disabled={filteredEntries.length === 0}
+              disabled={filteredEntries.length === 0 || exportingWord}
             >
               <Download className="h-3.5 w-3.5" />
-              تصدير لـ Excel (.csv)
+              {exportingWord ? "جاري التصدير…" : "تصدير Word (.docx)"}
             </Button>
             {activeFiltersCount > 0 ? (
               <Button

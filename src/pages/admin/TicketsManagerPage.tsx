@@ -25,16 +25,26 @@ import {
   type TicketThread,
   type TicketTypeRole,
 } from "@/lib/ticketsCenter";
+import {
+  ADMIN_TICKET_TYPE_DEFINITIONS,
+  getTicketTypeByRole,
+  getTicketTypeBySlug,
+  staffCanAccessTicketSlug,
+  STORE_TICKET_SLUG,
+} from "@/lib/ticketTypesConfig";
 import { revokePendingTicketAttachment } from "@/lib/ticketAttachmentRead";
+import { listenStorageSync } from "@/lib/storageSync";
 
-const TICKET_TYPES: { slug: string; label: string; role: TicketTypeRole & StaffRole; accent: string }[] = [
-  { slug: "support", label: "دعم فني", role: "ticket_support_manager", accent: "from-blue-100 to-sky-50" },
-  { slug: "admin-inquiry", label: "استفسار إداري", role: "ticket_admin_inquiry_manager", accent: "from-violet-100 to-fuchsia-50" },
-  { slug: "player-complaint", label: "شكوى لاعب", role: "ticket_player_complaint_manager", accent: "from-rose-100 to-pink-50" },
-  { slug: "compensation", label: "طلب تعويض", role: "ticket_compensation_manager", accent: "from-amber-100 to-yellow-50" },
-  { slug: "store", label: "طلب متجر", role: "ticket_store_manager", accent: "from-emerald-100 to-green-50" },
-  { slug: "general", label: "تكت عام", role: "ticket_general_manager", accent: "from-slate-100 to-zinc-50" },
-];
+const TICKET_RETENTION_STORAGE_KEY = "ic_tickets_retention_hours_v1";
+const TICKET_RETENTION_CHANGED_EVENT = "ic-tickets-retention";
+
+const TICKET_TYPES: { slug: string; label: string; role: TicketTypeRole & StaffRole; accent: string }[] =
+  ADMIN_TICKET_TYPE_DEFINITIONS.map((d) => ({
+    slug: d.slug,
+    label: d.label,
+    role: d.role as TicketTypeRole & StaffRole,
+    accent: d.accent,
+  }));
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   in_review: "قيد المراجعة",
@@ -63,10 +73,13 @@ type TicketNotification = {
 export type TicketsManagerPageProps = {
   /** صفحة «طلبات المتاجر» — نفس تكت «طلب المتجر» فقط بدون باقي أنواع التكت */
   storeOrdersOnly?: boolean;
+  /** داخل مدير العصابات — نوع تكت واحد بدون تبديل الأنواع */
+  embeddedGangSlug?: "gang-open";
 };
 
-const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps) => {
-  const { ticketType } = useParams<{ ticketType?: string }>();
+const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: TicketsManagerPageProps) => {
+  const { ticketType: ticketTypeParam } = useParams<{ ticketType?: string }>();
+  const ticketType = embeddedGangSlug ?? ticketTypeParam;
   const navigate = useNavigate();
   const { user, isSuperAdmin } = useAuth();
   const tickets = useTicketsCenter();
@@ -83,32 +96,47 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
+  const embeddedMode = !!embeddedGangSlug;
+
+  useEffect(() => {
+    return listenStorageSync(TICKET_RETENTION_STORAGE_KEY, () => setRetentionHours(loadTicketRetentionHours()), [
+      TICKET_RETENTION_CHANGED_EVENT,
+    ]);
+  }, []);
+
   const visibleTicketTypes = useMemo(() => {
     if (storeOrdersOnly) {
-      const store = TICKET_TYPES.find((x) => x.slug === "store");
-      if (!store) return [];
+      const storeDef = getTicketTypeBySlug(STORE_TICKET_SLUG);
+      if (!storeDef) return [];
       const roles = user?.roles ?? [];
       const allowed =
         isSuperAdmin || roles.includes("ticket_store_manager") || roles.includes("store_orders_manager");
-      return allowed ? [store] : [];
+      return allowed
+        ? [{ slug: storeDef.slug, label: storeDef.label, role: storeDef.role as TicketTypeRole & StaffRole, accent: storeDef.accent }]
+        : [];
     }
+    if (embeddedGangSlug) {
+      const item = TICKET_TYPES.find((x) => x.slug === embeddedGangSlug);
+      return item ? [item] : [];
+    }
+    const roles = user?.roles ?? [];
     return isSuperAdmin
       ? TICKET_TYPES
-      : TICKET_TYPES.filter((item) => (user?.roles ?? []).includes(item.role));
-  }, [isSuperAdmin, user?.roles, storeOrdersOnly]);
+      : TICKET_TYPES.filter((item) => staffCanAccessTicketSlug(item.slug, roles, !!isSuperAdmin));
+  }, [isSuperAdmin, user?.roles, storeOrdersOnly, embeddedGangSlug]);
 
-  const activeType = storeOrdersOnly
+  const activeType = storeOrdersOnly || embeddedMode
     ? visibleTicketTypes[0] ?? null
     : visibleTicketTypes.find((x) => x.slug === ticketType) ?? visibleTicketTypes[0] ?? null;
   const effectiveTypeRole = activeType?.role ?? null;
-  const effectiveTypeLabel = activeType?.label ?? "";
+  const effectiveTypeLabel = embeddedMode ? "طلبات فتح عصابة" : (activeType?.label ?? "");
 
   useEffect(() => {
-    if (storeOrdersOnly) return;
+    if (storeOrdersOnly || embeddedMode) return;
     if (!activeType && visibleTicketTypes.length > 0) {
       navigate(`/dashboard/tickets/${visibleTicketTypes[0].slug}`, { replace: true });
     }
-  }, [storeOrdersOnly, activeType, visibleTicketTypes, navigate]);
+  }, [storeOrdersOnly, embeddedMode, activeType, visibleTicketTypes, navigate]);
 
   const scopedTickets = useMemo(
     () => tickets.filter((t) => t.typeRole === effectiveTypeRole).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt)),
@@ -148,7 +176,10 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     }
     for (const ticket of scope) {
       const prevCount = previousSnapshotRef.current.get(ticket.id) ?? 0;
-      const typeSlug = TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug ?? "general";
+      const typeSlug =
+        TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug ??
+        getTicketTypeByRole(ticket.typeRole)?.slug ??
+        "high-admin";
       // إذا الشات مفتوح حالياً على هذا التكت، لا نرسل إشعارات عليه
       if (chatOpen && selectedTicketId === ticket.id) {
         continue;
@@ -179,7 +210,9 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
     const allowedRoles = new Set(visibleTicketTypes.map((x) => x.role));
     for (const ticket of tickets) {
       if (!allowedRoles.has(ticket.typeRole)) continue;
-      const typeSlug = TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug;
+      const typeSlug =
+        TICKET_TYPES.find((x) => x.role === ticket.typeRole)?.slug ??
+        getTicketTypeByRole(ticket.typeRole)?.slug;
       if (!typeSlug) continue;
       const cutoff = ticket.lastStaffReadAt ? new Date(ticket.lastStaffReadAt).getTime() : 0;
       const hasUnread = ticket.messages.some(
@@ -194,7 +227,11 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
   const openFromNotification = (notificationId: string, typeSlug: string, ticketId: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, unread: false } : n)));
     setNotificationsOpen(false);
-    navigate(storeOrdersOnly ? "/dashboard/store-orders" : `/dashboard/tickets/${typeSlug}`);
+    navigate(
+      storeOrdersOnly || typeSlug === STORE_TICKET_SLUG
+        ? "/dashboard/store-orders"
+        : `/dashboard/tickets/${typeSlug}`,
+    );
     setSelectedTicketId(ticketId);
     setChatOpen(true);
   };
@@ -313,7 +350,11 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
       </div>
     );
   }
-  if (!storeOrdersOnly && !ticketType) {
+  if (!storeOrdersOnly && !embeddedMode && ticketType === STORE_TICKET_SLUG) {
+    return <Navigate to="/dashboard/store-orders" replace />;
+  }
+
+  if (!storeOrdersOnly && !embeddedMode && !ticketType) {
     return <Navigate to={`/dashboard/tickets/${visibleTicketTypes[0].slug}`} replace />;
   }
 
@@ -322,7 +363,8 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
       <div
         className={cn(
           "rounded-2xl border border-violet-200 bg-gradient-to-b p-5 text-right shadow-[0_18px_44px_-30px_rgba(54,22,79,0.45)]",
-          activeType?.accent ?? "from-white to-violet-50",
+          (embeddedGangSlug ? getTicketTypeBySlug(embeddedGangSlug)?.accent : activeType?.accent) ??
+            "from-white to-violet-50",
           "dark:border-slate-600 dark:from-slate-900 dark:to-slate-950 dark:shadow-[0_18px_44px_-30px_rgba(0,0,0,0.5)]",
         )}
       >
@@ -333,10 +375,12 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
             </h1>
             <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
               {storeOrdersOnly
-                ? "طلبات المتجر المرسلة من صفحة التكت (نوع «طلب متجر») — اعرض الموضوع والزبون ورد من هنا."
-                : "جدول تكتات احترافي مع فلترة ونافذة شات للرد على الزبون."}
+                ? "طلبات المتجر من صفحة المتجر العامة — اعرض الموضوع والزبون ورد من هنا."
+                : embeddedGangSlug
+                  ? "طلبات تأسيس عصابة جديدة — راجع التفاصيل ورد على المتقدم. عند القبول أضف العصابة من «بطاقات العصابات»."
+                  : "جدول تكتات احترافي مع فلترة ونافذة شات للرد على الزبون."}
             </p>
-            {isSuperAdmin && !storeOrdersOnly ? (
+            {isSuperAdmin && !storeOrdersOnly && !embeddedMode ? (
               <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-violet-300 bg-white text-xs dark:border-slate-600 dark:bg-slate-800">
                 <button
                   type="button"
@@ -360,7 +404,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                 </button>
               </div>
             ) : null}
-            {isSuperAdmin && !storeOrdersOnly ? (
+            {isSuperAdmin && !storeOrdersOnly && !embeddedMode ? (
               <p className="mt-2 max-w-xl text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                 مدة الحذف التلقائي (24 ساعة / 3 أيام) لا تُطبَّق على{" "}
                 <strong className="font-semibold text-slate-600 dark:text-slate-300">طلبات المتجر</strong>؛ تظل محفوظة
@@ -417,7 +461,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
         </div>
       </div>
 
-      {!storeOrdersOnly ? (
+      {!storeOrdersOnly && !embeddedMode ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibleTicketTypes.map((item) => (
             <Button
@@ -506,6 +550,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
               <thead className="bg-violet-50/70 text-slate-700 dark:bg-slate-800/90 dark:text-slate-200">
                 <tr>
                   <th className="px-3 py-2 font-medium">الموضوع</th>
+                  {embeddedGangSlug ? <th className="px-3 py-2 font-medium">العصابة المقترحة</th> : null}
                   <th className="px-3 py-2 font-medium">الزبون</th>
                   <th className="px-3 py-2 font-medium">الحالة</th>
                   <th className="px-3 py-2 font-medium">آخر تحديث</th>
@@ -538,6 +583,11 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                           ) : null}
                         </div>
                       </td>
+                      {embeddedGangSlug ? (
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                          {ticket.gangOpenProposedName ?? "—"}
+                        </td>
+                      ) : null}
                       <td className="px-3 py-2 text-slate-700 dark:text-slate-300">{ticket.openedBy}</td>
                       <td className="px-3 py-2">
                         <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", STATUS_CLASSES[ticket.status])}>
@@ -597,6 +647,18 @@ const TicketsManagerPage = ({ storeOrdersOnly = false }: TicketsManagerPageProps
                     {STATUS_LABELS[selectedTicket.status]}
                   </span>
                 </div>
+                {selectedTicket.gangOpenProposedName ? (
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                    مقترح: <span className="font-semibold">{selectedTicket.gangOpenProposedName}</span>
+                    {selectedTicket.gangOpenSpecialty ? ` · ${selectedTicket.gangOpenSpecialty}` : ""}
+                    {selectedTicket.gangOpenLocation ? ` · ${selectedTicket.gangOpenLocation}` : ""}
+                  </p>
+                ) : null}
+                {selectedTicket.gangName && !selectedTicket.gangOpenProposedName ? (
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                    العصابة: <span className="font-semibold">{selectedTicket.gangName}</span>
+                  </p>
+                ) : null}
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"

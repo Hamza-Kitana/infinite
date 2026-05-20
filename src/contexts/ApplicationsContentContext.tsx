@@ -14,6 +14,7 @@ import type {
   LawsQuizAnswer,
   LawsQuizResult,
 } from "@/data/publicApplicationTypes";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const STORAGE_KEY = "ic_public_applications_v1";
 
@@ -106,8 +107,7 @@ export const PUBLIC_APPLICATIONS_CHANGED_EVENT = "ic-public-applications-changed
 
 function writeApplicationsOrThrow(list: ApplicationRecord[]) {
   const data: Persisted = { v: 1, applications: list };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent(PUBLIC_APPLICATIONS_CHANGED_EVENT));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data), [PUBLIC_APPLICATIONS_CHANGED_EVENT]);
 }
 
 function isQuotaError(e: unknown): boolean {
@@ -164,28 +164,9 @@ export function ApplicationsContentProvider({ children }: { children: ReactNode 
   }, []);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        const p = JSON.parse(e.newValue) as Persisted;
-        if (p.v === 1 && Array.isArray(p.applications)) setApplications(p.applications);
-      } catch {
-        /* ignore */
-      }
-    };
-    const onLocalPurge = () => {
-      try {
-        setApplications(loadPersisted());
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("ic-public-applications-changed", onLocalPurge);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("ic-public-applications-changed", onLocalPurge);
-    };
+    return listenStorageSync(STORAGE_KEY, () => setApplications(loadPersisted()), [
+      PUBLIC_APPLICATIONS_CHANGED_EVENT,
+    ]);
   }, []);
 
   const submitApplication = useCallback(

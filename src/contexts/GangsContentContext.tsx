@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { defaultGangsPersisted } from "@/data/gangsDefaultState";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import type { GangCard, GangsPersisted } from "@/types/gangsSchema";
 
 const STORAGE_KEY = "ic_gangs_v1";
@@ -27,7 +28,7 @@ function loadPersisted(): GangsPersisted {
 }
 
 function savePersisted(data: GangsPersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data));
 }
 
 type GangsContentValue = {
@@ -45,17 +46,7 @@ export function GangsContentProvider({ children }: { children: ReactNode }) {
   const [persisted, setPersisted] = useState<GangsPersisted>(() => loadPersisted());
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        const p = JSON.parse(e.newValue) as GangsPersisted;
-        if (p.v === 1 && Array.isArray(p.gangs)) setPersisted(p);
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return listenStorageSync(STORAGE_KEY, () => setPersisted(loadPersisted()));
   }, []);
 
   const resetToDefaults = useCallback(() => {

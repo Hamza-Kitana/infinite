@@ -1,8 +1,8 @@
 import { useRef } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Crown, ExternalLink, EyeOff, MapPin, Sparkles, UserRound } from "lucide-react";
-import { DISCORD_INVITE_URL } from "@/config/communityLinks";
+import { Crown, EyeOff, MapPin, Sparkles, UserRound } from "lucide-react";
+import { GangsPublicApplySection } from "@/components/gangs/GangsPublicApplySection";
 import { useGangsContent } from "@/contexts/GangsContentContext";
 import { cn } from "@/lib/utils";
 import { parseYoutubeVideoId, scheduleBoostYoutubePlayerQuality, youtubeEmbedUrl } from "@/lib/youtube";
@@ -229,7 +229,7 @@ function GangShowcaseCard({ gang }: { gang: GangCard }) {
                     {gang.leaderName?.trim() || "—"}
                   </span>
                 </p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">عصابة مأخوذة — لا يمكن طلب الانضمام حتى يُعلَن غير ذلك.</p>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">عصابة مأخوذة — غير متاحة حالياً.</p>
               </div>
             ) : null}
 
@@ -249,27 +249,12 @@ function GangShowcaseCard({ gang }: { gang: GangCard }) {
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] p-3 sm:flex-row sm:items-center sm:gap-4">
-                <div className="flex min-w-0 flex-1 items-start gap-2.5 text-right">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-display text-[11px] tracking-wide text-emerald-400/90">متاحة</p>
-                    <p className="mt-0.5 text-xs leading-snug text-muted-foreground sm:text-sm">
-                      يمكنك طلب استلامها عبر الإدارة بعد المراجعة.
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href={DISCORD_INVITE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-neon px-4 font-display text-sm font-semibold text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)] transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:h-11 sm:w-auto sm:min-w-[11.5rem]"
-                >
-                  <span>تواصل عبر الديسكورد</span>
-                  <ExternalLink className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                </a>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2.5">
+                <span className="font-display text-xs tracking-wide text-emerald-500/90">حالة: متاحة</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-background/60 px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                  <Sparkles className="h-3 w-3 text-emerald-400" aria-hidden />
+                  التقديم عبر طلب فتح عصابة من أسفل الصفحة
+                </span>
               </div>
             )}
           </div>
@@ -356,11 +341,16 @@ const GangsPage = () => {
           <GodfatherSpotlight />
         </section>
 
-        <section className="mt-10 w-full space-y-8 px-3 sm:px-4 md:mt-12 md:space-y-10 md:px-8 xl:space-y-12 xl:px-12">
+        <section
+          id="gang-list"
+          className="mt-10 w-full space-y-8 px-3 sm:px-4 md:mt-12 md:space-y-10 md:px-8 xl:space-y-12 xl:px-12"
+        >
           {visibleGangs.map((gang) => (
             <GangShowcaseCard key={gang.id} gang={gang} />
           ))}
         </section>
+
+        <GangsPublicApplySection />
       </main>
       <Footer />
     </div>

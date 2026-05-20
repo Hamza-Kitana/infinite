@@ -13,7 +13,7 @@ import { boostYoutubePlayerQuality } from "@/lib/youtube";
 const YOUTUBE_VIDEO_ID = "9w5SHL6nmkg";
 
 export const getYoutubeEmbedUrl = () =>
-  `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${YOUTUBE_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : ""}`;
+  `https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=0&loop=1&playlist=${YOUTUBE_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin) : ""}`;
 
 export type HeroBackgroundVideoContextValue = {
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
@@ -32,10 +32,10 @@ const PLAY_RETRY_MS = [0, 200, 500, 900, 1600, 2800, 4500] as const;
 export function HeroBackgroundVideoProvider({ children }: { children: ReactNode }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const playRetryTimersRef = useRef<number[]>([]);
-  /** الصوت يُفعَّل فقط بعد تفاعل المستخدم (زر الصوت/المنزلق) — التشغيل الصامت فوراً */
-  const soundUnlockedRef = useRef(false);
+  /** الصوت مفعّل افتراضياً عند فتح الموقع */
+  const soundUnlockedRef = useRef(true);
   const [volume, setVolume] = useState(50);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
 
   const postPlayerCommand = useCallback((func: string, args?: unknown[]) => {
     if (!iframeRef.current?.contentWindow) return;
@@ -57,10 +57,11 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
   const pushAutoplay = useCallback(() => {
     postPlayerCommand("playVideo");
     postPlayerCommand("setVolume", [volume]);
-    if (!soundUnlockedRef.current || muted || volume === 0) {
+    if (muted || volume === 0) {
       postPlayerCommand("mute");
     } else {
       postPlayerCommand("unMute");
+      postPlayerCommand("setVolume", [volume]);
     }
     boostYoutubePlayerQuality(iframeRef.current?.contentWindow);
   }, [muted, volume, postPlayerCommand]);
@@ -74,6 +75,19 @@ export function HeroBackgroundVideoProvider({ children }: { children: ReactNode 
     scheduleAutoplay();
     return clearPlayRetries;
   }, [scheduleAutoplay, clearPlayRetries]);
+
+  /** بعض المتصفحات تمنع الصوت التلقائي حتى أول تفاعل — نُعيد تفعيل الصوت عند أول نقر/لمس */
+  useEffect(() => {
+    const unlockSound = () => {
+      soundUnlockedRef.current = true;
+      if (muted || volume === 0) return;
+      postPlayerCommand("playVideo");
+      postPlayerCommand("setVolume", [volume]);
+      postPlayerCommand("unMute");
+    };
+    window.addEventListener("pointerdown", unlockSound, { once: true, capture: true });
+    return () => window.removeEventListener("pointerdown", unlockSound, { capture: true });
+  }, [muted, volume, postPlayerCommand]);
 
   const handleVolumeChange = useCallback(
     (nextVolume: number) => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import { DISCORD_INVITE_URL } from "@/config/communityLinks";
 
 const LEGACY_DISCORD_URLS = new Set([
@@ -114,21 +115,14 @@ export function loadFooterContent(): FooterContent {
 export function saveFooterContent(content: FooterContent) {
   if (typeof window === "undefined") return;
   const payload: FooterPersisted = { v: 1, content };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(payload), [EVENT_NAME]);
 }
 
 export function useFooterContent() {
   const [content, setContent] = useState<FooterContent>(() => loadFooterContent());
 
   useEffect(() => {
-    const sync = () => setContent(loadFooterContent());
-    window.addEventListener("storage", sync);
-    window.addEventListener(EVENT_NAME, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(EVENT_NAME, sync as EventListener);
-    };
+    return listenStorageSync(STORAGE_KEY, () => setContent(loadFooterContent()), [EVENT_NAME]);
   }, []);
 
   return useMemo(() => content, [content]);

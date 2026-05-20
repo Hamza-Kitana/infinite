@@ -55,7 +55,7 @@ const OversightPage = () => {
           </div>
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel="الرقابة" />
+        <InstitutionLawsPlaceholder organizationLabel="الرقابة" jobRoleKey="oversight" />
       </main>
       <Footer />
     </div>

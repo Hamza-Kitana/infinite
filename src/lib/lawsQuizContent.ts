@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import { CITIZEN_LAWS_QUIZ, JOB_ROLE_LAWS_QUIZ, type QuizQuestion } from "@/data/lawsQuiz";
 import { JOB_ROLE_LAWS, type JobRoleKey } from "@/data/jobRoleLaws";
 
@@ -111,30 +112,27 @@ export function saveQuizQuestions(key: QuizContextKey, questions: QuizQuestion[]
       [key]: cleaned.length > 0 ? cleaned : defaultQuizFor(key),
     },
   };
-  localStorage.setItem(LAWS_QUIZ_STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent(LAWS_QUIZ_CONTENT_CHANGED_EVENT));
+  writeSyncedLocalStorage(LAWS_QUIZ_STORAGE_KEY, JSON.stringify(next), [LAWS_QUIZ_CONTENT_CHANGED_EVENT]);
 }
 
 export function resetQuizQuestions(key: QuizContextKey) {
   const current = loadPersisted();
   const nextQuizzes = { ...current.quizzes };
   delete nextQuizzes[key];
-  localStorage.setItem(LAWS_QUIZ_STORAGE_KEY, JSON.stringify({ v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent));
-  window.dispatchEvent(new CustomEvent(LAWS_QUIZ_CONTENT_CHANGED_EVENT));
+  writeSyncedLocalStorage(
+    LAWS_QUIZ_STORAGE_KEY,
+    JSON.stringify({ v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent),
+    [LAWS_QUIZ_CONTENT_CHANGED_EVENT],
+  );
 }
 
 export function useQuizQuestions(key: QuizContextKey): QuizQuestion[] {
   const [questions, setQuestions] = useState<QuizQuestion[]>(() => loadQuizQuestions(key));
 
   useEffect(() => {
-    const sync = () => setQuestions(loadQuizQuestions(key));
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(LAWS_QUIZ_CONTENT_CHANGED_EVENT, sync as EventListener);
-    };
+    return listenStorageSync(LAWS_QUIZ_STORAGE_KEY, () => setQuestions(loadQuizQuestions(key)), [
+      LAWS_QUIZ_CONTENT_CHANGED_EVENT,
+    ]);
   }, [key]);
 
   return useMemo(() => questions, [questions]);

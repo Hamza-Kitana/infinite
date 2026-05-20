@@ -54,13 +54,17 @@ import {
 import {
   addManagedUser,
   findManagedUserByPublicId,
+  IC_MANAGED_STAFF_CHANGED_EVENT,
+  IC_MANAGED_STAFF_STORAGE_KEY,
   loadManagedUsers,
   removeManagedUser,
   updateManagedUser,
   type ManagedStaffRole,
   type ManagedUser,
 } from "@/staff/staffDirectory";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import { appendActivityLog } from "@/lib/activityLog";
+import { TICKET_STAFF_ROLE_OPTIONS } from "@/lib/ticketTypesConfig";
 import { purgeArtifactsForDeletedPublicUser } from "@/lib/purgeDeletedPublicUser";
 import {
   assertSuperAdminCanDeleteUsers,
@@ -123,8 +127,11 @@ function loadApplicationsForAdmin(): ApplicationRecord[] {
 }
 
 function saveApplicationsForAdmin(applications: ApplicationRecord[]) {
-  localStorage.setItem(APPLICATIONS_STORAGE_KEY, JSON.stringify({ v: 1, applications }));
-  window.dispatchEvent(new CustomEvent(APPLICATIONS_CHANGED_EVENT));
+  writeSyncedLocalStorage(
+    APPLICATIONS_STORAGE_KEY,
+    JSON.stringify({ v: 1, applications }),
+    [APPLICATIONS_CHANGED_EVENT],
+  );
 }
 
 function loadPublicUsersForAdmin(): PublicUserRow[] {
@@ -160,9 +167,11 @@ function loadPublicUsersForAdmin(): PublicUserRow[] {
   }
 }
 
+const PUBLIC_USERS_STORAGE_KEY = "ic_public_users_v1";
+
 function savePublicUsersForAdmin(users: PublicUserRow[]) {
-  localStorage.setItem(
-    "ic_public_users_v1",
+  writeSyncedLocalStorage(
+    PUBLIC_USERS_STORAGE_KEY,
     JSON.stringify(
       users.map((u) => ({
         id: u.id,
@@ -179,8 +188,8 @@ function savePublicUsersForAdmin(users: PublicUserRow[]) {
         authProvider: u.authProvider,
       })),
     ),
+    [IC_PUBLIC_USERS_CHANGED_EVENT],
   );
-  window.dispatchEvent(new CustomEvent(IC_PUBLIC_USERS_CHANGED_EVENT));
 }
 
 const BASE_ROLES: { value: ManagedStaffRole; label: string }[] = [
@@ -195,13 +204,7 @@ const BASE_ROLES: { value: ManagedStaffRole; label: string }[] = [
   { value: "application_reviewer", label: "مراجع التقديمات" },
   { value: "about_manager", label: "مدير من نحن" },
   { value: "store_orders_manager", label: "طلبات المتاجر" },
-  { value: "ticket_support_manager", label: "تكت — دعم فني" },
-  { value: "ticket_admin_inquiry_manager", label: "تكت — استفسار إداري" },
-  { value: "ticket_player_complaint_manager", label: "تكت — شكوى لاعب" },
-  { value: "ticket_compensation_manager", label: "تكت — طلب تعويض" },
-  { value: "ticket_store_manager", label: "تكت — طلب متجر" },
-  { value: "ticket_general_manager", label: "تكت — عام" },
-  { value: "footer_manager", label: "مدير الفوتر" },
+  ...TICKET_STAFF_ROLE_OPTIONS.map((o) => ({ value: o.value as ManagedStaffRole, label: o.label })),
 ];
 
 function roleLabel(role: ManagedStaffRole): string {
@@ -373,9 +376,14 @@ const StaffUsersPage = () => {
   }, []);
 
   useEffect(() => {
-    const onChange = () => refresh();
-    window.addEventListener("ic-managed-staff", onChange as EventListener);
-    return () => window.removeEventListener("ic-managed-staff", onChange as EventListener);
+    const unsubs = [
+      listenStorageSync(IC_MANAGED_STAFF_STORAGE_KEY, refresh, [IC_MANAGED_STAFF_CHANGED_EVENT]),
+      listenStorageSync(PUBLIC_USERS_STORAGE_KEY, refresh, [IC_PUBLIC_USERS_CHANGED_EVENT]),
+      listenStorageSync(APPLICATIONS_STORAGE_KEY, refresh, [APPLICATIONS_CHANGED_EVENT]),
+    ];
+    return () => {
+      for (const unsub of unsubs) unsub();
+    };
   }, [refresh]);
 
   if (!isSuperAdmin) {

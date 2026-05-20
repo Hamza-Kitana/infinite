@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ClipboardList,
   ExternalLink,
-  Footprints,
   History,
   Home,
   Info,
@@ -44,8 +43,16 @@ import {
   countPendingJobApplicationsForStaff,
   countPendingServerApplicationsForStaff,
 } from "@/lib/applicationReviewAccess";
+import { countGangManagerInboxUnread } from "@/lib/gangTicketStats";
 import { countPendingStreamerApplications } from "@/lib/streamerApplication";
-import { useTicketsCenter, type TicketTypeRole } from "@/lib/ticketsCenter";
+import {
+  DASHBOARD_TICKET_STAFF_ROLES,
+  isTicketTypeRole,
+  staffCanAccessTicketSlug,
+  TICKET_TYPE_NAV,
+  type TicketTypeRole,
+} from "@/lib/ticketTypesConfig";
+import { useTicketsCenter } from "@/lib/ticketsCenter";
 import { persistAdminDashboardTheme, readAdminDashboardTheme, type AdminDashboardTheme } from "@/lib/adminDashboardTheme";
 import "@/styles/admin-dashboard.css";
 
@@ -61,7 +68,7 @@ const STORE_SIDEBAR_NAV: NavItem[] = [
     to: "/dashboard/store-orders",
     label: "طلبات المتاجر",
     icon: ShoppingBag,
-    roles: ["super_admin", "store_orders_manager"],
+    roles: ["super_admin", "store_orders_manager", "ticket_store_manager"],
   },
 ];
 
@@ -86,20 +93,11 @@ const STATIC_NAV_LEADING: NavItem[] = [
 
 const STATIC_NAV_TRAILING: NavItem[] = [
   { to: "/dashboard/about", label: "مدير من نحن", icon: Info, roles: ["super_admin", "about_manager"] },
-  { to: "/dashboard/footer", label: "مدير الفوتر", icon: Footprints, roles: ["super_admin", "footer_manager"] },
   {
     to: "/dashboard/tickets",
     label: "التكت",
     icon: MessageSquareMore,
-    roles: [
-      "super_admin",
-      "ticket_support_manager",
-      "ticket_admin_inquiry_manager",
-      "ticket_player_complaint_manager",
-      "ticket_compensation_manager",
-      "ticket_store_manager",
-      "ticket_general_manager",
-    ],
+    roles: ["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES],
   },
 ];
 
@@ -110,15 +108,6 @@ const STATIC_NAV_TAIL: NavItem[] = [
     icon: ClipboardList,
     roles: ["super_admin", "application_reviewer", "streamer_manager", ...INSTITUTION_ROSTER_STAFF_ROLES],
   },
-];
-
-const TICKET_TYPE_NAV: { slug: string; label: string; role: TicketTypeRole & StaffRole }[] = [
-  { slug: "support", label: "دعم فني", role: "ticket_support_manager" },
-  { slug: "admin-inquiry", label: "استفسار إداري", role: "ticket_admin_inquiry_manager" },
-  { slug: "player-complaint", label: "شكوى لاعب", role: "ticket_player_complaint_manager" },
-  { slug: "compensation", label: "طلب تعويض", role: "ticket_compensation_manager" },
-  { slug: "store", label: "طلب متجر", role: "ticket_store_manager" },
-  { slug: "general", label: "تكت عام", role: "ticket_general_manager" },
 ];
 
 function adminRoleShell(role: StaffRole): { title: string; badge: string } {
@@ -147,16 +136,10 @@ function adminRoleShell(role: StaffRole): { title: string; badge: string } {
       return { title: "مدير من نحن", badge: "About Manager" };
     case "store_orders_manager":
       return { title: "طلبات المتاجر", badge: "Store Orders" };
-    case "ticket_support_manager":
-    case "ticket_admin_inquiry_manager":
-    case "ticket_player_complaint_manager":
-    case "ticket_compensation_manager":
-    case "ticket_store_manager":
-    case "ticket_general_manager":
-      return { title: "مدير التكت", badge: "Ticket Manager" };
-    case "footer_manager":
-      return { title: "مدير الفوتر", badge: "Footer Manager" };
     default:
+      if (isTicketTypeRole(role)) {
+        return { title: "مدير التكت", badge: "Ticket Manager" };
+      }
       if (isInstitutionRosterStaffRole(role)) {
         const id = branchIdFromInstitutionRosterStaffRole(role);
         if (id) {
@@ -215,7 +198,11 @@ const AdminLayout = () => {
   const ticketUnreadByRole = useMemo(() => {
     const allowedRoles = isSuperAdmin
       ? new Set(TICKET_TYPE_NAV.map((item) => item.role))
-      : new Set(TICKET_TYPE_NAV.filter((item) => userRoles.includes(item.role)).map((item) => item.role));
+      : new Set(
+          TICKET_TYPE_NAV.filter((item) => staffCanAccessTicketSlug(item.slug, userRoles, false)).map(
+            (item) => item.role,
+          ),
+        );
     const counts = new Map<TicketTypeRole, number>();
     for (const ticket of tickets) {
       if (!allowedRoles.has(ticket.typeRole)) continue;
@@ -233,7 +220,13 @@ const AdminLayout = () => {
     [ticketUnreadByRole],
   );
   const storeOrdersUnread = useMemo(() => {
-    if (!userRoles.includes("super_admin") && !userRoles.includes("store_orders_manager")) return 0;
+    if (
+      !userRoles.includes("super_admin") &&
+      !userRoles.includes("store_orders_manager") &&
+      !userRoles.includes("ticket_store_manager")
+    ) {
+      return 0;
+    }
     let n = 0;
     for (const ticket of tickets) {
       if (ticket.typeRole !== "ticket_store_manager") continue;
@@ -259,6 +252,8 @@ const AdminLayout = () => {
     () => countPendingStreamerApplications(applications),
     [applications],
   );
+
+  const gangInboxUnread = useMemo(() => countGangManagerInboxUnread(tickets), [tickets]);
 
   const pendingJobApplicationsCount = useMemo(
     () =>
@@ -286,8 +281,18 @@ const AdminLayout = () => {
     if (pendingStreamerApplicationsCount > 0) {
       map.set("/dashboard/streamers", pendingStreamerApplicationsCount);
     }
+    if (gangInboxUnread > 0) {
+      map.set("/dashboard/gangs", gangInboxUnread);
+    }
     return map;
-  }, [totalTicketUnread, storeOrdersUnread, pendingApplicationsCount, pendingJobApplicationsCount, pendingStreamerApplicationsCount]);
+  }, [
+    totalTicketUnread,
+    storeOrdersUnread,
+    pendingApplicationsCount,
+    pendingJobApplicationsCount,
+    pendingStreamerApplicationsCount,
+    gangInboxUnread,
+  ]);
 
   const renderSidebarBadge = (path: string, count: number) => {
     if (count <= 0) return null;
@@ -396,8 +401,6 @@ const AdminLayout = () => {
                     ? "طلبات المتاجر"
                   : location.pathname.startsWith("/dashboard/about")
                     ? "مدير من نحن"
-                    : location.pathname.startsWith("/dashboard/footer")
-                      ? "مدير الفوتر"
                     : location.pathname.startsWith("/dashboard/tickets")
                       ? "التكت"
                   : location.pathname === "/dashboard/institution"
@@ -436,19 +439,8 @@ const AdminLayout = () => {
                     ? "صلاحية من نحن"
                     : userRoles.includes("store_orders_manager")
                       ? "طلبات المتاجر"
-                    : userRoles.some((r) =>
-                        [
-                          "ticket_support_manager",
-                          "ticket_admin_inquiry_manager",
-                          "ticket_player_complaint_manager",
-                          "ticket_compensation_manager",
-                          "ticket_store_manager",
-                          "ticket_general_manager",
-                        ].includes(r),
-                      )
+                    : userRoles.some((r) => isTicketTypeRole(r))
                       ? "صلاحية التكت"
-                      : userRoles.includes("footer_manager")
-                        ? "صلاحية الفوتر"
               : isInstitutionRosterManager
                 ? "صلاحية طاقم مؤسسة"
                 : isApplicationReviewer
@@ -576,7 +568,7 @@ const AdminLayout = () => {
               {isGangManager ? (
                 <p className="px-3 text-[11px] leading-relaxed text-slate-400">
                   <Swords className="me-1 inline h-3 w-3 text-violet-400" />
-                  العصابات والشعارات محلياً.
+                  بطاقات العصابات وطلبات فتح العصابة — من التبويبات داخل مدير العصابات.
                 </p>
               ) : null}
               {isVipCarsManager ? (

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Anchor, BadgeCheck, Eye, Shield } from "lucide-react";
+import { Anchor, BadgeCheck, Eye, Fingerprint, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 
@@ -8,6 +8,7 @@ const links = [
   { to: "/interior/sheriff", label: "الشيرف", short: "شرف", icon: BadgeCheck },
   { to: "/interior/cia", label: "CIA", short: "CIA", icon: Eye },
   { to: "/interior/marines", label: "المارينز", short: "مارينز", icon: Anchor },
+  { to: "/interior/fpi", label: "FPI", short: "FPI", icon: Fingerprint },
 ] as const;
 
 /**
@@ -20,6 +21,7 @@ export function InteriorMinistryNav() {
     if (link.to === "/interior/sheriff") return visibility.institutions.interior_sheriff;
     if (link.to === "/interior/cia") return visibility.institutions.interior_cia;
     if (link.to === "/interior/marines") return visibility.institutions.interior_marines;
+    if (link.to === "/interior/fpi") return visibility.institutions.interior_fpi;
     return true;
   });
 

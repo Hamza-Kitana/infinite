@@ -43,7 +43,7 @@ const DeveloperPage = () => {
           <div className="glass-panel rounded-xl p-6"><ShieldCheck className="h-8 w-8 text-accent" /><h3 className="mt-4 font-display text-2xl">أمان</h3></div>
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel="المبرمجين" />
+        <InstitutionLawsPlaceholder organizationLabel="المبرمجين" jobRoleKey="developer" />
       </main>
       <Footer />
     </div>

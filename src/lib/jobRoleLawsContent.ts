@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import { JOB_ROLE_LAWS, type JobRoleKey, type JobRoleLawSet } from "@/data/jobRoleLaws";
 
 export const JOB_ROLE_LAWS_STORAGE_KEY = "ic_job_role_laws_content_v1";
@@ -61,8 +62,9 @@ export function saveJobRoleLawSet(key: JobRoleKey, lawSet: JobRoleLawSet) {
     v: 1,
     laws: { ...current.laws, [key]: normalized },
   };
-  localStorage.setItem(JOB_ROLE_LAWS_STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent(JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT));
+  writeSyncedLocalStorage(JOB_ROLE_LAWS_STORAGE_KEY, JSON.stringify(next), [
+    JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT,
+  ]);
 }
 
 export function useJobRoleLawSet(key: JobRoleKey | ""): JobRoleLawSet | null {
@@ -75,14 +77,9 @@ export function useJobRoleLawSet(key: JobRoleKey | ""): JobRoleLawSet | null {
       setLawSet(null);
       return;
     }
-    const sync = () => setLawSet(loadJobRoleLawSet(key));
-    sync();
-    window.addEventListener("storage", sync);
-    window.addEventListener(JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT, sync as EventListener);
-    };
+    return listenStorageSync(JOB_ROLE_LAWS_STORAGE_KEY, () => setLawSet(loadJobRoleLawSet(key)), [
+      JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT,
+    ]);
   }, [key]);
 
   return useMemo(() => lawSet, [lawSet]);

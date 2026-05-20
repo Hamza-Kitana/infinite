@@ -27,6 +27,7 @@ const JOBS: { role: string; title: string; subtitle: string; visible: (v: Return
   { role: "interior_sheriff", title: "الداخلية — الشيرف", subtitle: "Sheriff", visible: (v) => v.institutions.interior_sheriff },
   { role: "interior_cia", title: "الداخلية — CIA", subtitle: "Intelligence", visible: (v) => v.institutions.interior_cia },
   { role: "interior_marines", title: "الداخلية — المارينز", subtitle: "Marines", visible: (v) => v.institutions.interior_marines },
+  { role: "interior_fpi", title: "الداخلية — FPI", subtitle: "Federal Investigations", visible: (v) => v.institutions.interior_fpi },
   { role: "oversight", title: "مؤسسة الرقابة", subtitle: "Oversight", visible: (v) => v.institutions.oversight },
   { role: "lawyer", title: "وزارة العدل — هيئة المحاماة", subtitle: "Justice", visible: (v) => v.institutions.justice_lawyers },
   { role: "developer", title: "مؤسسة المبرمجين", subtitle: "Developer", visible: (v) => v.institutions.developer },

@@ -56,7 +56,7 @@ const HealthPage = () => {
           </div>
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel="وزارة الصحة" />
+        <InstitutionLawsPlaceholder organizationLabel="وزارة الصحة" jobRoleKey="ems" />
       </main>
       <Footer />
     </div>

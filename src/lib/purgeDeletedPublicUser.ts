@@ -11,6 +11,7 @@ import {
   type InstitutionRostersPersisted,
 } from "@/data/institutionRostersDefaultState";
 import { loadTickets, saveTickets, type TicketThread } from "@/lib/ticketsCenter";
+import { writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const APPLICATIONS_KEY = "ic_public_applications_v1";
 const ROSTERS_KEY = "ic_institution_rosters_v1";
@@ -36,8 +37,7 @@ function loadApplications(): ApplicationRecord[] {
 function saveApplications(list: ApplicationRecord[]) {
   if (typeof window === "undefined") return;
   const data: ApplicationsPersisted = { v: 1, applications: list };
-  localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent(IC_PUBLIC_APPLICATIONS_CHANGED_EVENT));
+  writeSyncedLocalStorage(APPLICATIONS_KEY, JSON.stringify(data), [IC_PUBLIC_APPLICATIONS_CHANGED_EVENT]);
 }
 
 function hydrateRosters(partial: unknown): InstitutionRostersPersisted {
@@ -67,8 +67,7 @@ function loadRostersPersisted(): InstitutionRostersPersisted {
 
 function saveRostersPersisted(data: InstitutionRostersPersisted) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(ROSTERS_KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent(IC_INSTITUTION_ROSTERS_CHANGED_EVENT));
+  writeSyncedLocalStorage(ROSTERS_KEY, JSON.stringify(data), [IC_INSTITUTION_ROSTERS_CHANGED_EVENT]);
 }
 
 function unlinkFromRosterPerson(

@@ -10,6 +10,8 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { evictSecondaryLocalData, isLocalStorageQuotaError } from "@/lib/localStorageQuota";
+import { writeSyncedLocalStorage } from "@/lib/storageSync";
+import { ALL_TICKET_STAFF_ROLES, migrateStaffTicketRole } from "@/lib/ticketTypesConfig";
 import type { ManagedStaffRole } from "@/staff/staffDirectory";
 
 export type StaffRoleGroup = {
@@ -40,13 +42,7 @@ const BASE_VALID: readonly string[] = [
   "application_reviewer",
   "about_manager",
   "store_orders_manager",
-  "ticket_support_manager",
-  "ticket_admin_inquiry_manager",
-  "ticket_player_complaint_manager",
-  "ticket_compensation_manager",
-  "ticket_store_manager",
-  "ticket_general_manager",
-  "footer_manager",
+  ...ALL_TICKET_STAFF_ROLES,
 ];
 
 function isValidStaffRole(v: unknown): v is ManagedStaffRole {
@@ -74,7 +70,10 @@ function safeParse(raw: string | null): StaffRoleGroup[] {
           id: row.id,
           name: row.name,
           description: typeof row.description === "string" ? row.description : undefined,
-          roles: row.roles.filter(isValidStaffRole),
+          roles: row.roles
+            .filter((r): r is string => typeof r === "string")
+            .map((r) => migrateStaffTicketRole(r))
+            .filter(isValidStaffRole),
           createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
           updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : new Date().toISOString(),
         };
@@ -93,16 +92,14 @@ function persistGroups(groups: StaffRoleGroup[]) {
   const payload = JSON.stringify(groups);
   for (let step = 0; step < 10; step++) {
     try {
-      localStorage.setItem(STORAGE_KEY, payload);
-      window.dispatchEvent(new CustomEvent(ROLE_GROUPS_EVENT));
+      writeSyncedLocalStorage(STORAGE_KEY, payload, [ROLE_GROUPS_EVENT]);
       return;
     } catch (e) {
       if (!isLocalStorageQuotaError(e)) throw e;
       evictSecondaryLocalData(step);
     }
   }
-  localStorage.setItem(STORAGE_KEY, payload);
-  window.dispatchEvent(new CustomEvent(ROLE_GROUPS_EVENT));
+  writeSyncedLocalStorage(STORAGE_KEY, payload, [ROLE_GROUPS_EVENT]);
 }
 
 export function saveRoleGroups(groups: StaffRoleGroup[]) {

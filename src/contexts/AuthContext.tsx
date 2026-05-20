@@ -11,6 +11,12 @@ import {
 } from "@/data/institutionBranches";
 import { appendActivityLog } from "@/lib/activityLog";
 import {
+  ALL_TICKET_STAFF_ROLES,
+  DASHBOARD_TICKET_STAFF_ROLES,
+  migrateStaffTicketRole,
+  type TicketTypeRole,
+} from "@/lib/ticketTypesConfig";
+import {
   findManagedUserByCredentials,
   findManagedUserByPublicId,
   loadManagedUsers,
@@ -29,13 +35,7 @@ export type CoreStaffRole =
   | "application_reviewer"
   | "about_manager"
   | "store_orders_manager"
-  | "ticket_support_manager"
-  | "ticket_admin_inquiry_manager"
-  | "ticket_player_complaint_manager"
-  | "ticket_compensation_manager"
-  | "ticket_store_manager"
-  | "ticket_general_manager"
-  | "footer_manager";
+  | TicketTypeRole;
 
 export type StaffRole = CoreStaffRole | InstitutionRosterStaffRole;
 
@@ -51,13 +51,7 @@ const CORE_STAFF_NO_SUPER: readonly CoreStaffRole[] = [
   "application_reviewer",
   "about_manager",
   "store_orders_manager",
-  "ticket_support_manager",
-  "ticket_admin_inquiry_manager",
-  "ticket_player_complaint_manager",
-  "ticket_compensation_manager",
-  "ticket_store_manager",
-  "ticket_general_manager",
-  "footer_manager",
+  ...ALL_TICKET_STAFF_ROLES,
 ];
 
 function isCoreStaffRoleNoSuper(v: string): v is Exclude<CoreStaffRole, "super_admin"> {
@@ -81,7 +75,9 @@ function migrateRawRoles(raw: readonly string[], legacyBranch?: string): StaffRo
       }
       continue;
     }
-    if (isStaffRole(r)) out.add(r);
+    if (r === "footer_manager") continue;
+    const migrated = migrateStaffTicketRole(r);
+    if (isStaffRole(migrated)) out.add(migrated);
   }
   return [...out];
 }
@@ -117,13 +113,8 @@ export function getPostLoginDashboardPath(roles: StaffRole[]): string {
     ["quiz_manager", "/dashboard/quiz"],
     ["about_manager", "/dashboard/about"],
     ["store_orders_manager", "/dashboard/store-orders"],
-    ["ticket_support_manager", "/dashboard/tickets"],
-    ["ticket_admin_inquiry_manager", "/dashboard/tickets"],
-    ["ticket_player_complaint_manager", "/dashboard/tickets"],
-    ["ticket_compensation_manager", "/dashboard/tickets"],
-    ["ticket_store_manager", "/dashboard/tickets"],
-    ["ticket_general_manager", "/dashboard/tickets"],
-    ["footer_manager", "/dashboard/footer"],
+    ["ticket_store_manager", "/dashboard/store-orders"],
+    ...DASHBOARD_TICKET_STAFF_ROLES.map((r) => [r, "/dashboard/tickets"] as const),
   ];
   for (const [r, path] of order) {
     if (roles.includes(r)) return path;
@@ -152,13 +143,8 @@ export function primaryStaffRole(roles: StaffRole[] | undefined): StaffRole | nu
     "quiz_manager",
     "about_manager",
     "store_orders_manager",
-    "ticket_support_manager",
-    "ticket_admin_inquiry_manager",
-    "ticket_player_complaint_manager",
-    "ticket_compensation_manager",
     "ticket_store_manager",
-    "ticket_general_manager",
-    "footer_manager",
+    ...DASHBOARD_TICKET_STAFF_ROLES,
   ];
   for (const r of coreOrder) {
     if (roles.includes(r)) return r;
@@ -426,14 +412,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         has("investments_manager") ||
         has("quiz_manager") ||
         has("about_manager") ||
-        has("ticket_support_manager") ||
-        has("ticket_admin_inquiry_manager") ||
-        has("ticket_player_complaint_manager") ||
-        has("ticket_compensation_manager") ||
-        has("ticket_store_manager") ||
-        has("ticket_general_manager") ||
+        ALL_TICKET_STAFF_ROLES.some((r) => has(r)) ||
         has("store_orders_manager") ||
-        has("footer_manager") ||
         (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false) ||
         has("application_reviewer"),
     };

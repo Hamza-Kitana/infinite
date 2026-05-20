@@ -4,6 +4,7 @@ export type JobRoleKey =
   | "interior_sheriff"
   | "interior_cia"
   | "interior_marines"
+  | "interior_fpi"
   | "oversight"
   | "lawyer"
   | "developer";
@@ -58,6 +59,15 @@ export const JOB_ROLE_LAWS: Record<JobRoleKey, JobRoleLawSet> = {
       "الالتزام بالتوجيهات التكتيكية لقائد الفريق.",
       "استخدام العتاد المتخصص فقط في المهام المعتمدة.",
       "الانضباط الكامل في عمليات الدعم والاقتحام.",
+    ],
+  },
+  interior_fpi: {
+    title: "قوانين الداخلية — FPI",
+    subtitle: "يلتزم المتقدم بقوانين التحقيق والسرية المؤسسية.",
+    rules: [
+      "حفظ سرية الملفات والأدلة وعدم تسريبها خارج الإطار الرسمي.",
+      "التحقيق وفق الإجراءات المعتمدة دون تجاوز صلاحيات الوحدة.",
+      "التنسيق مع باقي أذرع الوزارة عند القضايا المشتركة.",
     ],
   },
   oversight: {

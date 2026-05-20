@@ -6,7 +6,8 @@ import { InteriorMinistryNav } from "@/components/InteriorMinistryNav";
 import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
-import { Anchor, BadgeCheck, Eye, Shield, ChevronLeft } from "lucide-react";
+import { Anchor, BadgeCheck, Eye, Fingerprint, Shield, ChevronLeft } from "lucide-react";
+import { useSiteVisibility } from "@/lib/siteVisibility";
 
 const departments: {
   to: string;
@@ -38,10 +39,25 @@ const departments: {
     desc: "قوات مشاة بحرية — أزمات عسكرية، تأمين، ودعم عالي الخطورة.",
     icon: Anchor,
   },
+  {
+    to: "/interior/fpi",
+    title: "FPI",
+    desc: "تحقيقات فدرالية — قضايا معقّدة، أدلة، وتنسيق مع الادعاء.",
+    icon: Fingerprint,
+  },
 ];
 
 const InteriorHubPage = () => {
+  const visibility = useSiteVisibility();
   const overviewRoster = useInstitutionRoster("interior_hub");
+  const visibleDepartments = departments.filter((d) => {
+    if (d.to === "/interior/police") return visibility.institutions.interior_police;
+    if (d.to === "/interior/sheriff") return visibility.institutions.interior_sheriff;
+    if (d.to === "/interior/cia") return visibility.institutions.interior_cia;
+    if (d.to === "/interior/marines") return visibility.institutions.interior_marines;
+    if (d.to === "/interior/fpi") return visibility.institutions.interior_fpi;
+    return true;
+  });
 
   return (
     <div dir="rtl" className="min-h-screen bg-background text-foreground antialiased">
@@ -63,7 +79,7 @@ const InteriorHubPage = () => {
             {...overviewRoster}
             leaderBadge="وزير الداخلية"
             deputyBadge="نائب وزير الداخلية"
-            leadershipIntro="القيادة العليا لوزارة الداخلية؛ يتفرع منها أربعة أذرع تشغيلية لكل منها صفحة مستقلة أدناه."
+            leadershipIntro="القيادة العليا لوزارة الداخلية؛ يتفرع منها خمسة أذرع تشغيلية — لكل منها صفحة مستقلة أدناه."
             membersTitle=""
             membersSubtitle=""
             chromaRadius={560}
@@ -79,8 +95,8 @@ const InteriorHubPage = () => {
               اختر الجهاز للاطلاع على الهيكل القيادي وشبكة الأعضاء لكل فرع.
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {departments.map(({ to, title, desc, icon: Icon }) => (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {visibleDepartments.map(({ to, title, desc, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
@@ -100,7 +116,7 @@ const InteriorHubPage = () => {
           </div>
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel="وزارة الداخلية" />
+        <InstitutionLawsPlaceholder organizationLabel="وزارة الداخلية" jobsHubFallback />
       </main>
       <Footer />
     </div>

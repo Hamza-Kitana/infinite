@@ -18,6 +18,7 @@ import {
   defaultInstitutionRostersPersisted,
   type InstitutionRostersPersisted,
 } from "@/data/institutionRostersDefaultState";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const STORAGE_KEY = "ic_institution_rosters_v1";
 
@@ -45,9 +46,10 @@ function loadPersisted(): InstitutionRostersPersisted {
   }
 }
 
+const INSTITUTION_ROSTERS_CHANGED_EVENT = "ic-institution-rosters-changed";
+
 function savePersisted(data: InstitutionRostersPersisted) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent("ic-institution-rosters-changed"));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data), [INSTITUTION_ROSTERS_CHANGED_EVENT]);
 }
 
 /** نوع رتبة الفرد داخل طاقم المؤسسة */
@@ -126,27 +128,9 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
   const [persisted, setPersisted] = useState<InstitutionRostersPersisted>(() => loadPersisted());
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== STORAGE_KEY || e.newValue == null) return;
-      try {
-        setPersisted(hydrate(JSON.parse(e.newValue)));
-      } catch {
-        /* ignore */
-      }
-    };
-    const onLocalPurge = () => {
-      try {
-        setPersisted(loadPersisted());
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("ic-institution-rosters-changed", onLocalPurge);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("ic-institution-rosters-changed", onLocalPurge);
-    };
+    return listenStorageSync(STORAGE_KEY, () => setPersisted(loadPersisted()), [
+      INSTITUTION_ROSTERS_CHANGED_EVENT,
+    ]);
   }, []);
 
   const getBranchRoster = useCallback(

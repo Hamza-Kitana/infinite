@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { writeSyncedLocalStorage } from "@/lib/storageSync";
 
 type PublicUser = {
   id: string;
@@ -123,8 +124,7 @@ function loadUsers(): PublicUser[] {
 }
 
 function saveUsers(users: PublicUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  window.dispatchEvent(new CustomEvent(IC_PUBLIC_USERS_CHANGED_EVENT));
+  writeSyncedLocalStorage(USERS_KEY, JSON.stringify(users), [IC_PUBLIC_USERS_CHANGED_EVENT]);
 }
 
 function loadSession(): PublicSessionUser | null {

@@ -84,7 +84,7 @@ const JusticePage = () => {
           </Link>
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel="وزارة العدل (اللائحة التنظيمية)" />
+        <InstitutionLawsPlaceholder organizationLabel="وزارة العدل (اللائحة التنظيمية)" jobRoleKey="lawyer" />
       </main>
 
       <Footer />

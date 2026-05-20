@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { appendActivityLog } from "@/lib/activityLog";
+import { writeSyncedLocalStorage } from "@/lib/storageSync";
+import {
+  migrateTicketTypeRole,
+  ticketLabelForRole,
+  type TicketTypeRole,
+} from "@/lib/ticketTypesConfig";
+
+export type { TicketTypeRole } from "@/lib/ticketTypesConfig";
 
 const STORAGE_KEY = "ic_tickets_center_v1";
+
 const EVENT_NAME = "ic-tickets-center";
 const RETENTION_KEY = "ic_tickets_retention_hours_v1";
 const RETENTION_EVENT_NAME = "ic-tickets-retention";
-
-export type TicketTypeRole =
-  | "ticket_support_manager"
-  | "ticket_admin_inquiry_manager"
-  | "ticket_player_complaint_manager"
-  | "ticket_compensation_manager"
-  | "ticket_store_manager"
-  | "ticket_general_manager";
 
 export type TicketStatus = "in_review" | "waiting" | "closed";
 
@@ -50,6 +51,13 @@ export type TicketThread = {
   lastPublicReadAt?: string;
   /** بعد إرسال رسالة «الإدمن دخل يتابع» — لا تتكرر تلقائياً */
   staffPresenceSent?: boolean;
+  /** تقديم انضمام لعصابة — يُربط ببطاقة العصابة */
+  gangId?: string;
+  gangName?: string;
+  /** طلب فتح عصابة — اسم مقترح */
+  gangOpenProposedName?: string;
+  gangOpenSpecialty?: string;
+  gangOpenLocation?: string;
 };
 
 /** يظهر للزائر بعد إنشاء تكت جديد */
@@ -116,10 +124,11 @@ function normalize(raw: unknown): TicketThread[] {
             }))
             .filter((m) => m.body.trim().length > 0 || (m.attachments?.length ?? 0) > 0)
         : [];
+      const typeRole = migrateTicketTypeRole(x.typeRole);
       return {
         id: typeof x.id === "string" && x.id.trim() ? x.id : crypto.randomUUID(),
-        typeRole: (x.typeRole ?? "ticket_general_manager") as TicketTypeRole,
-        typeLabel: typeof x.typeLabel === "string" ? x.typeLabel : "تكت عام",
+        typeRole,
+        typeLabel: ticketLabelForRole(typeRole),
         openedById: typeof x.openedById === "string" ? x.openedById : undefined,
         openedBy: typeof x.openedBy === "string" ? x.openedBy : "—",
         subject: typeof x.subject === "string" ? x.subject : "تكت بدون عنوان",
@@ -130,6 +139,16 @@ function normalize(raw: unknown): TicketThread[] {
         lastStaffReadAt: typeof x.lastStaffReadAt === "string" ? x.lastStaffReadAt : undefined,
         lastPublicReadAt: typeof x.lastPublicReadAt === "string" ? x.lastPublicReadAt : undefined,
         staffPresenceSent: x.staffPresenceSent === true,
+        gangId: typeof x.gangId === "string" && x.gangId.trim() ? x.gangId.trim() : undefined,
+        gangName: typeof x.gangName === "string" && x.gangName.trim() ? x.gangName.trim() : undefined,
+        gangOpenProposedName:
+          typeof x.gangOpenProposedName === "string" && x.gangOpenProposedName.trim()
+            ? x.gangOpenProposedName.trim()
+            : undefined,
+        gangOpenSpecialty:
+          typeof x.gangOpenSpecialty === "string" && x.gangOpenSpecialty.trim() ? x.gangOpenSpecialty.trim() : undefined,
+        gangOpenLocation:
+          typeof x.gangOpenLocation === "string" && x.gangOpenLocation.trim() ? x.gangOpenLocation.trim() : undefined,
       };
     });
 }
@@ -156,8 +175,7 @@ export function loadTicketRetentionHours(): TicketRetentionHours {
 
 export function saveTicketRetentionHours(hours: TicketRetentionHours) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(RETENTION_KEY, JSON.stringify({ hours }));
-  window.dispatchEvent(new CustomEvent(RETENTION_EVENT_NAME));
+  writeSyncedLocalStorage(RETENTION_KEY, JSON.stringify({ hours }), [RETENTION_EVENT_NAME]);
 }
 
 /** طلبات المتجر لا تُحذف تلقائياً بمرور الوقت — فقط يدوياً من الإدارة */
@@ -219,8 +237,7 @@ export function saveTickets(tickets: TicketThread[]) {
   const retention = loadTicketRetentionHours();
   const { keep, removed } = pruneExpiredTickets(tickets, retention);
   const payload: Persisted = { v: 1, tickets: keep };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
+  writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(payload), [EVENT_NAME]);
   if (removed.length > 0) {
     appendActivityLog(
       "system",
@@ -238,6 +255,11 @@ export function createTicket(input: {
   subject?: string;
   body: string;
   attachments?: TicketAttachment[];
+  gangId?: string;
+  gangName?: string;
+  gangOpenProposedName?: string;
+  gangOpenSpecialty?: string;
+  gangOpenLocation?: string;
 }) {
   const now = new Date().toISOString();
   const ticket: TicketThread = {
@@ -261,6 +283,11 @@ export function createTicket(input: {
       },
     ],
     staffPresenceSent: false,
+    gangId: input.gangId?.trim() || undefined,
+    gangName: input.gangName?.trim() || undefined,
+    gangOpenProposedName: input.gangOpenProposedName?.trim() || undefined,
+    gangOpenSpecialty: input.gangOpenSpecialty?.trim() || undefined,
+    gangOpenLocation: input.gangOpenLocation?.trim() || undefined,
   };
   saveTickets([ticket, ...loadTickets()]);
   appendActivityLog(input.openedBy, "فتح تكت", `${ticket.typeLabel} — ${ticket.subject} — بانتظار رد الإدمن`);

@@ -5,7 +5,10 @@ import { primaryStaffRole, type StaffRole } from "@/contexts/AuthContext";
 import { SUPER_ADMIN_USERNAME } from "@/config/staffAuth";
 import { isInstitutionRosterStaffRole } from "@/data/institutionBranches";
 import { IC_ACTIVITY_LOG_CHANGED_EVENT, loadActivityLog } from "@/lib/activityLog";
+import { DASHBOARD_LIVE_EVENT } from "@/lib/storageSync";
+import { IC_MANAGED_STAFF_CHANGED_EVENT } from "@/staff/staffDirectory";
 import { loadManagedUsers } from "@/staff/staffDirectory";
+import { isTicketTypeRole } from "@/lib/ticketTypesConfig";
 import { cn } from "@/lib/utils";
 
 type CatKey = "leadership" | "content" | "commerce" | "tickets" | "institution" | "applications";
@@ -38,8 +41,7 @@ function categoryKeyFromPrimary(primary: StaffRole): CatKey {
     primary === "laws_editor" ||
     primary === "streamer_manager" ||
     primary === "gang_manager" ||
-    primary === "about_manager" ||
-    primary === "footer_manager"
+    primary === "about_manager"
   ) {
     return "content";
   }
@@ -52,14 +54,7 @@ function categoryKeyFromPrimary(primary: StaffRole): CatKey {
   ) {
     return "commerce";
   }
-  if (
-    primary === "ticket_support_manager" ||
-    primary === "ticket_admin_inquiry_manager" ||
-    primary === "ticket_player_complaint_manager" ||
-    primary === "ticket_compensation_manager" ||
-    primary === "ticket_store_manager" ||
-    primary === "ticket_general_manager"
-  ) {
+  if (isTicketTypeRole(primary)) {
     return "tickets";
   }
   if (isInstitutionRosterStaffRole(primary)) return "institution";
@@ -140,12 +135,14 @@ function useStaffEngagementSnapshot() {
   useEffect(() => {
     const bump = () => setTick((t) => t + 1);
     window.addEventListener("storage", bump);
-    window.addEventListener("ic-managed-staff", bump);
+    window.addEventListener(IC_MANAGED_STAFF_CHANGED_EVENT, bump);
     window.addEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, bump);
+    window.addEventListener(DASHBOARD_LIVE_EVENT, bump);
     return () => {
       window.removeEventListener("storage", bump);
-      window.removeEventListener("ic-managed-staff", bump);
+      window.removeEventListener(IC_MANAGED_STAFF_CHANGED_EVENT, bump);
       window.removeEventListener(IC_ACTIVITY_LOG_CHANGED_EVENT, bump);
+      window.removeEventListener(DASHBOARD_LIVE_EVENT, bump);
     };
   }, []);
   return useMemo(() => buildChartData(), [tick]);

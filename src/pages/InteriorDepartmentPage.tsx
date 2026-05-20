@@ -8,11 +8,12 @@ import InstitutionHero from "@/components/InstitutionHero";
 import { InstitutionRoster } from "@/components/InstitutionRoster";
 import { useInstitutionRoster } from "@/contexts/InstitutionRostersContentContext";
 import type { InstitutionBranchId } from "@/data/institutionBranches";
-import { Eye, Shield, Siren, Users } from "lucide-react";
+import type { JobRoleKey } from "@/data/jobRoleLaws";
+import { Eye, Fingerprint, Shield, Siren, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSiteVisibility } from "@/lib/siteVisibility";
 
-type DeptKey = "police" | "sheriff" | "cia" | "marines";
+type DeptKey = "police" | "sheriff" | "cia" | "marines" | "fpi";
 
 type DeptConfig = {
   branchId: InstitutionBranchId;
@@ -26,6 +27,7 @@ type DeptConfig = {
   membersSubtitle: string;
   cards: { icon: typeof Shield; title: string; body: string }[];
   lawsPlaceholderLabel: string;
+  jobRoleKey: JobRoleKey;
 };
 
 const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
@@ -61,6 +63,7 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
       },
     ],
     lawsPlaceholderLabel: "الشرطة",
+    jobRoleKey: "police",
   },
   sheriff: {
     branchId: "interior_sheriff",
@@ -94,6 +97,7 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
       },
     ],
     lawsPlaceholderLabel: "الشيرف",
+    jobRoleKey: "interior_sheriff",
   },
   cia: {
     branchId: "interior_cia",
@@ -127,6 +131,7 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
       },
     ],
     lawsPlaceholderLabel: "CIA",
+    jobRoleKey: "interior_cia",
   },
   marines: {
     branchId: "interior_marines",
@@ -160,6 +165,41 @@ const DEPT_CONFIG: Record<DeptKey, DeptConfig> = {
       },
     ],
     lawsPlaceholderLabel: "المارينز",
+    jobRoleKey: "interior_marines",
+  },
+  fpi: {
+    branchId: "interior_fpi",
+    badgeEn: "FPI — FEDERAL INVESTIGATIONS",
+    title: (
+      <>
+        <span className="text-gradient-neon">FPI</span>
+      </>
+    ),
+    alt: "FPI — Infinite City",
+    leaderBadge: "قائد FPI",
+    deputyBadge: "نائب قائد FPI",
+    leadershipIntro: "قيادة وحدة FPI ونائبها، ثم الوكلاء والمحققون في الشبكة أدناه.",
+    membersTitle: "وكلاء ومحققو FPI",
+    membersSubtitle: "تحقيقات، أدلة، وتنسيق مع الشرطة والادعاء — مرّر المؤشر للتفاصيل.",
+    cards: [
+      {
+        icon: Fingerprint,
+        title: "غرفة التحقيق",
+        body: "متابعة القضايا المعقّدة وسلسلة الأدلة والشهود.",
+      },
+      {
+        icon: Shield,
+        title: "التنسيق الوزاري",
+        body: "ربط الملفات مع LSPD والشيرف والادعاء عند الحاجة.",
+      },
+      {
+        icon: Users,
+        title: "فرق الاختصاص",
+        body: "توزيع القضايا حسب نوع الجريمة والخبرة الميدانية.",
+      },
+    ],
+    lawsPlaceholderLabel: "FPI",
+    jobRoleKey: "interior_fpi",
   },
 };
 
@@ -212,7 +252,7 @@ const InteriorDepartmentPage = () => {
           ))}
         </section>
 
-        <InstitutionLawsPlaceholder organizationLabel={cfg.lawsPlaceholderLabel} />
+        <InstitutionLawsPlaceholder organizationLabel={cfg.lawsPlaceholderLabel} jobRoleKey={cfg.jobRoleKey} />
       </main>
       <Footer />
     </div>

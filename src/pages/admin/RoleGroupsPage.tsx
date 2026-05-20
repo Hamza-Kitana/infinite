@@ -44,6 +44,7 @@ import {
 import type { ManagedStaffRole } from "@/staff/staffDirectory";
 import type { StaffRoleGroup } from "@/staff/roleGroups";
 import { appendActivityLog } from "@/lib/activityLog";
+import { TICKET_STAFF_ROLE_OPTIONS } from "@/lib/ticketTypesConfig";
 import {
   adminCard,
   adminInput,
@@ -66,13 +67,7 @@ const BASE_ROLES: { value: ManagedStaffRole; label: string }[] = [
   { value: "application_reviewer", label: "مراجع التقديمات" },
   { value: "about_manager", label: "مدير من نحن" },
   { value: "store_orders_manager", label: "طلبات المتاجر" },
-  { value: "ticket_support_manager", label: "تكت — دعم فني" },
-  { value: "ticket_admin_inquiry_manager", label: "تكت — استفسار إداري" },
-  { value: "ticket_player_complaint_manager", label: "تكت — شكوى لاعب" },
-  { value: "ticket_compensation_manager", label: "تكت — طلب تعويض" },
-  { value: "ticket_store_manager", label: "تكت — طلب متجر" },
-  { value: "ticket_general_manager", label: "تكت — عام" },
-  { value: "footer_manager", label: "مدير الفوتر" },
+  ...TICKET_STAFF_ROLE_OPTIONS.map((o) => ({ value: o.value as ManagedStaffRole, label: o.label })),
 ];
 
 function roleLabel(r: ManagedStaffRole): string {

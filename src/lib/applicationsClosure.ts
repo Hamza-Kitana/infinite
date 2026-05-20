@@ -3,6 +3,7 @@ import {
   INSTITUTION_BRANCH_IDS,
   type InstitutionBranchId,
 } from "@/data/institutionBranches";
+import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
 /**
  * إدارة حالة "إغلاق التقديم" لكل فرع مؤسسي.
@@ -55,11 +56,10 @@ export function loadApplicationsClosure(): Persisted {
 function save(next: Persisted) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(next), [EVENT_NAME]);
   } catch {
     /* تجاهل تجاوز الحصة — الحالة ستُعاد قراءتها لاحقاً من القرص */
   }
-  window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 
 export function setBranchApplicationsClosed(
@@ -101,13 +101,7 @@ export function useApplicationsClosure() {
   const [state, setState] = useState<Persisted>(() => loadApplicationsClosure());
 
   useEffect(() => {
-    const sync = () => setState(loadApplicationsClosure());
-    window.addEventListener("storage", sync);
-    window.addEventListener(EVENT_NAME, sync as EventListener);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener(EVENT_NAME, sync as EventListener);
-    };
+    return listenStorageSync(STORAGE_KEY, () => setState(loadApplicationsClosure()), [EVENT_NAME]);
   }, []);
 
   return useMemo(() => state, [state]);
@@ -132,6 +126,8 @@ export function branchIdFromApplicationRoleKey(
       return "interior_cia";
     case "interior_marines":
       return "interior_marines";
+    case "interior_fpi":
+      return "interior_fpi";
     case "oversight":
       return "oversight";
     case "lawyer":

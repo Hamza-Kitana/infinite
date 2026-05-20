@@ -130,3 +130,14 @@ export function canApplyForPublicJobs(
   if (!profile || profile.authProvider !== "discord") return false;
   return hasApprovedCitizenApplication(profile, applications);
 }
+
+/** نفس شرط الوظائف — تقديم العصابة، صنّاع المحتوى، والمؤسسات بعد قبول التقديم الإلكتروني */
+export function isPostCitizenApplyUnlocked(
+  profile: PublicUserProfile | null,
+  applications: ApplicationRecord[],
+): boolean {
+  return canApplyForPublicJobs(profile, applications);
+}
+
+export const MSG_POST_CITIZEN_APPROVED_NEEDED =
+  "هذا التقديم متاح فقط بعد إكمال التقديم الإلكتروني للمواطن وقبوله من الإدارة. إن كان طلبك قيد المراجعة، انتظر القرار ثم عُد.";
