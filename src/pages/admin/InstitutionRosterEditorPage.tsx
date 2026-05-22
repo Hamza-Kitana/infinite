@@ -304,6 +304,7 @@ const InstitutionRosterEditorPage = () => {
     resetBranchToDefault,
     assignFromApplication,
     promoteMember,
+    vacateLeadershipSlot,
   } = useInstitutionRostersContent();
   const { applications, setDecision } = useApplicationsContent();
   const visibility = useSiteVisibility();
@@ -497,19 +498,45 @@ const InstitutionRosterEditorPage = () => {
       setAssignConflict(null);
       return;
     }
-    const result = promoteMember(
+    const result = vacateLeadershipSlot(
       branchId,
-      { userId: slotPerson.userId },
-      "member",
+      slot,
       slotPerson.title || (slot === "leader" ? "قائد سابق" : "نائب سابق"),
     );
     if (result === "ok") {
       toast.success(slot === "leader" ? "تم تخفيض القائد الحالي إلى عضو" : "تم تخفيض النائب الحالي إلى عضو");
       setAssignConflict(null);
-      // مزامنة المسودة بعد التغيير المباشر على المخزن
       setDraft(rosterToDraft(getBranchRoster(branchId)));
     } else {
       toast.error("تعذر تخفيض الشخص الحالي. تحقق من البيانات.");
+    }
+  };
+
+  const promoteDraftMemberToRole = (memberKey: string, role: "leader" | "deputy") => {
+    if (!branchId || !draft) return;
+    const idx = getBranchRoster(branchId).members.findIndex((m) => {
+      const draftMember = draft.members.find((d) => d._key === memberKey);
+      if (!draftMember) return false;
+      if (draftMember.userId) return m.userId === draftMember.userId;
+      return m.title === draftMember.title && m.image === draftMember.image;
+    });
+    if (idx < 0) {
+      toast.error("تعذر العثور على العضو في الطاقم المحفوظ — احفظ التعديلات ثم أعد المحاولة");
+      return;
+    }
+    const member = getBranchRoster(branchId).members[idx];
+    const result = promoteMember(
+      branchId,
+      { memberIndex: idx },
+      role,
+      member.rankLabel || member.subtitle,
+    );
+    if (result === "ok") {
+      setDraft(rosterToDraft(getBranchRoster(branchId)));
+      setMemberEditKey(null);
+      toast.success(role === "leader" ? "تم تعيين قائد جديد (القائد السابق أُضيف للأعضاء)" : "تم تعيين نائب جديد");
+    } else {
+      toast.error("تعذر تعيين المنصب");
     }
   };
 
@@ -999,7 +1026,20 @@ const InstitutionRosterEditorPage = () => {
               </div>
             </div>
           ) : null}
-          <DialogFooter className="gap-2 sm:justify-start">
+          <DialogFooter className="flex flex-wrap gap-2 sm:justify-start">
+            {personEditTarget ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                onClick={() => {
+                  demoteCurrentLeaderOrDeputy(personEditTarget);
+                  setPersonEditTarget(null);
+                }}
+              >
+                نقل {personEditTarget === "leader" ? "القائد" : "النائب"} إلى الأعضاء
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -1157,7 +1197,27 @@ const InstitutionRosterEditorPage = () => {
               </div>
             </div>
           ) : null}
-          <DialogFooter className="gap-2 sm:justify-start">
+          <DialogFooter className="flex flex-wrap gap-2 sm:justify-start">
+            {memberToEdit ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  onClick={() => promoteDraftMemberToRole(memberToEdit._key, "leader")}
+                >
+                  تعيين كقائد
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+                  onClick={() => promoteDraftMemberToRole(memberToEdit._key, "deputy")}
+                >
+                  تعيين كنائب
+                </Button>
+              </>
+            ) : null}
             <Button type="button" variant="outline" className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800" onClick={() => setMemberEditKey(null)}>
               إغلاق
             </Button>

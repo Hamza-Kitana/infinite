@@ -48,6 +48,46 @@ function loadPersisted(): InstitutionRostersPersisted {
 
 const INSTITUTION_ROSTERS_CHANGED_EVENT = "ic-institution-rosters-changed";
 
+function emptyRosterPerson(): RosterPerson {
+  return { name: "", title: "", image: "", bio: "" };
+}
+
+function isLeadershipSlotOccupied(p: RosterPerson): boolean {
+  if (p.userId) return true;
+  return !!p.name && p.name.trim().length > 1;
+}
+
+function rosterPersonToMember(p: RosterPerson, rankFallback: string): ChromaGridItem {
+  return {
+    image: p.image || "/placeholder.svg",
+    title: p.name?.trim() || "—",
+    subtitle: p.title?.trim() || rankFallback,
+    rankLabel: p.title?.trim() || rankFallback,
+    bio: p.bio,
+    userId: p.userId,
+    discordId: p.discordId,
+    borderColor: "#22D3EE",
+    gradient: "linear-gradient(145deg, #0e7490, #000)",
+  };
+}
+
+/** ينقل شاغل منصب القائد/النائب إلى أعضاء الشبكة ويفرغ المنصب */
+function moveSlotOccupantToMembers(
+  roster: InstitutionRosterData,
+  slot: "leader" | "deputy",
+  rankFallback: string,
+): InstitutionRosterData {
+  const occupant = roster[slot];
+  if (!isLeadershipSlotOccupied(occupant)) {
+    return { ...roster, [slot]: emptyRosterPerson() };
+  }
+  return {
+    ...roster,
+    [slot]: emptyRosterPerson(),
+    members: [rosterPersonToMember(occupant, rankFallback), ...roster.members],
+  };
+}
+
 function savePersisted(data: InstitutionRostersPersisted) {
   writeSyncedLocalStorage(STORAGE_KEY, JSON.stringify(data), [INSTITUTION_ROSTERS_CHANGED_EVENT]);
 }
@@ -120,6 +160,12 @@ type InstitutionRostersContentValue = {
   ) => void;
   /** إزالة عضو من الـmembers grid */
   removeMember: (branchId: InstitutionBranchId, memberIndex: number) => void;
+  /** إفراغ منصب قائد/نائب (ينقل الشاغل الحالي إلى الأعضاء إن وُجد) */
+  vacateLeadershipSlot: (
+    branchId: InstitutionBranchId,
+    slot: "leader" | "deputy",
+    demotedRankLabel?: string,
+  ) => "ok" | "not_found";
 };
 
 const InstitutionRostersContentContext = createContext<InstitutionRostersContentValue | null>(null);
@@ -209,49 +255,54 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
     [persisted.rosters],
   );
 
-  /** يحدد ما إذا كان مكان القائد/النائب "مشغولاً" بشخص حقيقي (ليس placeholder افتراضياً) */
-  const isSlotOccupied = useCallback((p: RosterPerson): boolean => {
-    if (p.userId) return true;
-    return !!p.name && p.name.trim().length > 1;
-  }, []);
+  const isSlotOccupied = useCallback((p: RosterPerson): boolean => isLeadershipSlotOccupied(p), []);
 
   const assignFromApplication = useCallback(
     (input: AssignFromApplicationInput): "ok" | "leader_conflict" | "deputy_conflict" | "not_found" => {
       const current = persisted.rosters[input.branchId];
       if (!current) return "not_found";
 
-      if (input.role === "leader" && isSlotOccupied(current.leader)) {
-        return "leader_conflict";
+      let rosterBase = current;
+      if (input.role === "leader" && isSlotOccupied(rosterBase.leader)) {
+        rosterBase = moveSlotOccupantToMembers(
+          rosterBase,
+          "leader",
+          rosterBase.leader.title || "قائد سابق",
+        );
       }
-      if (input.role === "deputy" && isSlotOccupied(current.deputy)) {
-        return "deputy_conflict";
+      if (input.role === "deputy" && isSlotOccupied(rosterBase.deputy)) {
+        rosterBase = moveSlotOccupantToMembers(
+          rosterBase,
+          "deputy",
+          rosterBase.deputy.title || "نائب سابق",
+        );
       }
 
       const next: InstitutionRosterData =
         input.role === "leader"
           ? {
-              ...current,
+              ...rosterBase,
               leader: {
                 name: input.name,
                 title: input.rankLabel || "قائد المؤسسة",
                 image: input.image,
                 bio: input.bio ?? "",
                 tagline: input.tagline,
-                highlights: current.leader.highlights,
+                highlights: rosterBase.leader.highlights,
                 userId: input.userId,
                 discordId: input.discordId,
               },
             }
           : input.role === "deputy"
             ? {
-                ...current,
+                ...rosterBase,
                 deputy: {
                   name: input.name,
                   title: input.rankLabel || "نائب القائد",
                   image: input.image,
                   bio: input.bio ?? "",
                   tagline: input.tagline,
-                  highlights: current.deputy.highlights,
+                  highlights: rosterBase.deputy.highlights,
                   userId: input.userId,
                   discordId: input.discordId,
                 },
@@ -259,7 +310,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
             : (() => {
                 /** فحص — لو نفس userId موجود سابقاً، نحدّث بدل التكرار */
                 const existingIdx = input.userId
-                  ? current.members.findIndex((m) => m.userId === input.userId)
+                  ? rosterBase.members.findIndex((m) => m.userId === input.userId)
                   : -1;
                 const memberPayload: ChromaGridItem = {
                   image: input.image,
@@ -273,11 +324,11 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
                   gradient: input.gradient ?? "linear-gradient(145deg, #0e7490, #000)",
                 };
                 if (existingIdx >= 0) {
-                  const updated = [...current.members];
+                  const updated = [...rosterBase.members];
                   updated[existingIdx] = { ...updated[existingIdx], ...memberPayload };
-                  return { ...current, members: updated };
+                  return { ...rosterBase, members: updated };
                 }
-                return { ...current, members: [...current.members, memberPayload] };
+                return { ...rosterBase, members: [...rosterBase.members, memberPayload] };
               })();
 
       setPersisted((prev) => {
@@ -330,11 +381,26 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       }
       if (!person) return "not_found";
 
-      if (newRole === "leader" && !demotedFromLeader && isSlotOccupied(current.leader)) {
-        return "leader_conflict";
+      let working = current;
+
+      if (demotedFromLeader) {
+        working = { ...working, leader: emptyRosterPerson() };
+      } else if (demotedFromDeputy) {
+        working = { ...working, deputy: emptyRosterPerson() };
       }
-      if (newRole === "deputy" && !demotedFromDeputy && isSlotOccupied(current.deputy)) {
-        return "deputy_conflict";
+
+      if (removeMemberIdx >= 0) {
+        working = {
+          ...working,
+          members: working.members.filter((_, i) => i !== removeMemberIdx),
+        };
+      }
+
+      if (newRole === "leader" && !demotedFromLeader && isSlotOccupied(working.leader)) {
+        working = moveSlotOccupantToMembers(working, "leader", working.leader.title || "قائد سابق");
+      }
+      if (newRole === "deputy" && !demotedFromDeputy && isSlotOccupied(working.deputy)) {
+        working = moveSlotOccupantToMembers(working, "deputy", working.deputy.title || "نائب سابق");
       }
 
       const userId = "userId" in person ? person.userId : undefined;
@@ -343,28 +409,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       const name = "name" in person ? person.name : person.title;
       const bio = "bio" in person ? person.bio : undefined;
 
-      let nextRoster: InstitutionRosterData = current;
-
-      // إذا كان قادماً من القائد/النائب، نفرغ مكانه
-      if (demotedFromLeader) {
-        nextRoster = {
-          ...nextRoster,
-          leader: { name: "", title: "", image: "", bio: "" },
-        };
-      }
-      if (demotedFromDeputy) {
-        nextRoster = {
-          ...nextRoster,
-          deputy: { name: "", title: "", image: "", bio: "" },
-        };
-      }
-      // إذا كان من الأعضاء، نزيله من القائمة
-      if (removeMemberIdx >= 0) {
-        nextRoster = {
-          ...nextRoster,
-          members: nextRoster.members.filter((_, i) => i !== removeMemberIdx),
-        };
-      }
+      let nextRoster: InstitutionRosterData = working;
 
       const finalRankLabel = rankLabel ?? ("rankLabel" in person ? person.rankLabel : undefined);
 
@@ -444,6 +489,31 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
     [],
   );
 
+  const vacateLeadershipSlot = useCallback(
+    (
+      branchId: InstitutionBranchId,
+      slot: "leader" | "deputy",
+      demotedRankLabel?: string,
+    ): "ok" | "not_found" => {
+      const current = persisted.rosters[branchId];
+      if (!current) return "not_found";
+      const fallback =
+        demotedRankLabel?.trim() ||
+        (slot === "leader" ? current.leader.title || "قائد سابق" : current.deputy.title || "نائب سابق");
+      const next = moveSlotOccupantToMembers(current, slot, fallback);
+      setPersisted((prev) => {
+        const out: InstitutionRostersPersisted = {
+          v: 1,
+          rosters: { ...prev.rosters, [branchId]: next },
+        };
+        savePersisted(out);
+        return out;
+      });
+      return "ok";
+    },
+    [persisted.rosters],
+  );
+
   const removeMember = useCallback((branchId: InstitutionBranchId, memberIndex: number) => {
     setPersisted((prev) => {
       const r = prev.rosters[branchId];
@@ -471,6 +541,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       promoteMember,
       updateMember,
       removeMember,
+      vacateLeadershipSlot,
     }),
     [
       getBranchRoster,
@@ -482,6 +553,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       promoteMember,
       updateMember,
       removeMember,
+      vacateLeadershipSlot,
     ],
   );
 
