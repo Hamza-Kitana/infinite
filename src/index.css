@@ -145,4 +145,35 @@
     background-clip: text;
     color: transparent;
   }
+
+  /**
+   * قوائم منبثقة (Select / Dropdown / Context) — خلفية صلبة وتظليل hover واضح في الدارك مود
+   * يعمل على الموقع العام (body.dark) ولوحة الإدارة (html.dark)
+   */
+  .dark [data-radix-select-content],
+  .dark [data-radix-dropdown-menu-content],
+  .dark [data-radix-dropdown-menu-sub-content],
+  .dark [data-radix-context-menu-content],
+  .dark [data-radix-context-menu-sub-content] {
+    background-color: hsl(var(--popover)) !important;
+    color: hsl(var(--popover-foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+    opacity: 1 !important;
+    backdrop-filter: none !important;
+  }
+
+  .dark [data-radix-select-viewport] {
+    background-color: hsl(var(--popover)) !important;
+  }
+
+  .dark [data-radix-select-content] [role="option"][data-highlighted],
+  .dark [data-radix-select-content] [role="option"]:focus,
+  .dark [data-radix-dropdown-menu-content] [role="menuitem"][data-highlighted],
+  .dark [data-radix-dropdown-menu-content] [role="menuitem"]:focus,
+  .dark [data-radix-dropdown-menu-sub-content] [role="menuitem"][data-highlighted],
+  .dark [data-radix-context-menu-content] [role="menuitem"][data-highlighted],
+  .dark [data-radix-context-menu-content] [role="menuitem"]:focus {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
 }
