@@ -305,9 +305,7 @@ const AppRoutes = () => {
           <Route
             path="applications"
             element={
-              <RequireStaffAuth
-                allowRoles={["super_admin", "application_reviewer", "streamer_manager", ...INSTITUTION_ROSTER_STAFF_ROLES]}
-              >
+              <RequireStaffAuth allowRoles={["super_admin", "application_reviewer"]}>
                 <ApplicationsReviewPage />
               </RequireStaffAuth>
             }

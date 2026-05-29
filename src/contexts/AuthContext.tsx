@@ -425,7 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canEditInstitutionRosters:
         has("super_admin") || (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false),
       isApplicationReviewer: has("application_reviewer"),
-      canReviewApplications: has("super_admin") || has("application_reviewer") || has("streamer_manager"),
+      canReviewApplications: has("super_admin") || has("application_reviewer"),
       canUseDashboard:
         isOwner ||
         hasRole(user, "super_admin") ||

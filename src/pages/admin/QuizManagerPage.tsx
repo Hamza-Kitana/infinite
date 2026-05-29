@@ -21,8 +21,11 @@ import { appendActivityLog } from "@/lib/activityLog";
 import {
   saveQuizQuestions,
   loadQuizQuestions,
+  loadQuizAttemptSettings,
+  saveQuizAttemptSettings,
   LAWS_QUIZ_CONTENT_CHANGED_EVENT,
   LAWS_QUIZ_STORAGE_KEY,
+  type QuizAttemptSettings,
 } from "@/lib/lawsQuizContent";
 import {
   cleanQuestions,
@@ -47,12 +50,16 @@ const QuizManagerPage = () => {
   const [draft, setDraft] = useState<QuizQuestion[]>(() =>
     cloneQuizQuestions(loadQuizQuestions(CITIZEN_QUIZ_KEY)),
   );
+  const [attemptSettings, setAttemptSettings] = useState<QuizAttemptSettings>(() =>
+    loadQuizAttemptSettings(CITIZEN_QUIZ_KEY),
+  );
   const [questionDialog, setQuestionDialog] = useState<QuestionDialogState | null>(null);
   /** يمنع إعادة تحميل المسودة من التخزين فور حفظنا — كان يمحو السؤال الجديد قبل ظهوره */
   const skipHydrateRef = useRef(false);
 
   const hydrateFromStorage = useCallback(() => {
     setDraft(cloneQuizQuestions(loadQuizQuestions(CITIZEN_QUIZ_KEY)));
+    setAttemptSettings(loadQuizAttemptSettings(CITIZEN_QUIZ_KEY));
   }, []);
 
   useEffect(() => {
@@ -162,6 +169,20 @@ const QuizManagerPage = () => {
     toast.success("تم حفظ الأسئلة");
   };
 
+  const saveAttemptSettingsNow = () => {
+    const count = Math.min(50, Math.max(1, Math.floor(attemptSettings.questionsPerAttempt) || 10));
+    const normalized = { questionsPerAttempt: count };
+    skipHydrateRef.current = true;
+    saveQuizAttemptSettings(CITIZEN_QUIZ_KEY, normalized);
+    setAttemptSettings(normalized);
+    appendActivityLog(
+      user?.username ?? "admin",
+      "تعديل إعدادات اختبار التقديم",
+      `أسئلة لكل محاولة: ${count} من بنك ${draft.length}`,
+    );
+    toast.success("تم حفظ إعدادات المحاولة");
+  };
+
   const dialogDraft = questionDialog?.draft;
 
   return (
@@ -193,6 +214,47 @@ const QuizManagerPage = () => {
             </div>
           </div>
         </CardHeader>
+      </Card>
+
+      <Card className="border-violet-200/90 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/95 dark:shadow-none">
+        <CardHeader className="text-right">
+          <CardTitle className="font-display text-lg text-slate-900 dark:text-slate-50">
+            إعدادات كل محاولة تقديم
+          </CardTitle>
+          <CardDescription className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            بنك الأسئلة الحالي: <strong>{draft.length}</strong> سؤال. كل متقدم يحصل على عدد عشوائي محدّد أدناه —
+            مختلف عن غيره لتقليل الغش.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end justify-between gap-4 text-right">
+          <div className="space-y-2">
+            <Label htmlFor="questions-per-attempt" className="text-slate-700 dark:text-slate-200">
+              عدد الأسئلة لكل متقدم (1–50)
+            </Label>
+            <Input
+              id="questions-per-attempt"
+              type="number"
+              min={1}
+              max={50}
+              value={attemptSettings.questionsPerAttempt}
+              onChange={(e) =>
+                setAttemptSettings({
+                  questionsPerAttempt: Number.parseInt(e.target.value, 10) || 10,
+                })
+              }
+              className="max-w-[8rem] border-slate-300 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={saveAttemptSettingsNow}
+            className="gap-2 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-200 dark:hover:bg-violet-950/40"
+          >
+            <Save className="h-4 w-4" />
+            حفظ الإعداد
+          </Button>
+        </CardContent>
       </Card>
 
       <div className="flex justify-end">

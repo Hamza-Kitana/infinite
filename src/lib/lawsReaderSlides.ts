@@ -3,13 +3,14 @@ import type { LawRuleItem, LawTabSection } from "@/types/lawsSchema";
 export type LawsReaderRuleItem = { id: number; title: string; description: string };
 
 export type LawsReaderSlide =
-  | { kind: "rules"; title: string; items: LawsReaderRuleItem[] }
-  | { kind: "safeZones"; title: string; zones: { icon: string; label: string }[] };
+  | { kind: "rules"; sectionId: string; title: string; items: LawsReaderRuleItem[] }
+  | { kind: "safeZones"; sectionId: string; title: string; zones: { icon: string; label: string }[] };
 
 const RULES_PER_SLIDE = 3;
 
 function addRulesSlides(
   slides: LawsReaderSlide[],
+  sectionId: string,
   baseTitle: string,
   rules: LawsReaderRuleItem[],
 ) {
@@ -18,7 +19,7 @@ function addRulesSlides(
   for (let p = 0; p < totalParts; p += 1) {
     const items = rules.slice(p * RULES_PER_SLIDE, (p + 1) * RULES_PER_SLIDE);
     const title = totalParts > 1 ? `${baseTitle} — الجزء ${p + 1} من ${totalParts}` : baseTitle;
-    slides.push({ kind: "rules", title, items });
+    slides.push({ kind: "rules", sectionId, title, items });
   }
 }
 
@@ -56,14 +57,15 @@ export function buildLawsReaderSlides(sections: LawTabSection[]): LawsReaderSlid
     if (section.hidden) continue;
 
     if (section.kind === "rules") {
-      addRulesSlides(slides, section.label, visibleRules(section.rules));
+      addRulesSlides(slides, section.id, section.label, visibleRules(section.rules));
       continue;
     }
 
-    addRulesSlides(slides, section.label, penaltiesToRuleItems(section));
+    addRulesSlides(slides, section.id, section.label, penaltiesToRuleItems(section));
     if (section.penalties.safeZones.length > 0) {
       slides.push({
         kind: "safeZones",
+        sectionId: section.id,
         title: `${section.label} — المناطق الآمنة`,
         zones: section.penalties.safeZones,
       });
@@ -71,4 +73,13 @@ export function buildLawsReaderSlides(sections: LawTabSection[]): LawsReaderSlid
   }
 
   return slides;
+}
+
+/** يُرجع الشرائح التابعة للأقسام المختارة فقط */
+export function filterSlidesBySectionIds(
+  slides: LawsReaderSlide[],
+  sectionIds: ReadonlySet<string>,
+): LawsReaderSlide[] {
+  if (sectionIds.size === 0) return [];
+  return slides.filter((slide) => sectionIds.has(slide.sectionId));
 }

@@ -66,6 +66,15 @@ function clampQuizAnswer(a: LawsQuizAnswer): LawsQuizAnswer {
 function clampQuizResult(r: LawsQuizResult | undefined): LawsQuizResult | undefined {
   if (!r) return undefined;
   const answers = Array.isArray(r.answers) ? r.answers.slice(0, 50).map(clampQuizAnswer) : [];
+  const askedQuestionIds = Array.isArray(r.askedQuestionIds)
+    ? r.askedQuestionIds.slice(0, 50).map((id) => clampText(String(id), 80))
+    : undefined;
+  const selectedLawSectionIds = Array.isArray(r.selectedLawSectionIds)
+    ? r.selectedLawSectionIds.slice(0, 30).map((id) => clampText(String(id), 80))
+    : undefined;
+  const selectedLawSectionLabels = Array.isArray(r.selectedLawSectionLabels)
+    ? r.selectedLawSectionLabels.slice(0, 30).map((label) => clampText(String(label), 120))
+    : undefined;
   return {
     passed: !!r.passed,
     correctCount: Math.max(0, Math.min(50, Number.isFinite(r.correctCount) ? Math.floor(r.correctCount) : 0)),
@@ -73,6 +82,17 @@ function clampQuizResult(r: LawsQuizResult | undefined): LawsQuizResult | undefi
     attempts: Math.max(1, Math.min(99, Number.isFinite(r.attempts) ? Math.floor(r.attempts) : 1)),
     completedAt: clampText(r.completedAt || new Date().toISOString(), 40),
     answers,
+    poolSize:
+      typeof r.poolSize === "number" && Number.isFinite(r.poolSize)
+        ? Math.max(0, Math.min(200, Math.floor(r.poolSize)))
+        : undefined,
+    questionsPerAttempt:
+      typeof r.questionsPerAttempt === "number" && Number.isFinite(r.questionsPerAttempt)
+        ? Math.max(1, Math.min(50, Math.floor(r.questionsPerAttempt)))
+        : undefined,
+    askedQuestionIds: askedQuestionIds?.length ? askedQuestionIds : undefined,
+    selectedLawSectionIds: selectedLawSectionIds?.length ? selectedLawSectionIds : undefined,
+    selectedLawSectionLabels: selectedLawSectionLabels?.length ? selectedLawSectionLabels : undefined,
   };
 }
 

@@ -22,6 +22,15 @@ export type LawsQuizResult = {
   /** زمن تأكيد الإجابات (ISO) */
   completedAt: string;
   answers: LawsQuizAnswer[];
+  /** حجم بنك الأسئلة الكامل قبل السحب العشوائي */
+  poolSize?: number;
+  /** عدد الأسئلة المطلوبة لكل محاولة (إعداد الإدارة) */
+  questionsPerAttempt?: number;
+  /** معرّفات الأسئلة التي ظهرت لهذا المتقدم */
+  askedQuestionIds?: string[];
+  /** أقسام القوانين التي اختار قراءتها */
+  selectedLawSectionIds?: string[];
+  selectedLawSectionLabels?: string[];
 };
 
 export type ApplicationFormSnapshot = {

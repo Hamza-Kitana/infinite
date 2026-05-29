@@ -349,6 +349,11 @@ function QuizResultSection({ result }: { result?: LawsQuizResult }) {
           <span>
             النتيجة: <strong>{result.correctCount} / {result.totalQuestions}</strong>
           </span>
+          {typeof result.poolSize === "number" && result.poolSize > result.totalQuestions ? (
+            <span>
+              سُحبت من بنك: <strong>{result.totalQuestions}</strong> من <strong>{result.poolSize}</strong>
+            </span>
+          ) : null}
           <span>
             عدد المحاولات: <strong>{result.attempts}</strong>
           </span>
@@ -357,6 +362,12 @@ function QuizResultSection({ result }: { result?: LawsQuizResult }) {
           </span>
         </div>
       </header>
+
+      {Array.isArray(result.selectedLawSectionLabels) && result.selectedLawSectionLabels.length > 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs leading-relaxed text-slate-600 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+          الأقسام التي قرأها المتقدم: <strong>{result.selectedLawSectionLabels.join(" · ")}</strong>
+        </p>
+      ) : null}
 
       {!passed ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">

@@ -11,9 +11,19 @@ export type QuizContextMeta = {
   description: string;
 };
 
+export type QuizAttemptSettings = {
+  /** عدد الأسئلة التي تُسحب عشوائياً لكل متقدم من بنك الأسئلة */
+  questionsPerAttempt: number;
+};
+
+const DEFAULT_QUIZ_ATTEMPT_SETTINGS: QuizAttemptSettings = {
+  questionsPerAttempt: 10,
+};
+
 type PersistedQuizContent = {
   v: 1;
   quizzes: Partial<Record<QuizContextKey, QuizQuestion[]>>;
+  settings?: Partial<Record<QuizContextKey, QuizAttemptSettings>>;
 };
 
 export const LAWS_QUIZ_STORAGE_KEY = "ic_laws_quiz_content_v1";
@@ -68,8 +78,43 @@ function normalizeQuestion(row: QuizQuestion): QuizQuestion {
   };
 }
 
+function normalizeAttemptSettings(raw: unknown): QuizAttemptSettings {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_QUIZ_ATTEMPT_SETTINGS };
+  const n = (raw as Partial<QuizAttemptSettings>).questionsPerAttempt;
+  const questionsPerAttempt =
+    typeof n === "number" && Number.isFinite(n) ? Math.min(50, Math.max(1, Math.floor(n))) : DEFAULT_QUIZ_ATTEMPT_SETTINGS.questionsPerAttempt;
+  return { questionsPerAttempt };
+}
+
+function hydrateSettings(parsed: Partial<PersistedQuizContent>): Partial<Record<QuizContextKey, QuizAttemptSettings>> {
+  const out: Partial<Record<QuizContextKey, QuizAttemptSettings>> = {};
+  if (!parsed.settings || typeof parsed.settings !== "object") return out;
+  for (const ctx of QUIZ_CONTEXTS) {
+    const row = parsed.settings[ctx.key];
+    if (row) out[ctx.key] = normalizeAttemptSettings(row);
+  }
+  return out;
+}
+
 function defaultQuizFor(key: QuizContextKey): QuizQuestion[] {
   return DEFAULT_QUIZZES[key] ?? [];
+}
+
+export function loadQuizAttemptSettings(key: QuizContextKey): QuizAttemptSettings {
+  const stored = loadPersisted().settings?.[key];
+  return stored ? normalizeAttemptSettings(stored) : { ...DEFAULT_QUIZ_ATTEMPT_SETTINGS };
+}
+
+export function saveQuizAttemptSettings(key: QuizContextKey, settings: QuizAttemptSettings) {
+  const current = loadPersisted();
+  const next: PersistedQuizContent = {
+    ...current,
+    settings: {
+      ...current.settings,
+      [key]: normalizeAttemptSettings(settings),
+    },
+  };
+  writeSyncedLocalStorage(LAWS_QUIZ_STORAGE_KEY, JSON.stringify(next), [LAWS_QUIZ_CONTENT_CHANGED_EVENT]);
 }
 
 function loadPersisted(): PersistedQuizContent {
@@ -85,7 +130,7 @@ function loadPersisted(): PersistedQuizContent {
       const normalized = rows.filter(isQuizQuestion).map(normalizeQuestion);
       if (normalized.length > 0) quizzes[ctx.key] = normalized;
     }
-    return { v: 1, quizzes };
+    return { v: 1, quizzes, settings: hydrateSettings(parsed) };
   } catch {
     return { v: 1, quizzes: {} };
   }
@@ -106,6 +151,7 @@ export function saveQuizQuestions(key: QuizContextKey, questions: QuizQuestion[]
   const current = loadPersisted();
   const cleaned = questions.filter(isQuizQuestion).map(normalizeQuestion);
   const next: PersistedQuizContent = {
+    ...current,
     v: 1,
     quizzes: {
       ...current.quizzes,
@@ -121,9 +167,21 @@ export function resetQuizQuestions(key: QuizContextKey) {
   delete nextQuizzes[key];
   writeSyncedLocalStorage(
     LAWS_QUIZ_STORAGE_KEY,
-    JSON.stringify({ v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent),
+    JSON.stringify({ ...current, v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent),
     [LAWS_QUIZ_CONTENT_CHANGED_EVENT],
   );
+}
+
+export function useQuizAttemptSettings(key: QuizContextKey): QuizAttemptSettings {
+  const [settings, setSettings] = useState<QuizAttemptSettings>(() => loadQuizAttemptSettings(key));
+
+  useEffect(() => {
+    return listenStorageSync(LAWS_QUIZ_STORAGE_KEY, () => setSettings(loadQuizAttemptSettings(key)), [
+      LAWS_QUIZ_CONTENT_CHANGED_EVENT,
+    ]);
+  }, [key]);
+
+  return useMemo(() => settings, [settings]);
 }
 
 export function useQuizQuestions(key: QuizContextKey): QuizQuestion[] {

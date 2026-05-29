@@ -282,6 +282,9 @@ function rolesSetsEqual(a: Set<ManagedStaffRole>, b: readonly ManagedStaffRole[]
   return b.every((r) => a.has(r));
 }
 
+/** قوائم الرتب داخل نوافذ الحوار — لا تُقصّ بـ overflow النافذة */
+const STAFF_DIALOG_SELECT_CONTENT = "z-[500] max-h-[min(var(--radix-select-content-available-height),24rem)]";
+
 const StaffUsersPage = () => {
   const { isSuperAdmin, user, auditActorName } = useAuth();
   const { user: publicSessionUser } = usePublicUser();
@@ -1069,11 +1072,11 @@ const StaffUsersPage = () => {
       >
         <DialogContent
           dir="rtl"
-          className="max-h-[min(90dvh,42rem)] overflow-y-auto border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] sm:max-w-2xl sm:rounded-2xl"
+          className="max-h-[min(90dvh,42rem)] overflow-visible border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-2xl sm:rounded-2xl"
         >
           <DialogHeader>
-            <DialogTitle className="font-display text-slate-900">تعديل موظف</DialogTitle>
-            <DialogDescription className="text-slate-600">
+            <DialogTitle className="font-display text-slate-900 dark:text-slate-50">تعديل موظف</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               غيّر اسم المستخدم والرتب. يمكنك تطبيق مجموعة لإضافة عدة رتب.
               {editStaffLinkedToPublic
                 ? " الموظفون المربوطون بمواطن يدخلون عبر حسابهم العام — لا تُستخدم كلمة مرور منفصلة للوحة."
@@ -1081,6 +1084,7 @@ const StaffUsersPage = () => {
             </DialogDescription>
           </DialogHeader>
           {editForm ? (
+            <div className="max-h-[min(calc(90dvh-9rem),36rem)] overflow-y-auto overscroll-contain pe-0.5">
             <form onSubmit={handleEditSave} className="space-y-4" noValidate>
               {cannotEditOwnStaffRoles ? (
                 <p className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm leading-relaxed text-amber-950">
@@ -1126,6 +1130,7 @@ const StaffUsersPage = () => {
                   </div>
                   <Select
                     key={`grp-edit-${editGroupPickerKey}`}
+                    modal={false}
                     disabled={cannotEditOwnStaffRoles}
                     onValueChange={(v) => v && applyGroupToEdit(v)}
                   >
@@ -1137,7 +1142,7 @@ const StaffUsersPage = () => {
                     >
                       <SelectValue placeholder="اختر مجموعة لإضافة رتبها" />
                     </SelectTrigger>
-                    <SelectContent dir="rtl" className="max-h-72 border-amber-200 bg-white">
+                    <SelectContent dir="rtl" className={STAFF_DIALOG_SELECT_CONTENT}>
                       {groups.map((g) => (
                         <SelectItem
                           key={g.id}
@@ -1182,6 +1187,7 @@ const StaffUsersPage = () => {
                 <Label htmlFor="edit-role-picker" className="text-slate-700">إضافة رتبة فردية</Label>
                 <Select
                   key={editRolePickerKey}
+                  modal={false}
                   disabled={cannotEditOwnStaffRoles || !editHasAvailableRoles}
                   onValueChange={(v) => v && addEditRoleFromPicker(v)}
                 >
@@ -1195,7 +1201,7 @@ const StaffUsersPage = () => {
                       placeholder={editHasAvailableRoles ? "اختر رتبة لإضافتها" : "تم اختيار كل الرتب"}
                     />
                   </SelectTrigger>
-                  <SelectContent dir="rtl" className="max-h-[min(70vh,24rem)] border-violet-200 bg-white">
+                  <SelectContent dir="rtl" className={STAFF_DIALOG_SELECT_CONTENT}>
                     {BASE_ROLES.some((b) => !editForm.roles.has(b.value)) ? (
                       <SelectGroup>
                         <SelectLabel className="text-right text-slate-500">رتب عامة</SelectLabel>
@@ -1266,6 +1272,7 @@ const StaffUsersPage = () => {
                 </Button>
               </DialogFooter>
             </form>
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>
@@ -1576,7 +1583,7 @@ const StaffUsersPage = () => {
       >
         <DialogContent
           dir="rtl"
-          className="max-h-[min(92dvh,46rem)] overflow-y-auto border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-2xl sm:rounded-2xl"
+          className="max-h-[min(92dvh,46rem)] overflow-visible border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-2xl sm:rounded-2xl"
         >
           <DialogHeader>
             <DialogTitle className="flex items-center justify-end gap-2 font-display text-slate-900 dark:text-slate-50">
@@ -1588,6 +1595,7 @@ const StaffUsersPage = () => {
             </DialogDescription>
           </DialogHeader>
           {promote ? (
+            <div className="max-h-[min(calc(92dvh-9rem),40rem)] overflow-y-auto overscroll-contain pe-0.5">
             <form onSubmit={handlePromoteSubmit} className="space-y-5" noValidate>
               <div className="rounded-xl border border-amber-200 bg-gradient-to-l from-amber-50 via-white to-amber-50 p-4 dark:border-amber-800/55 dark:bg-gradient-to-l dark:from-amber-950/35 dark:via-slate-800 dark:to-amber-950/35">
                 <p className="font-display text-base font-bold text-slate-900 dark:text-slate-50">{promote.publicUser.fullName}</p>
@@ -1627,6 +1635,7 @@ const StaffUsersPage = () => {
                   </div>
                   <Select
                     key={`grp-promote-${promoteGroupPickerKey}`}
+                    modal={false}
                     disabled={promoteTargetsOwnPublicAccount}
                     onValueChange={(v) => v && applyGroupToPromote(v)}
                   >
@@ -1638,7 +1647,7 @@ const StaffUsersPage = () => {
                     >
                       <SelectValue placeholder="اختر مجموعة لإضافة كل رتبها" />
                     </SelectTrigger>
-                    <SelectContent dir="rtl" className="max-h-72 border-amber-200 bg-white dark:border-slate-600 dark:bg-slate-900">
+                    <SelectContent dir="rtl" className={STAFF_DIALOG_SELECT_CONTENT}>
                       {groups.map((g) => (
                         <SelectItem
                           key={g.id}
@@ -1689,6 +1698,7 @@ const StaffUsersPage = () => {
                 </Label>
                 <Select
                   key={promoteRolePickerKey}
+                  modal={false}
                   disabled={promoteTargetsOwnPublicAccount || !promoteHasAvailableRoles}
                   onValueChange={(v) => v && addPromoteRoleFromPicker(v)}
                 >
@@ -1702,7 +1712,7 @@ const StaffUsersPage = () => {
                       placeholder={promoteHasAvailableRoles ? "اختر رتبة لإضافتها" : "تم اختيار كل الرتب"}
                     />
                   </SelectTrigger>
-                  <SelectContent dir="rtl" className="max-h-[min(70vh,24rem)] border-violet-200 bg-white dark:border-slate-600 dark:bg-slate-900">
+                  <SelectContent dir="rtl" className={STAFF_DIALOG_SELECT_CONTENT}>
                     {BASE_ROLES.some((b) => !promote.roles.has(b.value)) ? (
                       <SelectGroup>
                         <SelectLabel className="text-right text-slate-500 dark:text-slate-400">رتب عامة</SelectLabel>
@@ -1790,6 +1800,7 @@ const StaffUsersPage = () => {
                 </div>
               </DialogFooter>
             </form>
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>

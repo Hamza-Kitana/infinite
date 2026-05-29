@@ -107,7 +107,7 @@ const STATIC_NAV_TAIL: NavItem[] = [
     to: "/dashboard/applications",
     label: "طلبات التقديم",
     icon: ClipboardList,
-    roles: ["super_admin", "application_reviewer", "streamer_manager", ...INSTITUTION_ROSTER_STAFF_ROLES],
+    roles: ["super_admin", "application_reviewer"],
   },
 ];
 
@@ -274,7 +274,7 @@ const AdminLayout = () => {
     if (storeOrdersUnread > 0) {
       map.set("/dashboard/store-orders", storeOrdersUnread);
     }
-    if (pendingApplicationsCount > 0) {
+    if (pendingApplicationsCount > 0 && (isSuperAdmin || isApplicationReviewer)) {
       map.set("/dashboard/applications", pendingApplicationsCount);
     }
     if (pendingJobApplicationsCount > 0) {
@@ -294,6 +294,8 @@ const AdminLayout = () => {
     pendingJobApplicationsCount,
     pendingStreamerApplicationsCount,
     gangInboxUnread,
+    isSuperAdmin,
+    isApplicationReviewer,
   ]);
 
   const renderSidebarBadge = (path: string, count: number) => {
