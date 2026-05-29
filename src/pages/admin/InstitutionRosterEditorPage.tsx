@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BookOpen, Building2, GripVertical, ImagePlus, Lock, Plus, Settings2, ShieldQuestion, Trash2, Unlock } from "lucide-react";
+import { BookOpen, Building2, GripVertical, ImagePlus, Lock, Settings2, ShieldQuestion, Trash2, Unlock } from "lucide-react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertDialog,
@@ -883,38 +883,7 @@ const InstitutionRosterEditorPage = () => {
       </div>
 
       <div ref={membersSectionRef} className="space-y-3 scroll-mt-24">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="font-display text-sm font-semibold text-violet-700 dark:text-violet-300">أعضاء الشبكة (Chroma)</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 hover:text-violet-800 dark:border-violet-600 dark:bg-slate-900 dark:text-violet-200 dark:hover:bg-slate-950 dark:hover:text-violet-100"
-            onClick={() =>
-              setDraft((d) =>
-                d
-                  ? {
-                      ...d,
-                      members: [
-                        ...d.members,
-                        {
-                          _key: crypto.randomUUID(),
-                          image: "/placeholder.svg",
-                          title: "اسم العضو",
-                          subtitle: "المنصب",
-                          borderColor: "#22D3EE",
-                          gradient: defaultGradient,
-                          hidden: false,
-                        },
-                      ],
-                    }
-                  : d,
-              )
-            }
-          >
-            <Plus className="ms-1 h-4 w-4" /> إضافة عضو
-          </Button>
-        </div>
+        <p className="font-display text-sm font-semibold text-violet-700 dark:text-violet-300">أعضاء الشبكة (Chroma)</p>
         <div className="max-w-sm">
           <Input
             value={memberSearch}
