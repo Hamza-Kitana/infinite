@@ -84,7 +84,6 @@ import {
 } from "@/lib/applicationsClosure";
 import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const ROSTER_PLACEHOLDER_IMAGE = "/placeholder.svg";
 
 /** صورة الطاقم عند القبول — يفضّل أفاتار Discord للحساب المرتبط */
@@ -384,10 +383,6 @@ const InstitutionRosterEditorPage = () => {
 
   const onLeaderImage = useCallback(async (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("الصورة كبيرة جداً (حد أقصى 2 ميجابايت).");
-      return;
-    }
     try {
       const url = await readFileAsDataUrl(file);
       setDraft((d) => (d ? { ...d, leader: { ...d.leader, image: url } } : d));
@@ -399,10 +394,6 @@ const InstitutionRosterEditorPage = () => {
 
   const onDeputyImage = useCallback(async (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("الصورة كبيرة جداً.");
-      return;
-    }
     try {
       const url = await readFileAsDataUrl(file);
       setDraft((d) => (d ? { ...d, deputy: { ...d.deputy, image: url } } : d));
@@ -414,10 +405,6 @@ const InstitutionRosterEditorPage = () => {
 
   const onMemberImage = useCallback(async (key: string, file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("الصورة كبيرة جداً.");
-      return;
-    }
     try {
       const url = await readFileAsDataUrl(file);
       setDraft((d) =>
@@ -1429,10 +1416,6 @@ function ApplicationReviewBody({
     input.onchange = async () => {
       const file = input.files?.[0] ?? null;
       if (!file || !file.type.startsWith("image/")) return;
-      if (file.size > MAX_IMAGE_BYTES) {
-        toast.error("الصورة كبيرة جداً (حد أقصى 2 ميجابايت).");
-        return;
-      }
       try {
         const url = await readFileAsDataUrl(file);
         setApplicantImage(url);
