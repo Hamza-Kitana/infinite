@@ -11,14 +11,14 @@ import { defaultPackagesPersisted, type PackagesPersisted } from "@/data/package
 import type { PackageCatalogItem } from "@/data/packagesCatalog";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_packages_v1";
+const STORAGE_KEY = "ic_packages_v2";
 
 function loadPersisted(): PackagesPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultPackagesPersisted();
     const p = JSON.parse(raw) as PackagesPersisted;
-    if (p?.v === 1 && Array.isArray(p.packages)) return p;
+    if (p?.v === 2 && Array.isArray(p.packages)) return p;
   } catch {
     /* fallback */
   }

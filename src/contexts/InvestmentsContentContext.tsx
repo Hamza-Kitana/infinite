@@ -11,14 +11,14 @@ import { defaultInvestmentsPersisted, type InvestmentsPersisted } from "@/data/i
 import type { InvestmentCatalogItem } from "@/data/investmentsCatalog";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_investments_v1";
+const STORAGE_KEY = "ic_investments_v2";
 
 function loadPersisted(): InvestmentsPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultInvestmentsPersisted();
     const p = JSON.parse(raw) as InvestmentsPersisted;
-    if (p?.v === 1 && Array.isArray(p.investments)) return p;
+    if (p?.v === 2 && Array.isArray(p.investments)) return p;
   } catch {
     /* fallback */
   }

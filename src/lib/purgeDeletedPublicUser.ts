@@ -14,7 +14,7 @@ import { loadTickets, saveTickets, type TicketThread } from "@/lib/ticketsCenter
 import { writeSyncedLocalStorage } from "@/lib/storageSync";
 
 const APPLICATIONS_KEY = "ic_public_applications_v1";
-const ROSTERS_KEY = "ic_institution_rosters_v1";
+const ROSTERS_KEY = "ic_institution_rosters_v2";
 
 export const IC_PUBLIC_APPLICATIONS_CHANGED_EVENT = "ic-public-applications-changed";
 export const IC_INSTITUTION_ROSTERS_CHANGED_EVENT = "ic-institution-rosters-changed";
@@ -45,11 +45,11 @@ function hydrateRosters(partial: unknown): InstitutionRostersPersisted {
   if (
     partial &&
     typeof partial === "object" &&
-    (partial as InstitutionRostersPersisted).v === 1 &&
+    (partial as InstitutionRostersPersisted).v === 2 &&
     typeof (partial as InstitutionRostersPersisted).rosters === "object" &&
     (partial as InstitutionRostersPersisted).rosters !== null
   ) {
-    return { v: 1, rosters: { ...base.rosters, ...(partial as InstitutionRostersPersisted).rosters } };
+    return { v: 2, rosters: { ...base.rosters, ...(partial as InstitutionRostersPersisted).rosters } };
   }
   return base;
 }
@@ -166,6 +166,6 @@ export function purgeArtifactsForDeletedPublicUser(target: DeletedPublicUserRef)
     }
   }
   if (rostersChanged) {
-    saveRostersPersisted({ v: 1, rosters: nextRosters });
+    saveRostersPersisted({ v: 2, rosters: nextRosters });
   }
 }

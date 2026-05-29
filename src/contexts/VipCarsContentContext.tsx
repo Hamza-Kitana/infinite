@@ -11,14 +11,14 @@ import { defaultVipCarsPersisted, type VipCarsPersisted } from "@/data/vipCarsDe
 import type { VipCatalogCar } from "@/data/vipCarsCatalog";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_vip_cars_v1";
+const STORAGE_KEY = "ic_vip_cars_v2";
 
 function loadPersisted(): VipCarsPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultVipCarsPersisted();
     const p = JSON.parse(raw) as VipCarsPersisted;
-    if (p?.v === 1 && Array.isArray(p.cars)) {
+    if (p?.v === 2 && Array.isArray(p.cars)) {
       return p;
     }
   } catch {

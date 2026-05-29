@@ -20,18 +20,18 @@ import {
 } from "@/data/institutionRostersDefaultState";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_institution_rosters_v1";
+const STORAGE_KEY = "ic_institution_rosters_v2";
 
 function hydrate(partial: unknown): InstitutionRostersPersisted {
   const base = defaultInstitutionRostersPersisted();
   if (
     partial &&
     typeof partial === "object" &&
-    (partial as InstitutionRostersPersisted).v === 1 &&
+    (partial as InstitutionRostersPersisted).v === 2 &&
     typeof (partial as InstitutionRostersPersisted).rosters === "object" &&
     (partial as InstitutionRostersPersisted).rosters !== null
   ) {
-    return { v: 1, rosters: { ...base.rosters, ...(partial as InstitutionRostersPersisted).rosters } };
+    return { v: 2, rosters: { ...base.rosters, ...(partial as InstitutionRostersPersisted).rosters } };
   }
   return base;
 }
@@ -187,7 +187,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
   const setBranchRoster = useCallback((id: InstitutionBranchId, roster: InstitutionRosterData) => {
     setPersisted((prev) => {
       const next: InstitutionRostersPersisted = {
-        v: 1,
+        v: 2,
         rosters: { ...prev.rosters, [id]: JSON.parse(JSON.stringify(roster)) as InstitutionRosterData },
       };
       savePersisted(next);
@@ -199,7 +199,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
     setPersisted((prev) => {
       const def = defaultInstitutionRostersPersisted().rosters[id];
       const next: InstitutionRostersPersisted = {
-        v: 1,
+        v: 2,
         rosters: { ...prev.rosters, [id]: JSON.parse(JSON.stringify(def)) as InstitutionRosterData },
       };
       savePersisted(next);
@@ -333,7 +333,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
 
       setPersisted((prev) => {
         const out: InstitutionRostersPersisted = {
-          v: 1,
+          v: 2,
           rosters: { ...prev.rosters, [input.branchId]: next },
         };
         savePersisted(out);
@@ -460,7 +460,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
 
       setPersisted((prev) => {
         const out: InstitutionRostersPersisted = {
-          v: 1,
+          v: 2,
           rosters: { ...prev.rosters, [branchId]: nextRoster },
         };
         savePersisted(out);
@@ -479,7 +479,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
         const members = [...r.members];
         members[memberIndex] = { ...members[memberIndex], ...patch };
         const next: InstitutionRostersPersisted = {
-          v: 1,
+          v: 2,
           rosters: { ...prev.rosters, [branchId]: { ...r, members } },
         };
         savePersisted(next);
@@ -503,7 +503,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       const next = moveSlotOccupantToMembers(current, slot, fallback);
       setPersisted((prev) => {
         const out: InstitutionRostersPersisted = {
-          v: 1,
+          v: 2,
           rosters: { ...prev.rosters, [branchId]: next },
         };
         savePersisted(out);
@@ -519,7 +519,7 @@ export function InstitutionRostersContentProvider({ children }: { children: Reac
       const r = prev.rosters[branchId];
       if (!r || memberIndex < 0 || memberIndex >= r.members.length) return prev;
       const next: InstitutionRostersPersisted = {
-        v: 1,
+        v: 2,
         rosters: {
           ...prev.rosters,
           [branchId]: { ...r, members: r.members.filter((_, i) => i !== memberIndex) },

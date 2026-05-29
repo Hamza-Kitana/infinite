@@ -14,6 +14,6 @@ export type StreamerEntry = {
 };
 
 export type StreamersPersisted = {
-  v: 1;
+  v: 2;
   items: StreamerEntry[];
 };

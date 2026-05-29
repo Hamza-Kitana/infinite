@@ -11,14 +11,14 @@ import { defaultGangsPersisted } from "@/data/gangsDefaultState";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import type { GangCard, GangsPersisted } from "@/types/gangsSchema";
 
-const STORAGE_KEY = "ic_gangs_v1";
+const STORAGE_KEY = "ic_gangs_v2";
 
 function loadPersisted(): GangsPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultGangsPersisted();
     const p = JSON.parse(raw) as GangsPersisted;
-    if (p?.v === 1 && Array.isArray(p.gangs)) {
+    if (p?.v === 2 && Array.isArray(p.gangs)) {
       return p;
     }
   } catch {

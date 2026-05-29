@@ -18,6 +18,6 @@ export type GangCard = {
 };
 
 export type GangsPersisted = {
-  v: 1;
+  v: 2;
   gangs: GangCard[];
 };

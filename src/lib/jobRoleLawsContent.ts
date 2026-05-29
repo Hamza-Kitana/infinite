@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 import { JOB_ROLE_LAWS, type JobRoleKey, type JobRoleLawSet } from "@/data/jobRoleLaws";
 
-export const JOB_ROLE_LAWS_STORAGE_KEY = "ic_job_role_laws_content_v1";
+export const JOB_ROLE_LAWS_STORAGE_KEY = "ic_job_role_laws_content_v2";
 export const JOB_ROLE_LAWS_CONTENT_CHANGED_EVENT = "ic-job-role-laws-content";
 
 type Persisted = {
-  v: 1;
+  v: 2;
   laws: Partial<Record<JobRoleKey, JobRoleLawSet>>;
 };
 
@@ -32,19 +32,19 @@ function normalizeLawSet(row: JobRoleLawSet): JobRoleLawSet {
 function loadPersisted(): Persisted {
   try {
     const raw = localStorage.getItem(JOB_ROLE_LAWS_STORAGE_KEY);
-    if (!raw) return { v: 1, laws: {} };
+    if (!raw) return { v: 2, laws: {} };
     const parsed = JSON.parse(raw) as Persisted;
-    if (parsed?.v !== 1 || !parsed.laws || typeof parsed.laws !== "object") return { v: 1, laws: {} };
+    if (parsed?.v !== 2 || !parsed.laws || typeof parsed.laws !== "object") return { v: 2, laws: {} };
     const laws: Partial<Record<JobRoleKey, JobRoleLawSet>> = {};
     for (const key of Object.keys(JOB_ROLE_LAWS) as JobRoleKey[]) {
       const row = parsed.laws[key];
       if (!isLawSet(row)) continue;
       const normalized = normalizeLawSet(row);
-      if (normalized.title.length > 0 && normalized.rules.length > 0) laws[key] = normalized;
+      if (normalized.title.length > 0) laws[key] = normalized;
     }
-    return { v: 1, laws };
+    return { v: 2, laws };
   } catch {
-    return { v: 1, laws: {} };
+    return { v: 2, laws: {} };
   }
 }
 
@@ -59,7 +59,7 @@ export function saveJobRoleLawSet(key: JobRoleKey, lawSet: JobRoleLawSet) {
   const current = loadPersisted();
   const normalized = normalizeLawSet(lawSet);
   const next: Persisted = {
-    v: 1,
+    v: 2,
     laws: { ...current.laws, [key]: normalized },
   };
   writeSyncedLocalStorage(JOB_ROLE_LAWS_STORAGE_KEY, JSON.stringify(next), [

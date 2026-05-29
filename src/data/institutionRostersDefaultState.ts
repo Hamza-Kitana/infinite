@@ -1,20 +1,8 @@
-import type { InstitutionBranchId } from "@/data/institutionBranches";
-import type { InstitutionRosterData } from "@/data/institutionRosters";
-import {
-  ciaDepartmentRoster,
-  developerRoster,
-  healthRoster,
-  lawyerRoster,
-  marinesDepartmentRoster,
-  fpiDepartmentRoster,
-  interiorMinistryHubRoster,
-  oversightRoster,
-  policeDepartmentRoster,
-  sheriffDepartmentRoster,
-} from "@/data/institutionRosters";
+import { INSTITUTION_BRANCH_IDS, type InstitutionBranchId } from "@/data/institutionBranches";
+import { emptyInstitutionRoster, type InstitutionRosterData } from "@/data/institutionRosters";
 
 export type InstitutionRostersPersisted = {
-  v: 1;
+  v: 2;
   rosters: Record<InstitutionBranchId, InstitutionRosterData>;
 };
 
@@ -23,20 +11,12 @@ function deepClone<T>(x: T): T {
 }
 
 export function defaultInstitutionRostersPersisted(): InstitutionRostersPersisted {
+  const empty = emptyInstitutionRoster();
   return {
-    v: 1,
-    rosters: {
-      health: deepClone(healthRoster),
-      interior_police: deepClone(policeDepartmentRoster),
-      interior_sheriff: deepClone(sheriffDepartmentRoster),
-      interior_cia: deepClone(ciaDepartmentRoster),
-      interior_marines: deepClone(marinesDepartmentRoster),
-      interior_fpi: deepClone(fpiDepartmentRoster),
-      interior_hub: deepClone(interiorMinistryHubRoster),
-      oversight: deepClone(oversightRoster),
-      justice_lawyers: deepClone(lawyerRoster),
-      developer: deepClone(developerRoster),
-    },
+    v: 2,
+    rosters: Object.fromEntries(
+      INSTITUTION_BRANCH_IDS.map((id) => [id, deepClone(empty)]),
+    ) as Record<InstitutionBranchId, InstitutionRosterData>,
   };
 }
 

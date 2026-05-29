@@ -21,12 +21,12 @@ const DEFAULT_QUIZ_ATTEMPT_SETTINGS: QuizAttemptSettings = {
 };
 
 type PersistedQuizContent = {
-  v: 1;
+  v: 2;
   quizzes: Partial<Record<QuizContextKey, QuizQuestion[]>>;
   settings?: Partial<Record<QuizContextKey, QuizAttemptSettings>>;
 };
 
-export const LAWS_QUIZ_STORAGE_KEY = "ic_laws_quiz_content_v1";
+export const LAWS_QUIZ_STORAGE_KEY = "ic_laws_quiz_content_v2";
 /** يُطلق عند تغيّر أسئلة الاختبار في التخزين المحلي — لتحديث الواجهات دون إعادة تحميل الصفحة */
 export const LAWS_QUIZ_CONTENT_CHANGED_EVENT = "ic-laws-quiz-content";
 
@@ -120,24 +120,25 @@ export function saveQuizAttemptSettings(key: QuizContextKey, settings: QuizAttem
 function loadPersisted(): PersistedQuizContent {
   try {
     const raw = localStorage.getItem(LAWS_QUIZ_STORAGE_KEY);
-    if (!raw) return { v: 1, quizzes: {} };
+    if (!raw) return { v: 2, quizzes: {} };
     const parsed = JSON.parse(raw) as PersistedQuizContent;
-    if (parsed?.v !== 1 || !parsed.quizzes || typeof parsed.quizzes !== "object") return { v: 1, quizzes: {} };
+    if (parsed?.v !== 2 || !parsed.quizzes || typeof parsed.quizzes !== "object") return { v: 2, quizzes: {} };
     const quizzes: Partial<Record<QuizContextKey, QuizQuestion[]>> = {};
     for (const ctx of QUIZ_CONTEXTS) {
       const rows = parsed.quizzes[ctx.key];
       if (!Array.isArray(rows)) continue;
-      const normalized = rows.filter(isQuizQuestion).map(normalizeQuestion);
-      if (normalized.length > 0) quizzes[ctx.key] = normalized;
+      quizzes[ctx.key] = rows.filter(isQuizQuestion).map(normalizeQuestion);
     }
-    return { v: 1, quizzes, settings: hydrateSettings(parsed) };
+    return { v: 2, quizzes, settings: hydrateSettings(parsed) };
   } catch {
-    return { v: 1, quizzes: {} };
+    return { v: 2, quizzes: {} };
   }
 }
 
 export function loadQuizQuestions(key: QuizContextKey): QuizQuestion[] {
-  return loadPersisted().quizzes[key] ?? defaultQuizFor(key);
+  const stored = loadPersisted().quizzes[key];
+  if (stored !== undefined) return stored;
+  return defaultQuizFor(key);
 }
 
 export function loadAllQuizQuestions(): Record<QuizContextKey, QuizQuestion[]> {
@@ -152,10 +153,10 @@ export function saveQuizQuestions(key: QuizContextKey, questions: QuizQuestion[]
   const cleaned = questions.filter(isQuizQuestion).map(normalizeQuestion);
   const next: PersistedQuizContent = {
     ...current,
-    v: 1,
+    v: 2,
     quizzes: {
       ...current.quizzes,
-      [key]: cleaned.length > 0 ? cleaned : defaultQuizFor(key),
+      [key]: cleaned,
     },
   };
   writeSyncedLocalStorage(LAWS_QUIZ_STORAGE_KEY, JSON.stringify(next), [LAWS_QUIZ_CONTENT_CHANGED_EVENT]);
@@ -167,7 +168,7 @@ export function resetQuizQuestions(key: QuizContextKey) {
   delete nextQuizzes[key];
   writeSyncedLocalStorage(
     LAWS_QUIZ_STORAGE_KEY,
-    JSON.stringify({ ...current, v: 1, quizzes: nextQuizzes } satisfies PersistedQuizContent),
+    JSON.stringify({ ...current, v: 2, quizzes: nextQuizzes } satisfies PersistedQuizContent),
     [LAWS_QUIZ_CONTENT_CHANGED_EVENT],
   );
 }

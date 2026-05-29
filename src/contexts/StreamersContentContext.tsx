@@ -16,14 +16,14 @@ import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 import type { StreamerEntry, StreamersPersisted } from "@/types/streamersSchema";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_streamers_v1";
+const STORAGE_KEY = "ic_streamers_v2";
 
 function loadPersisted(): StreamersPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultStreamersPersisted();
     const p = JSON.parse(raw) as StreamersPersisted;
-    if (p?.v === 1 && Array.isArray(p.items)) {
+    if (p?.v === 2 && Array.isArray(p.items)) {
       return p;
     }
   } catch {

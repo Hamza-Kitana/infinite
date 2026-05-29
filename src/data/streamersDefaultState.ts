@@ -14,5 +14,5 @@ export function buildDefaultStreamers(): StreamerEntry[] {
 }
 
 export function defaultStreamersPersisted(): StreamersPersisted {
-  return { v: 1, items: buildDefaultStreamers() };
+  return { v: 2, items: buildDefaultStreamers() };
 }

@@ -44,6 +44,6 @@ export type LawTabSectionPenalties = {
 export type LawTabSection = LawTabSectionRules | LawTabSectionPenalties;
 
 export type LawsPersisted = {
-  v: 1;
+  v: 2;
   sections: LawTabSection[];
 };

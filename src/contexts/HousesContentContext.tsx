@@ -11,14 +11,14 @@ import { defaultHousesPersisted, type HousesPersisted } from "@/data/housesDefau
 import type { HouseCatalogItem } from "@/data/housesCatalog";
 import { listenStorageSync, writeSyncedLocalStorage } from "@/lib/storageSync";
 
-const STORAGE_KEY = "ic_houses_v1";
+const STORAGE_KEY = "ic_houses_v2";
 
 function loadPersisted(): HousesPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultHousesPersisted();
     const p = JSON.parse(raw) as HousesPersisted;
-    if (p?.v === 1 && Array.isArray(p.houses)) return p;
+    if (p?.v === 2 && Array.isArray(p.houses)) return p;
   } catch {
     /* fallback */
   }

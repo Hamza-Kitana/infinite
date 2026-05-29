@@ -20,14 +20,14 @@ import type {
   RuleVariant,
 } from "@/types/lawsSchema";
 
-const STORAGE_KEY = "ic_laws_v1";
+const STORAGE_KEY = "ic_laws_v2";
 
 function loadPersisted(): LawsPersisted {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultLawsPersisted();
     const p = JSON.parse(raw) as LawsPersisted;
-    if (p?.v === 1 && Array.isArray(p.sections) && p.sections.length > 0) {
+    if (p?.v === 2 && Array.isArray(p.sections)) {
       return p;
     }
   } catch {
