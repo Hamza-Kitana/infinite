@@ -20,6 +20,8 @@ import { RoleGroupsProvider } from "@/contexts/RoleGroupsContext";
 import { RequireStaffAuth } from "@/components/RequireStaffAuth";
 import { ALL_TICKET_STAFF_ROLES, DASHBOARD_TICKET_STAFF_ROLES } from "@/lib/ticketTypesConfig";
 import { PublicStaffLinkSync } from "@/components/PublicStaffLinkSync";
+import { SiteMaintenanceGate } from "@/components/SiteMaintenanceGate";
+import { RequireOwnerAuth } from "@/components/RequireOwnerAuth";
 import AdminLayout from "./pages/admin/AdminLayout.tsx";
 import DashboardGate from "./pages/admin/DashboardGate.tsx";
 import GangsAdminShell from "./pages/admin/GangsAdminShell.tsx";
@@ -40,6 +42,7 @@ import InstitutionRosterHubPage from "./pages/admin/InstitutionRosterHubPage.tsx
 import ApplicationsReviewPage from "./pages/admin/ApplicationsReviewPage.tsx";
 import ActivityLogPage from "./pages/admin/ActivityLogPage.tsx";
 import AboutManagerPage from "./pages/admin/AboutManagerPage.tsx";
+import SiteMaintenancePage from "./pages/admin/SiteMaintenancePage.tsx";
 import TicketsManagerPage from "./pages/admin/TicketsManagerPage.tsx";
 import Index from "./pages/Index.tsx";
 import ApplicationFormPage from "./pages/ApplicationFormPage.tsx";
@@ -91,6 +94,7 @@ const AppRoutes = () => {
     <>
       <ScrollToTop />
       <PublicStaffLinkSync />
+      <SiteMaintenanceGate>
       <AnimatePresence>
         {showBootLoader && !skipBoot ? (
           <BootLoader key={location.pathname} onComplete={() => setShowBootLoader(false)} />
@@ -193,7 +197,7 @@ const AppRoutes = () => {
           <Route
             path="gangs"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "gang_manager"]}>
+              <RequireStaffAuth allowRoles={["super_admin", "gang_manager", "ticket_gang_open_manager"]}>
                 <GangsAdminShell />
               </RequireStaffAuth>
             }
@@ -271,9 +275,13 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="tickets/gang-open"
+            element={<Navigate to="/dashboard/gangs/open-requests" replace />}
+          />
+          <Route
             path="tickets"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES]}>
+              <RequireStaffAuth allowRoles={["super_admin", ...DASHBOARD_TICKET_STAFF_ROLES]}>
                 <TicketsManagerPage />
               </RequireStaffAuth>
             }
@@ -289,7 +297,7 @@ const AppRoutes = () => {
           <Route
             path="tickets/:ticketType"
             element={
-              <RequireStaffAuth allowRoles={["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES]}>
+              <RequireStaffAuth allowRoles={["super_admin", ...DASHBOARD_TICKET_STAFF_ROLES]}>
                 <TicketsManagerPage />
               </RequireStaffAuth>
             }
@@ -304,11 +312,20 @@ const AppRoutes = () => {
               </RequireStaffAuth>
             }
           />
+          <Route
+            path="site-maintenance"
+            element={
+              <RequireOwnerAuth>
+                <SiteMaintenancePage />
+              </RequireOwnerAuth>
+            }
+          />
         </Route>
         <Route path="/lawyer" element={<Navigate to="/justice#lawyers" replace />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </SiteMaintenanceGate>
     </>
   );
 };

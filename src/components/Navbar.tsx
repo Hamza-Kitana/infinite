@@ -50,7 +50,8 @@ function institutionLinkActive(pathname: string, to: string) {
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, canUseDashboard } = useAuth();
+  const { login, canUseDashboard, isOwner } = useAuth();
+  const showStaffDashboardLink = canUseDashboard && !isOwner;
   const publicUser = usePublicUser();
   const { applications } = useApplicationsContent();
   const { findMembershipForUser } = useInstitutionRostersContent();
@@ -408,7 +409,7 @@ const Navbar = () => {
                 <span className="relative">التقديم الإلكتروني</span>
               </button>
             ) : null}
-            {canUseDashboard ? (
+            {showStaffDashboardLink ? (
               <Button
                 asChild
                 variant="outline"
@@ -606,7 +607,7 @@ const Navbar = () => {
                   </Button>
                 </>
               ) : null}
-              {canUseDashboard ? (
+              {showStaffDashboardLink ? (
                 <Button asChild className="w-full touch-manipulation bg-primary text-primary-foreground hover:bg-primary-glow">
                   <Link to="/dashboard" onClick={() => setOpen(false)}>
                     <LayoutDashboard className="h-4 w-4 ml-2" /> لوحة التحكم
@@ -725,12 +726,20 @@ const Navbar = () => {
                   try {
                     const session = login(staffUser, staffPass);
                     if (session) {
+                      if (session.isOwner) {
+                        setLoginOpen(false);
+                        setStaffUser("");
+                        setStaffPass("");
+                        setStaffLoginVisible(false);
+                        navigate(getPostLoginDashboardPath(session));
+                        return;
+                      }
                       toast.success("تم الدخول كموظف");
                       setLoginOpen(false);
                       setStaffUser("");
                       setStaffPass("");
                       setStaffLoginVisible(false);
-                      navigate(getPostLoginDashboardPath(session.roles));
+                      navigate(getPostLoginDashboardPath(session));
                       return;
                     }
                     toast.error("بيانات الموظف غير صحيحة");

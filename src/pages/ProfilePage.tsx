@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -62,6 +62,7 @@ function statusLabel(status: "pending" | "approved" | "rejected") {
 const ProfilePage = () => {
   const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, getProfile, logout } = usePublicUser();
   const profile = getProfile();
   const { applications } = useApplicationsContent();
@@ -72,8 +73,8 @@ const ProfilePage = () => {
   /** جلسة الموظف — تكون موجودة تلقائياً للمواطن المرقّى عبر PublicStaffLinkSync */
   const auth = useAuth();
   const dashboardPath = useMemo(
-    () => (auth.user && auth.canUseDashboard ? getPostLoginDashboardPath(auth.user.roles) : null),
-    [auth.user, auth.canUseDashboard],
+    () => (auth.user && auth.canUseDashboard && !auth.isOwner ? getPostLoginDashboardPath(auth.user) : null),
+    [auth.user, auth.canUseDashboard, auth.isOwner],
   );
 
   /** عضوية المستخدم في طاقم مؤسسة (إن وُجدت) */
@@ -141,6 +142,16 @@ const ProfilePage = () => {
       .filter((a) => applicationBelongsToPublicProfile(a, profile))
       .sort((a, b) => +new Date(b.submittedAt) - +new Date(a.submittedAt));
   }, [applications, user, profile]);
+
+  useEffect(() => {
+    if (location.hash !== "#my-applications") return;
+    const el = document.getElementById("my-applications");
+    if (!el) return;
+    const timer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, myApplications.length, reduceMotion]);
 
   const resolveApprovedJobRank = useCallback(
     (roleKey: JobRoleKey): string => {
@@ -785,9 +796,11 @@ const ProfilePage = () => {
 
         {/* سجل الطلبات السابقة */}
         <motion.section
+          id="my-applications"
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.2 }}
+          className="scroll-mt-24"
         >
           <Card className="overflow-hidden border-violet-200/90 bg-white/95 shadow-[0_18px_50px_-22px_rgba(54,22,79,0.25)]">
             <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-violet-100 bg-gradient-to-l from-violet-50/90 to-white pb-4 text-right">

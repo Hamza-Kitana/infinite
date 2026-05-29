@@ -65,6 +65,7 @@ import type { RosterPerson } from "@/components/InstitutionRoster";
 import type { ChromaGridItem } from "@/components/ChromaGrid";
 import { InstitutionManageDialog } from "@/components/admin/InstitutionManageDialog";
 import { appendActivityLog } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import { jobRoleKeyFromInstitutionBranch } from "@/lib/institutionJobRole";
 import { suggestedMemberRankForAcceptance } from "@/lib/jobRoleRankLabels";
 import {
@@ -297,7 +298,7 @@ function roleKeysForBranch(branchId: InstitutionBranchId): string[] {
 const InstitutionRosterEditorPage = () => {
   const { branchId: branchParam } = useParams<{ branchId: string }>();
   const navigate = useNavigate();
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, auditActorName } = useAuth();
   const {
     getBranchRoster,
     setBranchRoster,
@@ -542,7 +543,7 @@ const InstitutionRosterEditorPage = () => {
 
   const runApplicationDecision = (status: "approved" | "rejected") => {
     if (!selectedApplication || selectedApplication.status !== "pending") return;
-    const actor = user?.username ?? "manager";
+    const actor = auditActorName("manager");
 
     if (status === "approved" && branchId) {
       const finalName = applicantFinalName.trim();
@@ -1509,7 +1510,7 @@ function ApplicationReviewBody({
 
       {!isPending ? (
         <div className="rounded-lg border border-violet-200 bg-violet-50/30 p-3 text-sm text-slate-700">
-          <p>القرار بواسطة: {application.decidedBy ?? "—"}</p>
+          <p>القرار بواسطة: {sanitizeAuditDisplayName(application.decidedBy, "—")}</p>
           {application.note ? <p className="mt-1">ملاحظة: {application.note}</p> : null}
         </div>
       ) : (

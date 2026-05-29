@@ -24,6 +24,7 @@ import {
   Users,
   Video,
   Moon,
+  PowerOff,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ const STATIC_NAV_TRAILING: NavItem[] = [
     to: "/dashboard/tickets",
     label: "التكت",
     icon: MessageSquareMore,
-    roles: ["super_admin", "gang_manager", ...DASHBOARD_TICKET_STAFF_ROLES],
+    roles: ["super_admin", ...DASHBOARD_TICKET_STAFF_ROLES],
   },
 ];
 
@@ -183,6 +184,7 @@ const AdminLayout = () => {
   const {
     user,
     logout,
+    isOwner,
     isSuperAdmin,
     isLawsEditor,
     isStreamerManager,
@@ -221,7 +223,7 @@ const AdminLayout = () => {
   );
   const storeOrdersUnread = useMemo(() => {
     if (
-      !userRoles.includes("super_admin") &&
+      !isSuperAdmin &&
       !userRoles.includes("store_orders_manager") &&
       !userRoles.includes("ticket_store_manager")
     ) {
@@ -237,7 +239,7 @@ const AdminLayout = () => {
       if (hasUnread) n++;
     }
     return n;
-  }, [tickets, userRoles]);
+  }, [tickets, userRoles, isSuperAdmin]);
   const pendingApplicationsCount = useMemo(
     () =>
       countPendingServerApplicationsForStaff(applications, {
@@ -319,6 +321,7 @@ const AdminLayout = () => {
         className={cn(
           "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold text-white shadow-sm",
           tone,
+          path === "/dashboard/institution" && "animate-pulse ring-2 ring-sky-300/60 ring-offset-1 ring-offset-transparent",
         )}
         title={title}
       >
@@ -328,7 +331,8 @@ const AdminLayout = () => {
   };
 
   const sidebarNav = useMemo(() => {
-    const filterNav = (arr: NavItem[]) => arr.filter((n) => n.roles.some((r) => userRoles.includes(r)));
+    const filterNav = (arr: NavItem[]) =>
+      arr.filter((n) => n.roles.some((r) => userRoles.includes(r) || (isSuperAdmin && r === "super_admin")));
     const instNav: NavItem[] = [];
     if (isSuperAdmin) {
       instNav.push({
@@ -354,9 +358,16 @@ const AdminLayout = () => {
     return {
       navLeading: filterNav(STATIC_NAV_LEADING),
       navStore: filterNav(STORE_SIDEBAR_NAV),
-      navTrailing: [...filterNav(STATIC_NAV_TRAILING), ...instNav, ...filterNav(STATIC_NAV_TAIL)],
+      navTrailing: [
+        ...filterNav(STATIC_NAV_TRAILING),
+        ...instNav,
+        ...filterNav(STATIC_NAV_TAIL),
+        ...(isOwner
+          ? [{ to: "/dashboard/site-maintenance", label: "إيقاف الموقع", icon: PowerOff, roles: [] as StaffRole[], end: true }]
+          : []),
+      ],
     };
-  }, [userRoles, isSuperAdmin]);
+  }, [userRoles, isSuperAdmin, isOwner]);
 
   const storeSectionActive = useMemo(
     () => STORE_SIDEBAR_PREFIXES.some((prefix) => location.pathname.startsWith(prefix)),
@@ -367,8 +378,12 @@ const AdminLayout = () => {
     if (storeSectionActive) setStoreGroupOpen(true);
   }, [storeSectionActive]);
 
-  const primary = primaryStaffRole(userRoles);
-  const shell = primary ? adminRoleShell(primary) : { title: "لوحة التحكم", badge: "Staff" };
+  const primary: StaffRole | null = isOwner ? null : primaryStaffRole(userRoles);
+  const shell = isOwner
+    ? { title: "لوحة التحكم", badge: "" }
+    : primary
+      ? adminRoleShell(primary)
+      : { title: "لوحة التحكم", badge: "Staff" };
   const title = shell.title;
   const badge = shell.badge;
 
@@ -414,6 +429,8 @@ const AdminLayout = () => {
                         })()
                     : location.pathname.startsWith("/dashboard/applications")
                       ? "طلبات التقديم"
+                      : location.pathname.startsWith("/dashboard/site-maintenance")
+                        ? "إيقاف الموقع"
                       : "لوحة التحكم";
 
   const subHint =
@@ -491,13 +508,19 @@ const AdminLayout = () => {
               <div className="min-w-0 flex-1 text-right">
                 <p className="font-display text-[10px] tracking-[0.28em] text-slate-400">INFINITE CITY</p>
                 <p className="mt-1 font-display text-lg font-bold leading-tight text-white">{title}</p>
-                <p className="mt-1.5 text-xs text-slate-400">
-                  {user?.username}
-                  <span className="mx-1.5 text-slate-600">·</span>
-                  <span className="rounded-md bg-violet-600/35 px-1.5 py-0.5 font-mono text-[10px] text-violet-100">
-                    {badge}
-                  </span>
-                </p>
+                {!isOwner ? (
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    {user?.username}
+                    {badge ? (
+                      <>
+                        <span className="mx-1.5 text-slate-600">·</span>
+                        <span className="rounded-md bg-violet-600/35 px-1.5 py-0.5 font-mono text-[10px] text-violet-100">
+                          {badge}
+                        </span>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -623,11 +646,13 @@ const AdminLayout = () => {
                 {pageTitle}
               </p>
               <p className={cn("truncate text-xs", isDashDark ? "text-slate-400" : "text-slate-500")}>
-                {isSuperAdmin
+                {isSuperAdmin && !isOwner
                   ? "مرحباً بك يا سوبر أدمن"
-                  : subHint
-                    ? `${user?.username} · ${subHint}`
-                    : (user?.username ?? "")}
+                  : isOwner
+                    ? "لوحة التحكم"
+                    : subHint
+                      ? `${user?.username} · ${subHint}`
+                      : (user?.username ?? "")}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

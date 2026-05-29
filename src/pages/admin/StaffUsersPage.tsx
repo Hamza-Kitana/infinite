@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SUPER_ADMIN_USERNAME } from "@/config/staffAuth";
+import { isOwnerUsername } from "@/config/ownerAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { IC_PUBLIC_USERS_CHANGED_EVENT, usePublicUser } from "@/contexts/PublicUserContext";
@@ -71,7 +72,7 @@ import {
   canDeleteManagedStaffTarget,
   SUPER_ADMIN_DELETE_ONLY_MESSAGE,
 } from "@/lib/staffUserDeletePolicy";
-import { cn } from "@/lib/utils";
+import { cn, isValidArabicNamePart } from "@/lib/utils";
 import { toast } from "sonner";
 
 type PublicUserRow = {
@@ -282,7 +283,7 @@ function rolesSetsEqual(a: Set<ManagedStaffRole>, b: readonly ManagedStaffRole[]
 }
 
 const StaffUsersPage = () => {
-  const { isSuperAdmin, user } = useAuth();
+  const { isSuperAdmin, user, auditActorName } = useAuth();
   const { user: publicSessionUser } = usePublicUser();
   const { applications } = useApplicationsContent();
   const { groups } = useRoleGroups();
@@ -314,6 +315,15 @@ const StaffUsersPage = () => {
   const [promote, setPromote] = useState<PromoteState | null>(null);
   const [promoteRolePickerKey, setPromoteRolePickerKey] = useState(0);
   const [promoteGroupPickerKey, setPromoteGroupPickerKey] = useState(0);
+
+  type GrantCitizenFormState = {
+    target: PublicUserRow;
+    firstName: string;
+    lastName: string;
+    age: string;
+  };
+  const [grantCitizenOpen, setGrantCitizenOpen] = useState(false);
+  const [grantCitizenForm, setGrantCitizenForm] = useState<GrantCitizenFormState | null>(null);
 
   const list = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -518,7 +528,7 @@ const StaffUsersPage = () => {
       toast.error("اسم المستخدم قصير جداً");
       return;
     }
-    if (u.toLowerCase() === SUPER_ADMIN_USERNAME.toLowerCase()) {
+    if (u.toLowerCase() === SUPER_ADMIN_USERNAME.toLowerCase() || isOwnerUsername(u)) {
       toast.error("هذا الاسم محجوز لحساب الإدارة");
       return;
     }
@@ -645,8 +655,22 @@ const StaffUsersPage = () => {
     toast.success(target.isActive ? "تم إيقاف الحساب" : "تم تفعيل الحساب");
   };
 
-  const handleGrantCitizenElectronicApply = (target: PublicUserRow) => {
-    if (!user?.roles.includes("super_admin")) {
+  const openGrantCitizenDialog = (target: PublicUserRow) => {
+    const nameParts = target.fullName.trim().split(/\s+/).filter(Boolean);
+    setGrantCitizenForm({
+      target,
+      firstName: nameParts[0] ?? "",
+      lastName: nameParts.slice(1).join(" "),
+      age: target.age > 0 ? String(target.age) : "",
+    });
+    setGrantCitizenOpen(true);
+  };
+
+  const handleGrantCitizenElectronicApply = (
+    target: PublicUserRow,
+    input: { firstName: string; lastName: string; age: number },
+  ) => {
+    if (!isSuperAdmin) {
       toast.error("تفعيل التقديم بدون نموذج متاح لمسؤول النظام (سوبر أدمن) فقط.");
       return;
     }
@@ -660,32 +684,41 @@ const StaffUsersPage = () => {
       return;
     }
 
+    const firstName = input.firstName.trim();
+    const lastName = input.lastName.trim();
+    const cityName = `${firstName} ${lastName}`.trim();
+    const age = Math.floor(input.age);
+
+    const nextUsers = publicUsers.map((u) =>
+      u.id === target.id ? { ...u, fullName: cityName, age } : u,
+    );
+    savePublicUsersForAdmin(nextUsers);
+
     const now = new Date().toISOString();
-    const nameParts = target.fullName.trim().split(/\s+/).filter(Boolean);
     const record: ApplicationRecord = {
       id: crypto.randomUUID(),
       roleKey: "citizen",
       targetTitle: "تقديم المواطن",
       applicantUserId: target.id,
       applicantUsername: target.username,
-      applicantDisplayName: target.fullName || target.username,
+      applicantDisplayName: target.displayName || target.username,
       status: "approved",
       submittedAt: now,
       decidedAt: now,
-      decidedBy: user?.username ?? "super_admin",
+      decidedBy: auditActorName("super_admin"),
       note: "تفعيل يدوي من السوبر أدمن من صفحة المستخدمين والأدوار.",
       snapshot: {
-        firstName: nameParts[0] ?? (target.fullName || target.username),
-        lastName: nameParts.slice(1).join(" ") || "—",
+        firstName,
+        lastName,
         gender: "male",
         birthSummaryLine: "—",
-        ageSummaryLine: target.age > 0 ? `${target.age} سنة` : "—",
+        ageSummaryLine: `${age} سنة`,
         countryCode: "JO",
         discord: target.discordId ? `${target.realName} (ID: ${target.discordId})` : target.realName,
         previousCities: "تفعيل يدوي من الإدارة",
         experience: "تم تفعيل التقديم الإلكتروني لهذا المواطن يدوياً بواسطة السوبر أدمن.",
         lawsAccepted: true,
-        cityName: target.fullName,
+        cityName,
         discordId: target.discordId,
       },
     };
@@ -700,13 +733,36 @@ const StaffUsersPage = () => {
     appendActivityLog(
       user?.username ?? "super_admin",
       "تفعيل تقديم إلكتروني لمواطن",
-      `${target.username} — تم إنشاء طلب مواطن مقبول يدوياً`,
+      `${target.username} — ${cityName} (${age} سنة)`,
     );
-    toast.success("تم تفعيل المواطن كأنه قدّم وتم قبول التقديم الإلكتروني");
+    refresh();
+    setGrantCitizenOpen(false);
+    setGrantCitizenForm(null);
+    toast.success("تم تفعيل المواطن وحفظ اسمه وعمره في البروفايل");
+  };
+
+  const handleSubmitGrantCitizen = (e: FormEvent) => {
+    e.preventDefault();
+    if (!grantCitizenForm) return;
+    const { target, firstName, lastName, age } = grantCitizenForm;
+    if (!isValidArabicNamePart(firstName)) {
+      toast.error("أدخل الاسم الأول بالعربي فقط (حرفين على الأقل)");
+      return;
+    }
+    if (!isValidArabicNamePart(lastName)) {
+      toast.error("أدخل اسم العائلة بالعربي فقط (حرفين على الأقل)");
+      return;
+    }
+    const ageNum = Math.floor(Number(age));
+    if (!Number.isFinite(ageNum) || ageNum < 13) {
+      toast.error("أدخل عمراً صحيحاً (13 سنة أو أكثر)");
+      return;
+    }
+    handleGrantCitizenElectronicApply(target, { firstName, lastName, age: ageNum });
   };
 
   const handleRevokeCitizenElectronicApply = (target: PublicUserRow) => {
-    if (!user?.roles.includes("super_admin")) {
+    if (!isSuperAdmin) {
       toast.error("هذا الإجراء متاح لمسؤول النظام (سوبر أدمن) فقط.");
       return;
     }
@@ -1425,6 +1481,93 @@ const StaffUsersPage = () => {
       </Dialog>
 
       <Dialog
+        open={grantCitizenOpen}
+        onOpenChange={(open) => {
+          setGrantCitizenOpen(open);
+          if (!open) setGrantCitizenForm(null);
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="border-slate-200/95 bg-white text-right shadow-[0_28px_72px_-24px_rgba(15,23,42,0.38)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-md sm:rounded-2xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display text-slate-900 dark:text-slate-50">تفعيل بدون اختبار</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {grantCitizenForm
+                ? `أدخل الاسم الثنائي بالعربي وعمر ${grantCitizenForm.target.username} — يُحفظان في بروفايله ويُفعّل التقديم الإلكتروني.`
+                : "أدخل بيانات المواطن للتفعيل اليدوي."}
+            </DialogDescription>
+          </DialogHeader>
+          {grantCitizenForm ? (
+            <form onSubmit={handleSubmitGrantCitizen} className="space-y-3" noValidate>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="grant-citizen-first" className="text-slate-700 dark:text-slate-200">
+                    الاسم الأول (عربي)
+                  </Label>
+                  <Input
+                    id="grant-citizen-first"
+                    value={grantCitizenForm.firstName}
+                    onChange={(e) => setGrantCitizenForm((p) => (p ? { ...p, firstName: e.target.value } : p))}
+                    placeholder="مثال: محمد"
+                    className="border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="grant-citizen-last" className="text-slate-700 dark:text-slate-200">
+                    اسم العائلة (عربي)
+                  </Label>
+                  <Input
+                    id="grant-citizen-last"
+                    value={grantCitizenForm.lastName}
+                    onChange={(e) => setGrantCitizenForm((p) => (p ? { ...p, lastName: e.target.value } : p))}
+                    placeholder="مثال: العلي"
+                    className="border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="grant-citizen-age" className="text-slate-700 dark:text-slate-200">
+                  العمر
+                </Label>
+                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                  يظهر في بروفايل المواطن ويُستخدم لتفعيل التكتات والتوظيف.
+                </p>
+                <Input
+                  id="grant-citizen-age"
+                  value={grantCitizenForm.age}
+                  onChange={(e) => setGrantCitizenForm((p) => (p ? { ...p, age: e.target.value.replace(/[^\d]/g, "") } : p))}
+                  placeholder="مثال: 22"
+                  className="border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  inputMode="numeric"
+                />
+              </div>
+              <DialogFooter className="gap-2 sm:justify-start">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-violet-200 bg-white text-violet-700 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-violet-200"
+                  onClick={() => {
+                    setGrantCitizenOpen(false);
+                    setGrantCitizenForm(null);
+                  }}
+                >
+                  إلغاء
+                </Button>
+                <Button type="submit" className="bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500">
+                  <ShieldCheck className="ms-1 h-4 w-4" />
+                  تفعيل وحفظ
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={promoteOpen}
         onOpenChange={(open) => {
           setPromoteOpen(open);
@@ -1782,7 +1925,7 @@ const StaffUsersPage = () => {
                         size="sm"
                         title="للمسؤول الأعلى فقط: قبول تقديم المواطن إدارياً دون تعبئة النموذج أو اختبار القوانين."
                         className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-200 dark:hover:bg-emerald-950/55"
-                        onClick={() => handleGrantCitizenElectronicApply(u)}
+                        onClick={() => openGrantCitizenDialog(u)}
                       >
                         <ShieldCheck className="h-4 w-4 ms-1 shrink-0 text-current" />
                         تفعيل التقديم (سوبر أدمن)

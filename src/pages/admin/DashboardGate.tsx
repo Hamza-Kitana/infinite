@@ -6,12 +6,12 @@ import DashboardHomePage from "./DashboardHomePage.tsx";
 const DashboardGate = () => {
   const { user, isSuperAdmin } = useAuth();
 
-  if (isSuperAdmin) {
+  if (isSuperAdmin || user?.isOwner) {
     return <DashboardHomePage />;
   }
 
   if (user?.roles?.length) {
-    const dest = getPostLoginDashboardPath(user.roles);
+    const dest = getPostLoginDashboardPath(user);
     if (dest !== "/dashboard") {
       return <Navigate to={dest} replace />;
     }

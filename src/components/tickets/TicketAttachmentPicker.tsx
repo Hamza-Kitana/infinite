@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { TicketAttachment } from "@/lib/ticketsCenter";
+import { TicketChatAttachmentMedia } from "@/components/tickets/TicketChatAttachmentMedia";
 import {
   formatFileSize,
   readTicketAttachmentFromFile,
@@ -96,12 +97,17 @@ export function TicketAttachmentPicker({ value, onChange, className, variant = "
         ) : null}
       </div>
       {value && !loading ? (
-        <p className="text-right text-xs text-slate-600 dark:text-slate-400">
-          <span className="font-medium text-slate-800 dark:text-slate-200">{value.name}</span>
-          {value.blobStoreId ? (
-            <span className="me-1 text-violet-600 dark:text-violet-400"> — تخزين محلي للملف الكبير</span>
-          ) : null}
-        </p>
+        <div className="space-y-2 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-right text-xs text-slate-600 dark:text-slate-400">
+              <span className="font-medium text-slate-800 dark:text-slate-200">{value.name}</span>
+              {value.blobStoreId ? (
+                <span className="me-1 text-violet-600 dark:text-violet-400"> — ملف كبير (تخزين محلي)</span>
+              ) : null}
+            </p>
+          </div>
+          <TicketChatAttachmentMedia att={value} variant="dashCustomer" compact />
+        </div>
       ) : null}
       <p className="text-right text-[11px] leading-relaxed text-slate-500 dark:text-slate-500">
         حتى {formatFileSize(TICKET_ATTACHMENT_INLINE_MAX_BYTES)} يُحفظ مع التكت؛ الأكبر يُخزَّن في المتصفح (IndexedDB) لتفادي امتلاء التخزين.

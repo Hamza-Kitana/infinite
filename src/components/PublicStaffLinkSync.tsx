@@ -38,6 +38,7 @@ export function PublicStaffLinkSync() {
   }, []);
 
   useEffect(() => {
+    if (auth.user?.isOwner) return;
     if (publicId) {
       const linkedManaged = findManagedUserByPublicId(publicId);
 

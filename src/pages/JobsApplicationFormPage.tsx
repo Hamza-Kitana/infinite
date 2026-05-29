@@ -179,8 +179,10 @@ const JobsApplicationFormPage = () => {
       toast.error("تعذر إرسال الطلب حالياً");
       return;
     }
-    toast.success("تم إرسال طلب التوظيف بنجاح");
-    navigate("/jobs");
+    toast.success("تم إرسال طلب التوظيف بنجاح", {
+      description: "يمكنك متابعة حالة طلبك من قسم «طلباتي السابقة» في البروفايل.",
+    });
+    navigate("/profile#my-applications", { replace: true });
   };
 
   if (isDiscordUser && !jobApplyUnlocked) {

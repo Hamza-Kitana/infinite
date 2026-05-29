@@ -23,12 +23,21 @@ const videoBorder: Record<TicketAttachmentChatVariant, string> = {
   dashStaff: "border-violet-300 dark:border-violet-600",
 };
 
+const previewMaxHeight: Record<TicketAttachmentChatVariant, string> = {
+  ticketsUser: "max-h-56",
+  ticketsStaff: "max-h-56",
+  dashCustomer: "max-h-40",
+  dashStaff: "max-h-56",
+};
+
 type Props = {
   att: TicketAttachment;
   variant: TicketAttachmentChatVariant;
+  /** في نافذة اختيار المرفق — معاينة فقط بدون أزرار فتح/تنزيل */
+  compact?: boolean;
 };
 
-export function TicketChatAttachmentMedia({ att, variant }: Props) {
+export function TicketChatAttachmentMedia({ att, variant, compact = false }: Props) {
   const [objectUrl, setObjectUrl] = useState<string | null>(att.dataUrl ?? null);
   const isVideo = att.mimeType.startsWith("video/");
 
@@ -65,20 +74,22 @@ export function TicketChatAttachmentMedia({ att, variant }: Props) {
         <a href={objectUrl} target="_blank" rel="noreferrer" className="block">
           <video
             controls
-            className={cn("max-h-56 rounded-lg border bg-black/10", videoBorder[variant])}
+            className={cn("w-full rounded-lg border bg-slate-100", previewMaxHeight[variant], videoBorder[variant])}
             preload="metadata"
           >
             <source src={objectUrl} type={att.mimeType} />
           </video>
         </a>
-        <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-          <a href={objectUrl} target="_blank" rel="noreferrer" className={linkCls}>
-            فتح
-          </a>
-          <a href={objectUrl} download={att.name} className={linkCls}>
-            تنزيل
-          </a>
-        </div>
+        {!compact ? (
+          <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+            <a href={objectUrl} target="_blank" rel="noreferrer" className={linkCls}>
+              فتح
+            </a>
+            <a href={objectUrl} download={att.name} className={linkCls}>
+              تنزيل
+            </a>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -90,19 +101,22 @@ export function TicketChatAttachmentMedia({ att, variant }: Props) {
           src={objectUrl}
           alt={att.name}
           className={cn(
-            "max-h-56 cursor-zoom-in rounded-lg border object-contain",
+            "w-full cursor-zoom-in rounded-lg border object-contain",
+            previewMaxHeight[variant],
             variant === "ticketsUser" ? "border-white/20" : "border-violet-200 dark:border-slate-600",
           )}
         />
       </a>
-      <div className="flex flex-wrap justify-end gap-2 text-[11px]">
-        <a href={objectUrl} target="_blank" rel="noreferrer" className={linkCls}>
-          فتح
-        </a>
-        <a href={objectUrl} download={att.name} className={linkCls}>
-          تنزيل
-        </a>
-      </div>
+      {!compact ? (
+        <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+          <a href={objectUrl} target="_blank" rel="noreferrer" className={linkCls}>
+            فتح
+          </a>
+          <a href={objectUrl} download={att.name} className={linkCls}>
+            تنزيل
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }

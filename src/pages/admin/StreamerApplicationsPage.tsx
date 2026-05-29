@@ -14,6 +14,7 @@ import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import { useStreamersContent } from "@/contexts/StreamersContentContext";
 import type { ApplicationRecord, ApplicationStatus } from "@/data/publicApplicationTypes";
 import { appendActivityLog } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import {
   draftFromApplication,
   draftFromStreamerEntry,
@@ -50,7 +51,7 @@ function statusLabel(status: ApplicationStatus) {
 }
 
 const StreamerApplicationsPage = () => {
-  const { user } = useAuth();
+  const { user, auditActorName } = useAuth();
   const { applications, setDecision } = useApplicationsContent();
   const { items, upsertFromApplication } = useStreamersContent();
   const [filter, setFilter] = useState<ApplicationStatus | "all">("pending");
@@ -113,7 +114,7 @@ const StreamerApplicationsPage = () => {
     if (!selected) return;
     upsertFromApplication(selected, cardDraft.role, cardDraft);
     appendActivityLog(
-      user?.username?.trim() || "streamer_manager",
+      auditActorName("streamer_manager"),
       "تعديل بطاقة صانع محتوى",
       cardDraft.name,
     );
@@ -122,7 +123,7 @@ const StreamerApplicationsPage = () => {
 
   const runDecision = (status: "approved" | "rejected") => {
     if (!selected || selected.status !== "pending") return;
-    const actor = user?.username?.trim() || "streamer_manager";
+    const actor = auditActorName("streamer_manager");
 
     if (status === "approved") {
       upsertFromApplication(
@@ -305,7 +306,7 @@ const StreamerApplicationsPage = () => {
               ) : selected.status === "approved" ? (
                 <>
                   <p className="text-slate-500">
-                    القرار: {statusLabel(selected.status)} — {selected.decidedBy ?? "—"}
+                    القرار: {statusLabel(selected.status)} — {sanitizeAuditDisplayName(selected.decidedBy, "—")}
                   </p>
                   <div className="flex justify-end">
                     <Button type="button" className="bg-[#36164f] text-white hover:bg-[#2f1344]" onClick={saveLinkedCard}>
@@ -315,7 +316,7 @@ const StreamerApplicationsPage = () => {
                 </>
               ) : (
                 <p className="text-slate-500">
-                  القرار: {statusLabel(selected.status)} — {selected.decidedBy ?? "—"}
+                  القرار: {statusLabel(selected.status)} — {sanitizeAuditDisplayName(selected.decidedBy, "—")}
                 </p>
               )}
             </div>

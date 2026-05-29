@@ -26,6 +26,7 @@ import { canStaffReviewApplication } from "@/lib/applicationReviewAccess";
 import { STREAMER_APPLICATION_ROLE } from "@/lib/streamerApplication";
 import { getArabCountryLabel, isArabCountryCode } from "@/data/arabCountries";
 import { appendActivityLog } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import { cn } from "@/lib/utils";
 import {
   adminDialogSurface,
@@ -58,7 +59,7 @@ function statusLabel(status: ApplicationStatus) {
 }
 
 const ApplicationsReviewPage = () => {
-  const { user, isSuperAdmin, isApplicationReviewer } = useAuth();
+  const { user, isSuperAdmin, isApplicationReviewer, auditActorName } = useAuth();
   const { applications, setDecision } = useApplicationsContent();
   const [filter, setFilter] = useState<ApplicationStatus | "all">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -104,7 +105,7 @@ const ApplicationsReviewPage = () => {
 
   const runDecision = (status: "approved" | "rejected") => {
     if (!selected || selected.status !== "pending") return;
-    const name = user?.username?.trim() || (isSuperAdmin ? "super_admin" : "reviewer");
+    const name = auditActorName(isSuperAdmin ? "super_admin" : "reviewer");
     setDecision(selected.id, status, name, decisionNote);
     appendActivityLog(
       name,
@@ -259,7 +260,8 @@ function ApplicationDetail({
       {app.status !== "pending" && (
         <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300">
           <p>
-            <span className="text-slate-500 dark:text-slate-400">القرار بواسطة:</span> {app.decidedBy ?? "—"}
+            <span className="text-slate-500 dark:text-slate-400">القرار بواسطة:</span>{" "}
+            {sanitizeAuditDisplayName(app.decidedBy, "—")}
           </p>
           <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400" dir="ltr">
             {app.decidedAt ? new Date(app.decidedAt).toLocaleString("ar") : ""}

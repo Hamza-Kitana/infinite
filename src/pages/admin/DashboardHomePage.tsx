@@ -1,12 +1,15 @@
 import { Link } from "react-router-dom";
 import { BookOpen, Building2, Car, ClipboardList, Swords, Users, Video } from "lucide-react";
+import { useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { adminCard, adminPageWrap, adminStatCard } from "@/lib/adminUi";
 import { useApplicationsContent } from "@/contexts/ApplicationsContentContext";
 import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 import { useActivityLogPreview } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import { isJobApplicationRoleKey } from "@/data/jobRoleLaws";
+import { countPendingJobApplicationsForStaff } from "@/lib/applicationReviewAccess";
 
 import { DashboardTeamDonut } from "@/components/admin/DashboardTeamDonut";
 
@@ -31,9 +34,18 @@ const ROLE_LABELS: Record<string, string> = {
 
 /** نظرة عامة — سوبر أدمِن فقط (المحررون يُوجَّهون إلى تحرير القوانين) */
 const DashboardHomePage = () => {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user } = useAuth();
   const { applications } = useApplicationsContent();
   const latestLogs = useActivityLogPreview(5);
+
+  const pendingJobApplicationsCount = useMemo(
+    () =>
+      countPendingJobApplicationsForStaff(applications, {
+        isSuperAdmin: true,
+        userRoles: user?.roles ?? [],
+      }),
+    [applications, user?.roles],
+  );
 
   if (!isSuperAdmin) return null;
 
@@ -223,7 +235,7 @@ const DashboardHomePage = () => {
                     className="border-b border-slate-100 text-slate-700 odd:bg-white even:bg-slate-50/60 dark:border-slate-700 dark:text-slate-200 dark:odd:bg-slate-800 dark:even:bg-slate-800/70"
                   >
                     <td className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{new Date(log.at).toLocaleString("ar-JO")}</td>
-                    <td className="px-3 py-2 font-medium">{log.actor}</td>
+                    <td className="px-3 py-2 font-medium">{sanitizeAuditDisplayName(log.actor, "—")}</td>
                     <td className="px-3 py-2 font-medium text-violet-700 dark:text-violet-300">{log.action}</td>
                     <td className="px-3 py-2 text-slate-600 dark:text-slate-400">{log.detail ?? "—"}</td>
                   </tr>
@@ -283,13 +295,21 @@ const DashboardHomePage = () => {
         </Link>
         <Link
           to="/dashboard/institution"
-          className={`group ${adminCard} p-4 text-right transition-colors hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-600 dark:hover:bg-violet-950/35`}
+          className={cn(
+            `group relative ${adminCard} p-4 text-right transition-colors hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-600 dark:hover:bg-violet-950/35`,
+            pendingJobApplicationsCount > 0 && "border-sky-200/90 ring-1 ring-sky-300/50 dark:border-sky-700/50",
+          )}
         >
           <Building2 className="mb-2 h-6 w-6 text-violet-600 transition-transform group-hover:scale-105 dark:text-violet-400" />
           <h2 className="font-display text-base font-bold text-slate-900 dark:text-slate-50">طواقم المؤسسات</h2>
           <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
             تحرير قائد ونائب وشبكة الأعضاء لكل فرع (صحة، أذرع الداخلية، رقابة، عدل، مبرمجين).
           </p>
+          {pendingJobApplicationsCount > 0 ? (
+            <span className="absolute left-3 top-3 inline-flex min-w-5 items-center justify-center rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              {pendingJobApplicationsCount}
+            </span>
+          ) : null}
         </Link>
         <Link
           to="/dashboard/applications"

@@ -52,8 +52,6 @@ const TICKET_TYPE_ROLES: readonly TicketTypeRole[] = [
 export const GANG_OPEN_TICKET_SLUG = "gang-open";
 export const GANG_OPEN_TICKET_ROLE: TicketTypeRole = "ticket_gang_open_manager";
 
-const GANG_MANAGER_TICKET_SLUGS = [GANG_OPEN_TICKET_SLUG] as const;
-
 export function isTicketTypeRole(v: unknown): v is TicketTypeRole {
   return typeof v === "string" && (TICKET_TYPE_ROLES as readonly string[]).includes(v);
 }
@@ -192,7 +190,7 @@ export const PUBLIC_TICKET_TYPE_DEFINITIONS = TICKET_TYPE_DEFINITIONS.filter((d)
 export const STORE_TICKET_SLUG = "store";
 
 export const DASHBOARD_TICKET_TYPE_DEFINITIONS = TICKET_TYPE_DEFINITIONS.filter(
-  (d) => d.slug !== STORE_TICKET_SLUG,
+  (d) => d.slug !== STORE_TICKET_SLUG && d.slug !== GANG_OPEN_TICKET_SLUG,
 );
 
 /** أنواع التكت في لوحة الإدارة (بدون طلب المتجر) */
@@ -228,7 +226,7 @@ export function ticketLabelForRole(role: TicketTypeRole): string {
   return getTicketTypeByRole(role)?.label ?? "تكت";
 }
 
-/** صلاحية مراجعة نوع تكت — مدير العصابات يرى طلبات فتح العصابة دون رتبة تكت منفصلة */
+/** صلاحية مراجعة نوع تكت في صفحة «التكت» — فتح العصابة والمتجر من أقسامهما المخصصة */
 export function staffCanAccessTicketSlug(
   slug: string,
   staffRoles: readonly string[],
@@ -237,9 +235,5 @@ export function staffCanAccessTicketSlug(
   if (isSuperAdmin) return true;
   const def = getTicketTypeBySlug(slug);
   if (!def) return false;
-  if (staffRoles.includes(def.role)) return true;
-  if (GANG_MANAGER_TICKET_SLUGS.includes(slug as (typeof GANG_MANAGER_TICKET_SLUGS)[number]) && staffRoles.includes("gang_manager")) {
-    return true;
-  }
-  return false;
+  return staffRoles.includes(def.role);
 }

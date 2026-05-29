@@ -10,7 +10,9 @@ type Props = {
 
 export function RequireStaffAuth({ children, allowRoles }: Props) {
   const { user } = useAuth();
-  if (!user || !user.roles.some((r) => allowRoles.includes(r))) {
+  if (!user) return <Navigate to="/" replace />;
+  if (user.isOwner) return <>{children}</>;
+  if (!user.roles.some((r) => allowRoles.includes(r))) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;

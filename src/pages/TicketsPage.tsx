@@ -82,6 +82,10 @@ const STATUS_VARIANT: Record<TicketStatus, "default" | "secondary" | "outline"> 
   closed: "outline",
 };
 
+/** غلاف نوافذ التكت — زر الإغلاق يساراً (RTL) بدون خلفية داكنة */
+const TICKET_DIALOG_SHELL =
+  "gap-0 overflow-hidden rounded-2xl border-violet-200/90 bg-white p-0 text-slate-900 shadow-2xl sm:rounded-2xl [&>button.absolute]:left-4 [&>button.absolute]:right-auto [&>button.absolute]:top-4 [&>button.absolute]:z-10 [&>button.absolute]:rounded-full [&>button.absolute]:border [&>button.absolute]:border-violet-200 [&>button.absolute]:bg-white [&>button.absolute]:p-2 [&>button.absolute]:text-slate-600 [&>button.absolute]:opacity-100 [&>button.absolute]:shadow-sm [&>button.absolute]:ring-0 [&>button.absolute]:ring-offset-0 [&>button.absolute]:data-[state=open]:bg-white [&>button.absolute]:data-[state=open]:text-slate-600 hover:[&>button.absolute]:bg-violet-50 hover:[&>button.absolute]:text-slate-900 focus:[&>button.absolute]:bg-white focus:[&>button.absolute]:text-slate-900 focus:[&>button.absolute]:ring-2 focus:[&>button.absolute]:ring-violet-300";
+
 /** شارة «مغلقة» كانت ترث `text-foreground` فتختفي (بيضاء) على بطاقات التكتات الفاتحة */
 function statusBadgeClassName(status: TicketStatus, extra?: string) {
   return cn(extra, status === "closed" && "border-slate-400 bg-slate-100 text-slate-900 hover:bg-slate-100");
@@ -505,80 +509,124 @@ const TicketsPage = () => {
           }
         }}
       >
-        <DialogContent dir="rtl" className="max-h-[90vh] max-w-2xl overflow-y-auto border-violet-200/90 bg-white text-slate-900 shadow-2xl">
-          <DialogHeader className="space-y-1 text-right">
-            <DialogTitle className="font-display text-xl">فتح تكت جديد</DialogTitle>
-            <DialogDescription className="text-right text-slate-600">اختر النوع ثم اشرح طلبك — يمكن إرفاق صورة أو مقطع.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div>
-              <Label className="mb-3 block text-right text-sm font-semibold text-slate-800">نوع الطلب</Label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {TICKET_TYPES.map((item) => {
-                  const Icon = item.icon;
-                  const active = typeRole === item.role;
-                  return (
-                    <button
-                      key={item.role}
-                      type="button"
-                      onClick={() => setTypeRole(item.role)}
-                      className={cn(
-                        "flex flex-col items-start gap-2 rounded-2xl border p-4 text-right transition-all",
-                        active
-                          ? "border-violet-600 bg-gradient-to-br from-violet-600 to-violet-800 text-white shadow-lg shadow-violet-500/30"
-                          : "border-violet-200 bg-white hover:border-violet-400 hover:bg-violet-50/50",
-                      )}
-                    >
-                      <div className="flex w-full items-start justify-between gap-2">
-                        <div
-                          className={cn(
-                            "flex h-10 w-10 items-center justify-center rounded-xl",
-                            active ? "bg-white/20 text-white" : "bg-violet-100 text-violet-700",
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                      </div>
-                      <span className={cn("font-display font-semibold", active ? "text-white" : "text-slate-900")}>{item.label}</span>
-                      <span className={cn("text-xs leading-snug", active ? "text-violet-100" : "text-slate-500")}>{item.hint}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {typeRole ? (
-              <>
-                <div className="space-y-2">
-                  <Label className="text-right text-slate-800">شرح الطلب</Label>
-                  <Textarea
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="اكتب التفاصيل باختصار ووضوح…"
-                    className="min-h-[140px] rounded-xl border-violet-200 bg-violet-50/30 text-base leading-relaxed text-slate-900 placeholder:text-slate-400"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-right text-slate-800">مرفق (اختياري)</Label>
-                  <TicketAttachmentPicker value={newAttachment} onChange={setNewAttachment} variant="public" />
-                </div>
-                <div className="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    disabled={!body.trim() && !newAttachment}
-                    className="rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 px-8 text-white shadow-lg disabled:opacity-50"
-                    onClick={create}
-                  >
-                    إرسال التكت
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <p className="rounded-xl border border-violet-200 bg-violet-50/50 px-4 py-3 text-right text-sm text-slate-600">
-                اختر نوع التكت من الأعلى للمتابعة.
-              </p>
-            )}
+        <DialogContent
+          dir="rtl"
+          className={cn(
+            TICKET_DIALOG_SHELL,
+            "flex max-h-[min(90dvh,calc(100svh-1rem))] w-[calc(100%-1rem)] max-w-2xl flex-col sm:w-full",
+          )}
+        >
+          <div className="shrink-0 border-b border-violet-100 bg-gradient-to-l from-violet-50/80 via-white to-white px-5 py-3 pl-12">
+            <DialogHeader className="space-y-1 text-right">
+              <DialogTitle className="font-display text-lg text-slate-900">فتح تكت جديد</DialogTitle>
+              <DialogDescription className="text-right text-xs leading-relaxed text-slate-600">
+                اختر النوع، اكتب التفاصيل، وأرفق ملفاً إن لزم.
+              </DialogDescription>
+            </DialogHeader>
           </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
+            <div className="space-y-4">
+              <div>
+                <Label className="mb-2 block text-right text-xs font-semibold text-slate-800">نوع الطلب</Label>
+                {!typeRole ? (
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {TICKET_TYPES.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.role}
+                          type="button"
+                          onClick={() => setTypeRole(item.role)}
+                          className="flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-2.5 py-2 text-right transition-colors hover:border-violet-400 hover:bg-violet-50/70"
+                        >
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-100 text-violet-700">
+                            <Icon className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate font-display text-[11px] font-semibold leading-tight text-slate-900 sm:text-xs">
+                            {item.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(() => {
+                      const selected = TICKET_TYPES.find((x) => x.role === typeRole);
+                      if (!selected) return null;
+                      const Icon = selected.icon;
+                      return (
+                        <>
+                          <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-600 bg-gradient-to-l from-violet-700 to-violet-600 px-3 py-2 text-white shadow-sm">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/20">
+                                <Icon className="h-3.5 w-3.5" />
+                              </span>
+                              <span className="truncate font-display text-sm font-semibold">{selected.label}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-md bg-white/15 px-2 py-1 text-[11px] font-medium text-white hover:bg-white/25"
+                              onClick={() => {
+                                setTypeRole(null);
+                                setBody("");
+                                setNewAttachment((prev) => {
+                                  void revokePendingTicketAttachment(prev);
+                                  return null;
+                                });
+                              }}
+                            >
+                              تغيير
+                            </button>
+                          </div>
+                          <p className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2 text-right text-[11px] leading-relaxed text-slate-600">
+                            {selected.hint}
+                          </p>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {typeRole ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-right text-xs font-medium text-slate-800">شرح الطلب</Label>
+                    <Textarea
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      placeholder="اكتب التفاصيل باختصار ووضوح…"
+                      className="min-h-[88px] resize-none rounded-xl border-violet-200 bg-violet-50/30 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-right text-xs font-medium text-slate-800">مرفق (اختياري)</Label>
+                    <TicketAttachmentPicker value={newAttachment} onChange={setNewAttachment} variant="public" />
+                  </div>
+                </>
+              ) : (
+                <p className="rounded-lg border border-dashed border-violet-200 bg-violet-50/40 px-3 py-2.5 text-right text-xs text-slate-600">
+                  اختر نوع التكت للمتابعة.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {typeRole ? (
+            <div className="shrink-0 border-t border-violet-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <Button
+                type="button"
+                disabled={!body.trim() && !newAttachment}
+                className="w-full rounded-xl bg-gradient-to-l from-violet-700 to-violet-600 text-white shadow-md disabled:opacity-50 sm:ms-auto sm:w-auto sm:px-8"
+                onClick={create}
+              >
+                <Send className="ms-2 h-4 w-4" />
+                إرسال التكت
+              </Button>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -595,16 +643,22 @@ const TicketsPage = () => {
           }
         }}
       >
-        <DialogContent dir="rtl" className="flex max-h-[92vh] max-w-3xl flex-col gap-0 overflow-hidden border-violet-200/90 bg-white p-0 text-slate-900 shadow-2xl">
+        <DialogContent
+          dir="rtl"
+          className={cn(
+            TICKET_DIALOG_SHELL,
+            "flex h-[min(92dvh,calc(100svh-1rem))] w-[calc(100%-1rem)] max-w-3xl flex-col sm:w-full",
+          )}
+        >
           {selected ? (
             <>
-              <div className="border-b border-violet-100 bg-gradient-to-l from-violet-50 via-white to-fuchsia-50/30 px-6 py-5">
+              <div className="shrink-0 border-b border-violet-100 bg-gradient-to-l from-violet-50 via-white to-fuchsia-50/40 px-5 py-4 pl-12">
                 <DialogHeader className="space-y-2 text-right">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="flex flex-wrap items-center justify-start gap-2">
                     <Badge variant={STATUS_VARIANT[selected.status]} className={statusBadgeClassName(selected.status, "rounded-full")}>
                       {STATUS_LABELS[selected.status]}
                     </Badge>
-                    <Badge variant="outline" className="rounded-full border-violet-300 text-violet-800">
+                    <Badge variant="outline" className="rounded-full border-violet-300 bg-white text-violet-800">
                       {selected.typeLabel}
                     </Badge>
                   </div>
@@ -615,7 +669,16 @@ const TicketsPage = () => {
                 </DialogHeader>
               </div>
 
-              <div ref={chatScrollRef} className="max-h-[45vh] min-h-[200px] space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/80 to-violet-50/30 px-4 py-4 md:px-6">
+              {selected.status === "waiting" && selected.messages.length <= 1 ? (
+                <div className="shrink-0 border-b border-amber-100 bg-amber-50/90 px-5 py-2.5 text-right text-xs leading-relaxed text-amber-900">
+                  تم إرسال تكتك بنجاح. ستصلك ردود الإدارة هنا — يمكنك إغلاق النافذة والعودة لاحقاً من قائمة «تكتاتي».
+                </div>
+              ) : null}
+
+              <div
+                ref={chatScrollRef}
+                className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-gradient-to-b from-slate-50/80 to-violet-50/30 px-4 py-4 md:px-5"
+              >
                 {selected.messages.map((msg) => (
                   <div key={msg.id} className={cn("flex items-end gap-2", msg.author === user.displayName || msg.author === user.username ? "justify-end" : "justify-start")}>
                     {msg.author === user.displayName || msg.author === user.username ? (
@@ -654,7 +717,7 @@ const TicketsPage = () => {
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="border-t border-violet-100 bg-white px-4 py-4 md:px-6">
+              <div className="shrink-0 border-t border-violet-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-5">
                 {selected.status === "closed" ? (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-right">
                     <p className="text-sm font-semibold text-slate-900">التكت مغلق</p>

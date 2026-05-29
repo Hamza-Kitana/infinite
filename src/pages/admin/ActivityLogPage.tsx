@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import type { ActivityLogEntry } from "@/lib/activityLog";
 import { IC_ACTIVITY_LOG_CHANGED_EVENT, loadActivityLog } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -646,7 +647,7 @@ const ActivityLogPage = () => {
                       className="text-right font-medium text-slate-900 hover:text-violet-700 hover:underline dark:text-slate-100 dark:hover:text-violet-300"
                       title="فلترة لوجات هذا المستخدم"
                     >
-                      {e.actor}
+                      {sanitizeAuditDisplayName(e.actor, "—")}
                     </button>
                     <button
                       type="button"

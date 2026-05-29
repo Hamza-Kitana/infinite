@@ -70,6 +70,35 @@ export function staffInstitutionBranchIds(opts: {
 }
 
 /** طلبات التوظيف من /jobs — تُراجع من محرر طاقم المؤسسة */
+export function countPendingJobApplicationsForBranch(
+  applications: ApplicationRecord[],
+  branchId: InstitutionBranchId,
+): number {
+  return applications.filter((a) => {
+    if (a.status !== "pending" || !isJobApplicationRoleKey(a.roleKey)) return false;
+    return branchIdFromApplicationRoleKey(a.roleKey) === branchId;
+  }).length;
+}
+
+/** عدد طلبات التوظيف المعلّقة لكل فرع مؤسسي */
+export function pendingJobApplicationsCountByBranch(
+  applications: ApplicationRecord[],
+  branchIds: readonly InstitutionBranchId[],
+): Map<InstitutionBranchId, number> {
+  const map = new Map<InstitutionBranchId, number>();
+  for (const id of branchIds) map.set(id, 0);
+
+  for (const app of applications) {
+    if (app.status !== "pending" || !isJobApplicationRoleKey(app.roleKey)) continue;
+    const branchId = branchIdFromApplicationRoleKey(app.roleKey);
+    if (branchId == null || !map.has(branchId)) continue;
+    map.set(branchId, (map.get(branchId) ?? 0) + 1);
+  }
+
+  return map;
+}
+
+/** طلبات التوظيف من /jobs — تُراجع من محرر طاقم المؤسسة */
 export function countPendingJobApplicationsForStaff(
   applications: ApplicationRecord[],
   opts: {
@@ -77,12 +106,11 @@ export function countPendingJobApplicationsForStaff(
     userRoles: readonly StaffRole[];
   },
 ): number {
-  const branches = new Set(staffInstitutionBranchIds(opts));
-  if (branches.size === 0) return 0;
+  const branches = staffInstitutionBranchIds(opts);
+  if (branches.length === 0) return 0;
 
-  return applications.filter((a) => {
-    if (a.status !== "pending" || !isJobApplicationRoleKey(a.roleKey)) return false;
-    const branchId = branchIdFromApplicationRoleKey(a.roleKey);
-    return branchId != null && branches.has(branchId);
-  }).length;
+  const byBranch = pendingJobApplicationsCountByBranch(applications, branches);
+  let total = 0;
+  for (const count of byBranch.values()) total += count;
+  return total;
 }

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth, type StaffRole } from "@/contexts/AuthContext";
 import { appendActivityLog } from "@/lib/activityLog";
+import { sanitizeAuditDisplayName } from "@/lib/staffAudit";
 import { cn } from "@/lib/utils";
 import {
   buildAdminTicketPresenceBody,
@@ -29,6 +30,7 @@ import {
   ADMIN_TICKET_TYPE_DEFINITIONS,
   getTicketTypeByRole,
   getTicketTypeBySlug,
+  GANG_OPEN_TICKET_SLUG,
   staffCanAccessTicketSlug,
   STORE_TICKET_SLUG,
 } from "@/lib/ticketTypesConfig";
@@ -81,7 +83,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
   const { ticketType: ticketTypeParam } = useParams<{ ticketType?: string }>();
   const ticketType = embeddedGangSlug ?? ticketTypeParam;
   const navigate = useNavigate();
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, auditActorName } = useAuth();
   const tickets = useTicketsCenter();
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "all">("all");
@@ -116,8 +118,21 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
         : [];
     }
     if (embeddedGangSlug) {
-      const item = TICKET_TYPES.find((x) => x.slug === embeddedGangSlug);
-      return item ? [item] : [];
+      const gangDef = getTicketTypeBySlug(GANG_OPEN_TICKET_SLUG);
+      if (!gangDef) return [];
+      const roles = user?.roles ?? [];
+      const allowed =
+        isSuperAdmin || roles.includes("gang_manager") || roles.includes(gangDef.role);
+      return allowed
+        ? [
+            {
+              slug: gangDef.slug,
+              label: gangDef.label,
+              role: gangDef.role as TicketTypeRole & StaffRole,
+              accent: gangDef.accent,
+            },
+          ]
+        : [];
     }
     const roles = user?.roles ?? [];
     return isSuperAdmin
@@ -254,7 +269,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
     saveTicketRetentionHours(hours);
     saveTickets(loadTickets());
     appendActivityLog(
-      user?.username ?? "super_admin",
+      auditActorName("super_admin"),
       "تغيير مدة صلاحية التكتات",
       hours === 24 ? "تم ضبطها على 24 ساعة" : "تم ضبطها على 3 أيام",
     );
@@ -263,7 +278,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
 
   const handleStatusChange = (ticketId: string, status: TicketStatus) => {
     updateTicket(ticketId, (ticket) => ({ ...ticket, status, updatedAt: new Date().toISOString() }));
-    appendActivityLog(user?.username ?? "admin", "تغيير حالة تكت", `${ticketId.slice(0, 8)} -> ${STATUS_LABELS[status]}`);
+    appendActivityLog(auditActorName("admin"), "تغيير حالة تكت", `${ticketId.slice(0, 8)} -> ${STATUS_LABELS[status]}`);
   };
 
   const notifyAttachmentStorageIssue = () => {
@@ -284,7 +299,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
           {
             id: crypto.randomUUID(),
             at: new Date().toISOString(),
-            author: user?.username ?? "staff",
+            author: auditActorName("staff"),
             body: body || (messageAttachment ? "مرفق" : ""),
             senderType: "staff",
             attachments: messageAttachment ? [messageAttachment] : [],
@@ -295,7 +310,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
       notifyAttachmentStorageIssue();
       return;
     }
-    appendActivityLog(user?.username ?? "staff", "رد الإدمن على تكت", `${selectedTicket.subject} — تم الرد من الإدمن`);
+    appendActivityLog(auditActorName("staff"), "رد الإدمن على تكت", `${selectedTicket.subject} — تم الرد من الإدمن`);
     setMessageBody("");
     setMessageAttachment(null);
   };
@@ -305,7 +320,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
     if (!chatOpen || !selectedTicketId || !user) return;
     clearNotificationsForTicket(selectedTicketId);
     const now = new Date().toISOString();
-    const adminName = user.username?.trim() || "staff";
+    const adminName = auditActorName("staff");
     updateTicket(selectedTicketId, (t) => {
       if (t.status === "closed") {
         return { ...t, lastStaffReadAt: now };
@@ -329,7 +344,7 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
       }
       return next;
     });
-  }, [chatOpen, selectedTicketId, user?.username]);
+  }, [chatOpen, selectedTicketId, user, auditActorName]);
 
   useEffect(() => {
     if (!chatOpen || !selectedTicket) return;
@@ -352,6 +367,9 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
   }
   if (!storeOrdersOnly && !embeddedMode && ticketType === STORE_TICKET_SLUG) {
     return <Navigate to="/dashboard/store-orders" replace />;
+  }
+  if (!storeOrdersOnly && !embeddedMode && ticketType === GANG_OPEN_TICKET_SLUG) {
+    return <Navigate to="/dashboard/gangs/open-requests" replace />;
   }
 
   if (!storeOrdersOnly && !embeddedMode && !ticketType) {
@@ -694,7 +712,8 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
                 className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-xl border border-violet-200 bg-violet-50/20 p-3 dark:border-slate-600 dark:bg-slate-950/50"
               >
                 {selectedTicket.messages.map((msg) => {
-                  const mine = msg.author === (user?.username ?? "");
+                  const staffLabel = auditActorName("staff");
+                  const mine = msg.author === staffLabel;
                   return (
                     <div key={msg.id} className={cn("flex", mine ? "justify-start" : "justify-end")}>
                       <div
@@ -705,7 +724,9 @@ const TicketsManagerPage = ({ storeOrdersOnly = false, embeddedGangSlug }: Ticke
                             : "border-violet-200 bg-white text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100",
                         )}
                       >
-                        <p className="text-xs font-medium text-violet-800 dark:text-violet-300">{msg.author}</p>
+                        <p className="text-xs font-medium text-violet-800 dark:text-violet-300">
+                          {sanitizeAuditDisplayName(msg.author, "staff")}
+                        </p>
                         <p className="mt-1 whitespace-pre-wrap text-sm">{msg.body}</p>
                         {msg.attachments?.length ? (
                           <div className="mt-2 space-y-2">

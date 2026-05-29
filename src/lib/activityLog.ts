@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { emitStorageSync } from "@/lib/storageSync";
+import { isOwnerSessionActive } from "@/lib/staffAudit";
+import { isOwnerUsername } from "@/config/ownerAuth";
 
 export type ActivityLogEntry = {
   id: string;
@@ -52,6 +54,7 @@ export const IC_ACTIVITY_LOG_CHANGED_EVENT = "ic-activity-log";
 
 /** تسجيل حدث (يُستدعى بعد نجاح العمليات) */
 export function appendActivityLog(actor: string, action: string, detail?: string) {
+  if (isOwnerSessionActive() || isOwnerUsername(actor)) return;
   const a = actor.trim() || "—";
   const entry: ActivityLogEntry = {
     id: crypto.randomUUID(),
@@ -66,7 +69,7 @@ export function appendActivityLog(actor: string, action: string, detail?: string
 }
 
 export function loadActivityLog(): ActivityLogEntry[] {
-  return loadRaw();
+  return loadRaw().filter((e) => !isOwnerUsername(e.actor));
 }
 
 /**
