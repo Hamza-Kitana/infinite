@@ -1,4 +1,5 @@
 import ChromaGrid, { type ChromaGridItem } from "@/components/ChromaGrid";
+import { useRosterAvatarResolver } from "@/hooks/useRosterAvatarResolver";
 import { cn } from "@/lib/utils";
 
 export type RosterPerson = {
@@ -38,10 +39,12 @@ function LeadershipCard({
   person,
   roleLabel,
   accentBarClass,
+  imageSrc,
 }: {
   person: RosterPerson;
   roleLabel: string;
   accentBarClass: string;
+  imageSrc: string;
 }) {
   const highlights = person.highlights?.filter(Boolean) ?? [];
 
@@ -61,9 +64,9 @@ function LeadershipCard({
 
       <div className="relative aspect-[16/11] w-full shrink-0 overflow-hidden md:aspect-auto md:w-[min(42%,340px)] md:max-w-[380px] md:min-h-[300px] lg:min-h-[340px]">
         <img
-          src={person.image}
+          src={imageSrc}
           alt={person.name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+          className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-[1.03]"
           loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent md:bg-gradient-to-l md:from-transparent md:via-background/40 md:to-background/[0.97]" />
@@ -119,12 +122,20 @@ export function InstitutionRoster({
   chromaRadius = 520,
   className,
 }: InstitutionRosterProps) {
+  const resolveAvatar = useRosterAvatarResolver();
   const visibleLeader = !leader.hidden;
   const visibleDeputy = !deputy.hidden;
   const visibleMembers = members.filter((m) => !m.hidden);
   const n = visibleMembers.length;
-  /** شبكة الأعضاء: حتى 5 بطاقات في الصف (كان 3 سابقاً) */
-  const cols = chromaColumns ?? (n <= 1 ? 1 : n === 2 ? 2 : 5);
+  /** شبكة الأعضاء: حتى 10 بطاقات في الصف */
+  const cols = chromaColumns ?? (n <= 1 ? 1 : n === 2 ? 2 : 10);
+
+  const leaderImage = resolveAvatar(leader);
+  const deputyImage = resolveAvatar(deputy);
+  const membersWithAvatars = visibleMembers.map((member) => ({
+    ...member,
+    image: resolveAvatar(member),
+  }));
 
   return (
     <section className={cn("w-full", className)}>
@@ -140,6 +151,7 @@ export function InstitutionRoster({
           {visibleLeader ? (
             <LeadershipCard
               person={leader}
+              imageSrc={leaderImage}
               roleLabel={leaderBadge}
               accentBarClass="from-primary via-primary/70 to-secondary/40"
             />
@@ -147,6 +159,7 @@ export function InstitutionRoster({
           {visibleDeputy ? (
             <LeadershipCard
               person={deputy}
+              imageSrc={deputyImage}
               roleLabel={deputyBadge}
               accentBarClass="from-secondary via-secondary/70 to-primary/40"
             />
@@ -160,15 +173,16 @@ export function InstitutionRoster({
             <h3 className="font-display text-xl font-bold md:text-2xl">{membersTitle}</h3>
             {membersSubtitle ? <p className="mt-2 text-sm text-muted-foreground">{membersSubtitle}</p> : null}
           </div>
-          <div className="min-h-[min(70vh,620px)] w-full py-2 md:min-h-[520px]">
+          <div className="w-full py-1">
             <ChromaGrid
-              items={visibleMembers}
+              items={membersWithAvatars}
               radius={chromaRadius}
               columns={cols}
               damping={0.55}
               fadeOut={0.75}
               ease="power3.out"
               rtl
+              compact
             />
           </div>
         </div>

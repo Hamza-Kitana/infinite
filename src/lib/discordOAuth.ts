@@ -126,3 +126,14 @@ export function discordCdnAvatarUrl(userId: string, avatarHash: string | null, s
   const ext = avatarHash.startsWith("a_") ? "gif" : "png";
   return `https://cdn.discordapp.com/avatars/${userId}/${avatarHash}.${ext}?size=${size}`;
 }
+
+/** صورة Discord الافتراضية عندما لا يملك المستخدم أفاتار مخصص */
+export function discordDefaultAvatarUrl(discordUserId: string, size = 128): string {
+  try {
+    const id = BigInt(discordUserId);
+    const index = Number((id >> 22n) % 6n);
+    return `https://cdn.discordapp.com/embed/avatars/${index}.png?size=${size}`;
+  } catch {
+    return `https://cdn.discordapp.com/embed/avatars/0.png?size=${size}`;
+  }
+}

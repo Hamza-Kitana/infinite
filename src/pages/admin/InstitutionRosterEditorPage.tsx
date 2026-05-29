@@ -73,6 +73,7 @@ import {
   loadJobRoleLawSet,
 } from "@/lib/jobRoleLawsContent";
 import { LAWS_QUIZ_CONTENT_CHANGED_EVENT, loadQuizQuestions } from "@/lib/lawsQuizContent";
+import { resolveRosterPersonImage, loadPublicUserAvatars } from "@/lib/rosterAvatar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { setInstitutionVisible, useSiteVisibility } from "@/lib/siteVisibility";
@@ -86,13 +87,21 @@ import type { ApplicationRecord } from "@/data/publicApplicationTypes";
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const ROSTER_PLACEHOLDER_IMAGE = "/placeholder.svg";
 
-/** صورة الطاقم عند القبول — null يعني تلقائي (مرفقة من المتقدم أو افتراضي) */
+/** صورة الطاقم عند القبول — يفضّل أفاتار Discord للحساب المرتبط */
 function resolveApplicantRosterImage(
   adminImage: string | null,
   submittedAvatar?: string,
+  linked?: { userId?: string; discordId?: string },
 ): string {
   if (adminImage === ROSTER_PLACEHOLDER_IMAGE) return ROSTER_PLACEHOLDER_IMAGE;
   if (adminImage?.trim()) return adminImage;
+  if (linked?.userId || linked?.discordId) {
+    return resolveRosterPersonImage(loadPublicUserAvatars(), {
+      image: submittedAvatar,
+      userId: linked.userId,
+      discordId: linked.discordId,
+    });
+  }
   if (submittedAvatar?.trim()) return submittedAvatar;
   return ROSTER_PLACEHOLDER_IMAGE;
 }
@@ -564,6 +573,10 @@ const InstitutionRosterEditorPage = () => {
       const finalImage = resolveApplicantRosterImage(
         applicantImage,
         selectedApplication.snapshot.avatarDataUrl,
+        {
+          userId: selectedApplication.applicantUserId,
+          discordId: selectedApplication.snapshot.discordId,
+        },
       );
 
       const assignRes = assignFromApplication({
@@ -1401,6 +1414,11 @@ function ApplicationReviewBody({
 }) {
   const s = application.snapshot;
   const submittedAvatar = s.avatarDataUrl;
+  const linkedApplicant = {
+    userId: application.applicantUserId,
+    discordId: s.discordId,
+  };
+  const previewAvatar = resolveApplicantRosterImage(applicantImage, submittedAvatar, linkedApplicant);
   const cityName = s.cityName?.trim() || `${s.firstName} ${s.lastName}`.trim();
   const bioText = (s.bio?.trim() || s.experience?.trim() || "").trim();
 
@@ -1433,7 +1451,7 @@ function ApplicationReviewBody({
       {/* رأس الطلب */}
       <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-violet-200 bg-gradient-to-l from-violet-50/60 via-white to-white p-4">
         <img
-          src={submittedAvatar || ROSTER_PLACEHOLDER_IMAGE}
+          src={previewAvatar}
           alt={cityName || "applicant"}
           className="h-20 w-20 shrink-0 rounded-2xl border border-violet-200 object-cover shadow-sm"
         />
@@ -1577,7 +1595,7 @@ function ApplicationReviewBody({
               </p>
               <div className="flex items-center gap-3">
                 <img
-                  src={resolveApplicantRosterImage(applicantImage, submittedAvatar)}
+                  src={previewAvatar}
                   alt=""
                   className="h-16 w-16 rounded-xl border border-violet-200 object-cover"
                 />

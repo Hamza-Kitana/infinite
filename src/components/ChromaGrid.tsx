@@ -30,6 +30,8 @@ type ChromaGridProps = {
   fadeOut?: number;
   ease?: string;
   rtl?: boolean;
+  /** بطاقات أصغر — 10 أعضاء بالصف في صفحات المؤسسات */
+  compact?: boolean;
 };
 
 const ChromaGrid = ({
@@ -38,6 +40,7 @@ const ChromaGrid = ({
   columns = 5,
   rows = 2,
   rtl = false,
+  compact = false,
 }: ChromaGridProps) => {
   const handleCardClick = (url?: string) => {
     if (url) {
@@ -58,12 +61,14 @@ const ChromaGrid = ({
 
   return (
     <div
-      className={`chroma-grid ${rtl ? "chroma-grid--rtl" : ""} ${className}`.trim()}
+      className={`chroma-grid ${rtl ? "chroma-grid--rtl" : ""} ${compact ? "chroma-grid--compact" : ""} ${className}`.trim()}
       style={
-        {
-          "--cols": columns,
-          "--rows": rows,
-        } as CSSProperties
+        compact
+          ? undefined
+          : ({
+              "--cols": columns,
+              "--rows": rows,
+            } as CSSProperties)
       }
     >
       {items.map((c, i) => (
